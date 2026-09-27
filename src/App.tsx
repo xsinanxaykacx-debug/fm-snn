@@ -1,0 +1,77 @@
+import { useState } from 'react';
+import { useGameStore } from './store/gameStore';
+import { Dashboard } from './components/Dashboard';
+import { Squad } from './components/Squad';
+import { Tactics } from './components/Tactics';
+import { Table } from './components/Table';
+import { MatchDay } from './components/MatchDay';
+import { Transfers } from './components/Transfers';
+import { Training } from './components/Training';
+
+type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training';
+
+export default function App() {
+  const [tab, setTab] = useState<Tab>('dashboard');
+  const newGame = useGameStore(s => s.newGame);
+  const season = useGameStore(s => s.season);
+  const week = useGameStore(s => s.currentWeek);
+  const userClub = useGameStore(s => s.clubs[s.userClubId]);
+  const budget = userClub?.budget ?? 0;
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'dashboard', label: '📋 Ana Sayfa' },
+    { key: 'match', label: '⚽ Maç' },
+    { key: 'squad', label: '👥 Kadro' },
+    { key: 'tactics', label: '🎯 Taktik' },
+    { key: 'training', label: '🏃 Antrenman' },
+    { key: 'table', label: '📊 Puan Durumu' },
+    { key: 'transfer', label: '💸 Transfer' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-pitch-900">
+      <header className="bg-pitch-800 border-b border-pitch-700 px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-accent">⚽ FM Clone</h1>
+            <p className="text-xs text-slate-400">
+              {userClub?.name} • Sezon {season} • Hafta {week} • Bütçe: £{(budget / 1_000_000).toFixed(1)}M
+            </p>
+          </div>
+          <button
+            onClick={() => { if (confirm('Yeni oyun başlatılsın mı? Mevcut kayıt silinir.')) newGame(); }}
+            className="btn-secondary text-sm"
+          >
+            🔄 Yeni Oyun
+          </button>
+        </div>
+      </header>
+
+      <nav className="bg-pitch-800 border-b border-pitch-700 px-6 flex overflow-x-auto">
+        {tabs.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+              tab === t.key
+                ? 'text-accent border-b-2 border-accent'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      <main className="p-6 max-w-7xl mx-auto">
+        {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
+        {tab === 'match' && <MatchDay />}
+        {tab === 'squad' && <Squad />}
+        {tab === 'tactics' && <Tactics />}
+        {tab === 'training' && <Training />}
+        {tab === 'table' && <Table />}
+        {tab === 'transfer' && <Transfers />}
+      </main>
+    </div>
+  );
+}
