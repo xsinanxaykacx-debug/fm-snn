@@ -9,6 +9,7 @@ import { initTable, updateTable } from '../engine/league/table';
 import { simulateMatch } from '../engine/match/simulate';
 import { developPlayers } from '../engine/progression/training';
 import { applyTrainingToSquad } from '../engine/progression/trainingSystem';
+import { aiTransferWindow } from '../engine/transfer/aiTransfer';
 import { useInboxStore } from './useInboxStore';
 
 interface Store extends GameState {
@@ -65,9 +66,6 @@ function createInitialState(): GameState {
 // INBOX MESAJ YARDIMCILARI
 // ═══════════════════════════════════════════════
 
-/**
- * Aynı oyuncu için zaten aktif sakatlık mesajı var mı kontrol et
- */
 function hasActiveInjuryMessage(playerName: string): boolean {
   const inbox = useInboxStore.getState();
   return inbox.messages.some(
@@ -77,9 +75,6 @@ function hasActiveInjuryMessage(playerName: string): boolean {
   );
 }
 
-/**
- * Bu hafta sakatlanan oyuncular için mesaj ekle (sadece ilk seferinde)
- */
 function addInjuryMessages(
   players: Record<string, Player>,
   userClubId: string,
@@ -106,9 +101,6 @@ function addInjuryMessages(
   });
 }
 
-/**
- * Transfer teklifi üret (%15 ihtimalle)
- */
 function maybeAddTransferOffer(
   players: Record<string, Player>,
   clubs: Record<string, Club>,
@@ -134,7 +126,6 @@ function maybeAddTransferOffer(
   const biddingClub = otherClubs[Math.floor(Math.random() * otherClubs.length)];
   const offerAmount = Math.round(target.value * (1.1 + Math.random() * 0.5));
 
-  // Aynı oyuncu için zaten bekleyen teklif var mı?
   const existingOffer = inbox.messages.some(
     m => m.category === 'TRANSFER' &&
          m.transferOffer?.playerId === target.id &&
@@ -165,9 +156,6 @@ function maybeAddTransferOffer(
   });
 }
 
-/**
- * Yönetim mesajı (her 10 haftada bir)
- */
 function maybeAddBoardMessage(
   table: Record<string, any>,
   userClubId: string,
@@ -178,7 +166,6 @@ function maybeAddBoardMessage(
 
   const inbox = useInboxStore.getState();
 
-  // Aynı hafta için zaten mesaj var mı?
   const existing = inbox.messages.some(
     m => m.category === 'BOARD' && m.week === week && m.season === season
   );
@@ -225,7 +212,6 @@ export const useGameStore = create<Store>()(
       pendingPressMatch: null,
 
       newGame: () => {
-        // Inbox'ı temizle
         useInboxStore.getState().clearAll();
         set({ ...createInitialState(), pendingPressMatch: null });
       },
@@ -342,7 +328,6 @@ export const useGameStore = create<Store>()(
           }
         }
 
-        // ═══ OYUNCU DURUM GÜNCELLEMELERİ ═══
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           p.condition = Math.max(40, p.condition - Math.floor(Math.random() * 15));
@@ -384,25 +369,19 @@ export const useGameStore = create<Store>()(
           pendingPressMatch: userMatch,
         });
 
-        // ═══════════════════════════════════════════════
-        // OTOMATİK INBOX MESAJLARI
-        // ═══════════════════════════════════════════════
-
-        // 1. Sakatlık mesajları (duplicate kontrolü ile)
+        // Otomatik Inbox mesajları
         addInjuryMessages(newPlayers, state.userClubId, state.season, state.currentWeek);
-
-        // 2. Transfer teklifi (%15 ihtimalle)
         maybeAddTransferOffer(newPlayers, state.clubs, state.userClubId, state.season, state.currentWeek);
-
-        // 3. Yönetim mesajı (her 10 haftada bir)
         maybeAddBoardMessage(newTable, state.userClubId, state.season, state.currentWeek);
       },
 
       advanceSeason: () => {
         const state = get();
+
+        // 1. Oyuncuları geliştir
         let newPlayers = developPlayers(state.players);
 
-        // Sezon istatistiklerini sıfırla (kariyer korunur)
+        // 2. Sezon istatistiklerini sıfırla
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           if (p.careerStats) {
@@ -421,9 +400,29 @@ export const useGameStore = create<Store>()(
           newPlayers[id] = p;
         }
 
+        // 3. AI TRANSFER WINDOW — AI takımlar transfer yapar
+        const transferResult = aiTransferWindow(
+          state.clubs,
+          newPlayers,
+          state.userClubId
+        );
+        newPlayers = transferResult.players;
+        const newClubs = transferResult.clubs;
+
+        // 4. Yeni sezon fikstürü
         const season = state.season + 1;
-        const fixtures = generateFixtures(state.clubs, season);
-        const table = initTable(Object.keys(state.clubs));
+        const fixtures = generateFixtures(newClubs, season);
+        const table = initTable(Object.keys(newClubs));
+
+        const news = [`🏆 Sezon ${season} başladı!`, ...state.news];
+
+        // AI transfer log'unu haberlere ekle (ilk 3)
+        if (transferResult.log.length > 0) {
+          news.unshift(`📨 Transfer sezonu: ${transferResult.log.length} transfer gerçekleşti`);
+          transferResult.log.slice(0, 3).forEach(msg => {
+            news.push(`• ${msg}`);
+          });
+        }
 
         set({
           season,
@@ -431,8 +430,9 @@ export const useGameStore = create<Store>()(
           fixtures,
           table,
           players: newPlayers,
+          clubs: newClubs,
           seasonOver: false,
-          news: [`🏆 Sezon ${season} başladı!`, ...state.news].slice(0, 30),
+          news: news.slice(0, 30),
         });
 
         // Yeni sezon mesajı
@@ -444,6 +444,18 @@ export const useGameStore = create<Store>()(
           content: `Yeni sezon başladı. Transfer dönemi açık, hedeflerinizi belirleyin. Başarılar!`,
           category: 'BOARD',
         });
+
+        // AI transfer özeti
+        if (transferResult.log.length > 0) {
+          useInboxStore.getState().addMessage({
+            season,
+            week: 1,
+            sender: '📨 Transfer Ofisi',
+            title: `Transfer dönemi kapandı`,
+            content: `Bu sezon ${transferResult.log.length} transfer gerçekleşti.\n\n${transferResult.log.slice(0, 5).join('\n')}`,
+            category: 'TRANSFER',
+          });
+        }
       },
 
       transferBuy: (playerId) => {
@@ -467,7 +479,6 @@ export const useGameStore = create<Store>()(
           news: [`✅ ${player.name} transfer edildi!`, ...state.news].slice(0, 30),
         });
 
-        // Transfer mesajı
         useInboxStore.getState().addMessage({
           season: state.season,
           week: state.currentWeek,
@@ -494,7 +505,6 @@ export const useGameStore = create<Store>()(
           news: [`💸 ${player.name} satıldı (+£${((player.value * 0.9) / 1_000_000).toFixed(2)}M)`, ...state.news].slice(0, 30),
         });
 
-        // Satış mesajı
         useInboxStore.getState().addMessage({
           season: state.season,
           week: state.currentWeek,
