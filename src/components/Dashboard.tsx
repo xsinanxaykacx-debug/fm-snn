@@ -1,5 +1,10 @@
+// src/components/Dashboard.tsx
+
 import { useGameStore } from '../store/gameStore';
 import { sortedTable } from '../engine/league/table';
+import { TeamBadge } from './TeamBadge';
+import { FormBadge } from './FormBadge';
+import { getTeamColor } from '../utils/teamColors';
 
 interface Props {
   onNavigate: (tab: any) => void;
@@ -12,6 +17,7 @@ export function Dashboard({ onNavigate }: Props) {
   const userPos = table.findIndex(r => r.clubId === state.userClubId) + 1;
   const userRow = table.find(r => r.clubId === state.userClubId);
 
+  // Sıradaki maç
   const nextMatch = state.fixtures.find(
     m => m.week === state.currentWeek && !m.played &&
       (m.homeId === state.userClubId || m.awayId === state.userClubId)
@@ -21,70 +27,248 @@ export function Dashboard({ onNavigate }: Props) {
     : null;
   const isHome = nextMatch?.homeId === state.userClubId;
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 space-y-6">
-        <div className="card">
-          <h2 className="text-lg font-bold mb-3">📋 Son Haberler</h2>
-          <ul className="space-y-2">
-            {state.news.slice(0, 8).map((n, i) => (
-              <li key={i} className="text-sm text-slate-300 border-l-2 border-pitch-600 pl-3 py-1">
-                {n}
-              </li>
-            ))}
-          </ul>
-        </div>
+  // Son 5 maç (form)
+  const last5 = [...state.fixtures]
+    .filter(m => m.played && (m.homeId === state.userClubId || m.awayId === state.userClubId))
+    .sort((a, b) => b.week - a.week)
+    .slice(0, 5)
+    .map(m => {
+      const isUserHome = m.homeId === state.userClubId;
+      const ourScore = isUserHome ? m.homeScore : m.awayScore;
+      const theirScore = isUserHome ? m.awayScore : m.homeScore;
+      const result: 'W' | 'D' | 'L' =
+        ourScore > theirScore ? 'W' :
+        ourScore < theirScore ? 'L' : 'D';
+      const oppId = isUserHome ? m.awayId : m.homeId;
+      return {
+        match: m,
+        result,
+        opponent: state.clubs[oppId],
+        ourScore,
+        theirScore,
+        isHome: isUserHome,
+      };
+    });
 
-        <div className="card">
-          <h2 className="text-lg font-bold mb-3">⚽ Sıradaki Maç</h2>
-          {opponent && nextMatch ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400">{isHome ? '🏠 Ev Sahibi' : '✈️ Deplasman'}</p>
-                <p className="text-xl font-bold mt-1">vs {opponent.name}</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Hafta {nextMatch.week} • Stadyum: {userClub?.stadiumCapacity.toLocaleString()} kişi
-                </p>
-              </div>
-              <button onClick={() => onNavigate('match')} className="btn-primary">
-                Maça Git →
-              </button>
-            </div>
-          ) : (
-            <p className="text-slate-400">Bu hafta maçın yok.</p>
-          )}
+  // Sakatlar
+  const injured = Object.values(state.players)
+    .filter(p => p.clubId === state.userClubId && p.injuryWeeks > 0)
+    .slice(0, 3);
+
+  // Cezalılar
+  const suspended = Object.values(state.players)
+    .filter(p => p.clubId === state.userClubId && p.suspensionWeeks > 0)
+    .slice(0, 3);
+
+  const userColor = getTeamColor(state.userClubId);
+
+  return (
+    <div className="space-y-6">
+      {/* ═══ HEADER: Kulüp özeti ═══ */}
+      <div
+        className="card flex items-center gap-4"
+        style={{
+          background: `linear-gradient(135deg, ${userColor.bg}15 0%, ${userColor.bg}05 100%)`,
+          borderColor: `${userColor.bg}40`,
+        }}
+      >
+        <TeamBadge clubId={state.userClubId} shortName={userClub?.shortName ?? '???'} size="xl" />
+        <div className="flex-1">
+          <h2 className="text-2xl font-bold">{userClub?.name}</h2>
+          <p className="text-sm text-slate-400">
+            Sezon {state.season} • Hafta {state.currentWeek}
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="text-sm text-slate-400">Lig Sıralaması</div>
+          <div className="text-3xl font-bold" style={{ color: userColor.bg }}>
+            {userPos}.
+          </div>
+          <div className="text-xs text-slate-500">{userRow?.points ?? 0} puan</div>
         </div>
       </div>
 
-      <div className="space-y-6">
+      {/* ═══ GRID: Sıradaki Maç + Lig Durumu ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Sıradaki Maç */}
+        {opponent && nextMatch ? (
+          <div
+            className="card"
+            style={{
+              background: `linear-gradient(135deg, ${getTeamColor(opponent.id).bg}20 0%, transparent 100%)`,
+              borderColor: `${getTeamColor(opponent.id).bg}50`,
+            }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">⚽ Sıradaki Maç</h3>
+              <span className="text-xs text-slate-400">
+                {isHome ? '🏠 Ev Sahibi' : '✈️ Deplasman'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-center gap-6 py-4">
+              <div className="text-center">
+                <TeamBadge clubId={state.userClubId} shortName={userClub?.shortName ?? '???'} size="lg" />
+                <p className="text-xs text-slate-400 mt-2">{userClub?.shortName}</p>
+              </div>
+              <div className="text-3xl font-bold text-slate-500">vs</div>
+              <div className="text-center">
+                <TeamBadge clubId={opponent.id} shortName={opponent.shortName} size="lg" />
+                <p className="text-xs text-slate-400 mt-2">{opponent.shortName}</p>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-slate-500 mb-4">
+              Hafta {nextMatch.week} • Stadyum: {userClub?.stadiumCapacity.toLocaleString()} kişi
+            </div>
+
+            <button
+              onClick={() => onNavigate('match')}
+              className="w-full py-3 rounded-md font-bold text-white transition-all hover:scale-[1.02]"
+              style={{
+                backgroundColor: '#22c55e',
+                boxShadow: '0 0 20px rgba(34,197,94,0.4)',
+              }}
+            >
+              ▶ Haftayı Oyna
+            </button>
+          </div>
+        ) : (
+          <div className="card flex items-center justify-center text-slate-500 py-12">
+            Bu hafta maçın yok.
+          </div>
+        )}
+
+        {/* Lig Durumu (ilk 5) */}
         <div className="card">
-          <h2 className="text-lg font-bold mb-3">📊 Lig Durumu</h2>
-          {userRow && (
-            <div className="space-y-2">
-              <div className="stat-row"><span>Sıralama</span><span className="font-bold text-accent">{userPos}.</span></div>
-              <div className="stat-row"><span>Puan</span><span className="font-bold">{userRow.points}</span></div>
-              <div className="stat-row"><span>Oynanan</span><span>{userRow.played}</span></div>
-              <div className="stat-row"><span>G / B / M</span><span>{userRow.won} / {userRow.drawn} / {userRow.lost}</span></div>
-              <div className="stat-row"><span>Gol (A/Y)</span><span>{userRow.gf} / {userRow.ga}</span></div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold">📊 Lig Durumu</h3>
+            <button
+              onClick={() => onNavigate('table')}
+              className="text-xs text-accent hover:underline"
+            >
+              Tümünü Gör →
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            {table.slice(0, 5).map((row, i) => {
+              const club = state.clubs[row.clubId];
+              const isUser = row.clubId === state.userClubId;
+              const color = getTeamColor(row.clubId);
+              return (
+                <div
+                  key={row.clubId}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm ${
+                    isUser ? 'bg-accent/10 border border-accent/30' : ''
+                  }`}
+                >
+                  <span className="w-5 text-slate-500 text-xs">{i + 1}.</span>
+                  <TeamBadge clubId={row.clubId} shortName={club?.shortName ?? '???'} size="xs" />
+                  <span className="flex-1 truncate">{club?.shortName}</span>
+                  <span className="text-xs text-slate-400">{row.played} maç</span>
+                  <span className="font-bold text-xs w-8 text-right">{row.points}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ SON 5 MAÇ FORMU ═══ */}
+      {last5.length > 0 && (
+        <div className="card">
+          <h3 className="text-lg font-bold mb-3">📈 Son Maçlar</h3>
+          <div className="space-y-2">
+            {last5.map(({ match, result, opponent: opp, ourScore, theirScore, isHome }) => (
+              <div
+                key={match.id}
+                className="flex items-center gap-3 px-3 py-2 rounded hover:bg-pitch-700/30 transition-colors"
+              >
+                <span className="text-xs text-slate-500 w-10">H{match.week}</span>
+                <FormBadge result={result} size="sm" />
+                <span className="text-xs text-slate-500 w-6">
+                  {isHome ? '🏠' : '✈️'}
+                </span>
+                <TeamBadge clubId={opp?.id ?? ''} shortName={opp?.shortName ?? '???'} size="xs" />
+                <span className="flex-1 text-sm truncate">{opp?.name}</span>
+                <span className="font-bold text-sm">
+                  {ourScore} - {theirScore}
+                </span>
+                <span className="text-xs text-slate-500 w-20 text-right">
+                  xG: {match.stats.xG?.home?.toFixed(1) ?? '?'} - {match.stats.xG?.away?.toFixed(1) ?? '?'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ SAKATLAR + CEZALILAR + FİNANS ═══ */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Sakatlar */}
+        <div className="card">
+          <h3 className="text-sm font-bold mb-2">🏥 Sakatlar</h3>
+          {injured.length === 0 ? (
+            <p className="text-xs text-slate-500">✅ Sakat oyuncu yok</p>
+          ) : (
+            <div className="space-y-1">
+              {injured.map(p => (
+                <div key={p.id} className="flex items-center gap-2 text-xs">
+                  <span className="flex-1 truncate">{p.name}</span>
+                  <span className="text-red-400">🚑 {p.injuryWeeks}h</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
+        {/* Cezalılar */}
         <div className="card">
-          <h2 className="text-lg font-bold mb-3">💰 Finans</h2>
-          <div className="space-y-2">
-            <div className="stat-row">
-              <span>Transfer Bütçesi</span>
-              <span className="font-bold text-accent">
-                £{((userClub?.budget ?? 0) / 1_000_000).toFixed(2)}M
-              </span>
+          <h3 className="text-sm font-bold mb-2">🟨 Cezalılar</h3>
+          {suspended.length === 0 ? (
+            <p className="text-xs text-slate-500">✅ Cezalı oyuncu yok</p>
+          ) : (
+            <div className="space-y-1">
+              {suspended.map(p => (
+                <div key={p.id} className="flex items-center gap-2 text-xs">
+                  <span className="flex-1 truncate">{p.name}</span>
+                  <span className="text-yellow-400">🟨 {p.suspensionWeeks}h</span>
+                </div>
+              ))}
             </div>
-            <div className="stat-row">
-              <span>Maaş Bütçesi</span>
-              <span>£{((userClub?.wageBudget ?? 0) / 1_000).toFixed(0)}K</span>
-            </div>
+          )}
+        </div>
+
+        {/* Finans */}
+        <div className="card">
+          <h3 className="text-sm font-bold mb-2">💰 Finans</h3>
+          <div className="stat-row">
+            <span className="text-xs">Transfer</span>
+            <span className="font-bold text-accent text-sm">
+              £{((userClub?.budget ?? 0) / 1_000_000).toFixed(2)}M
+            </span>
+          </div>
+          <div className="stat-row">
+            <span className="text-xs">Maaş</span>
+            <span className="text-sm">£{((userClub?.wageBudget ?? 0) / 1_000).toFixed(0)}K</span>
           </div>
         </div>
+      </div>
+
+      {/* ═══ HABERLER ═══ */}
+      <div className="card">
+        <h3 className="text-lg font-bold mb-3">📰 Son Haberler</h3>
+        <ul className="space-y-2">
+          {state.news.slice(0, 6).map((n, i) => (
+            <li
+              key={i}
+              className="text-sm text-slate-300 border-l-2 border-pitch-600 pl-3 py-1"
+            >
+              {n}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
