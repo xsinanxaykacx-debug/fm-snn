@@ -1,30 +1,10 @@
 import type { Player, Club, Attributes } from '../types';
 import { getStartingXI } from '../data/generateData';
 
-/**
- * ═══════════════════════════════════════════════
- * BÖLGESEL EŞLEŞME MOTORU (KATMAN 4)
- * ═══════════════════════════════════════════════
- *
- * 8 saha bölgesi:
- *  1. SOL SAVUNMA   (A'nın sol kanadı → B'nin sağ kanadı)
- *  2. MERKEZ SAVUNMA
- *  3. SAĞ SAVUNMA
- *  4. SOL ORTA
- *  5. MERKEZ ORTA
- *  6. SAĞ ORTA
- *  7. SOL HÜCUM
- *  8. SAĞ HÜCUM
- */
+// ═══════════════════════════════════════════════
+// YARDIMCILAR
+// ═══════════════════════════════════════════════
 
-export interface ZonePlayer {
-  player: Player;
-  effectiveAttrs: Partial<Attributes>;
-}
-
-/**
- * Efektif attribute — kondisyon, form, moral çarpanı
- */
 export function eff(player: Player, key: keyof Attributes): number {
   const base = player.attributes[key];
   const cond = 0.5 + (player.condition / 100) * 0.5;
@@ -33,17 +13,11 @@ export function eff(player: Player, key: keyof Attributes): number {
   return base * cond * form * morale;
 }
 
-/**
- * Ortalama efektif attribute (oyuncu grubu)
- */
 export function avgEff(players: Player[], key: keyof Attributes): number {
   if (players.length === 0) return 40;
   return players.reduce((s, p) => s + eff(p, key), 0) / players.length;
 }
 
-/**
- * Ağırlıklı attribute hesaplama
- */
 export function weightedEff(
   player: Player,
   weights: Partial<Record<keyof Attributes, number>>
@@ -57,27 +31,27 @@ export function weightedEff(
   return weightSum > 0 ? total / weightSum : 40;
 }
 
+export function sigmoid(a: number, b: number): number {
+  return 100 / (1 + Math.exp(-(a - b) / 8));
+}
+
 // ═══════════════════════════════════════════════
-// BÖLGESEL GÜÇ HESAPLAMA
+// BOLGESEL GUC
 // ═══════════════════════════════════════════════
 
 export interface ZoneStrength {
   zone: string;
-  attackPower: number;   // Bu bölgeden hücum gücü
-  defensePower: number;  // Bu bölgeyi savunma gücü
-  players: Player[];     // Bu bölgedeki oyuncular
+  attackPower: number;
+  defensePower: number;
+  players: Player[];
 }
 
-/**
- * Bir takımın 8 bölgesini hesapla
- */
 export function calculateZones(
   club: Club,
   players: Record<string, Player>
 ): Record<string, ZoneStrength> {
   const xi = getStartingXI(club.id, players, club.tactic.formation);
 
-  const gk = xi.filter(p => p.position === 'GK');
   const cbs = xi.filter(p => p.position === 'DC');
   const lbs = xi.filter(p => p.position === 'DL');
   const rbs = xi.filter(p => p.position === 'DR');
@@ -91,7 +65,6 @@ export function calculateZones(
   const sts = xi.filter(p => p.position === 'ST');
 
   return {
-    // SAVUNMA BÖLGELERİ (kendi kalemize yakın)
     leftDefense: {
       zone: 'Sol Savunma',
       attackPower: avgEff([...lbs, ...amls.slice(0, 1)], 'crossing') * 0.5 + avgEff(lbs, 'pace') * 0.5,
@@ -117,8 +90,6 @@ export function calculateZones(
                     avgEff([...rbs, ...cbs.slice(0, 1)], 'defensivePositioning') * 0.2,
       players: [...rbs, ...cbs.slice(0, 1)],
     },
-
-    // ORTA SAHA BÖLGELERİ
     leftMidfield: {
       zone: 'Sol Orta',
       attackPower: avgEff([...mls, ...lbs], 'passing') * 0.3 +
@@ -153,20 +124,18 @@ export function calculateZones(
                     avgEff([...mrs, ...rbs], 'workRate') * 0.3,
       players: [...mrs, ...rbs],
     },
-
-    // HÜCUM BÖLGELERİ
     leftAttack: {
-      zone: 'Sol Hücum',
+      zone: 'Sol Hucum',
       attackPower: avgEff([...amls, ...sts], 'dribbling') * 0.25 +
                    avgEff([...amls, ...sts], 'crossing') * 0.25 +
                    avgEff([...amls, ...sts], 'finishing') * 0.20 +
                    avgEff([...amls, ...sts], 'pace') * 0.15 +
                    avgEff([...amls, ...sts], 'offTheBall') * 0.15,
-      defensePower: 30, // hücum bölgesi, savunma zayıf
+      defensePower: 30,
       players: [...amls, ...sts.slice(0, 1)],
     },
     centerAttack: {
-      zone: 'Merkez Hücum',
+      zone: 'Merkez Hucum',
       attackPower: avgEff([...sts, ...amcs], 'finishing') * 0.30 +
                    avgEff([...sts, ...amcs], 'offTheBall') * 0.20 +
                    avgEff([...sts, ...amcs], 'shooting') * 0.20 +
@@ -176,7 +145,7 @@ export function calculateZones(
       players: [...sts, ...amcs],
     },
     rightAttack: {
-      zone: 'Sağ Hücum',
+      zone: 'Sag Hucum',
       attackPower: avgEff([...amrs, ...sts], 'dribbling') * 0.25 +
                    avgEff([...amrs, ...sts], 'crossing') * 0.25 +
                    avgEff([...amrs, ...sts], 'finishing') * 0.20 +
@@ -189,43 +158,32 @@ export function calculateZones(
 }
 
 // ═══════════════════════════════════════════════
-// BÖLGESEL EŞLEŞME (KİM KİME KARŞI)
+// BOLGESEL ESLESME
 // ═══════════════════════════════════════════════
 
 export interface ZoneMatchup {
-  attackZone: string;      // A'nın hücum ettiği bölge
-  defenseZone: string;     // B'nin savunduğu bölge
+  attackZone: string;
+  defenseZone: string;
   attackPower: number;
   defensePower: number;
-  advantagePct: number;    // Sigmoid üstünlük
+  advantagePct: number;
   favored: 'attack' | 'defense' | 'neutral';
 }
 
-/**
- * Sigmoid üstünlük
- */
-export function sigmoid(a: number, b: number): number {
-  return 100 / (1 + Math.exp(-(a - b) / 8));
-}
-
-/**
- * A takımının B'ye karşı bölgesel eşleşmelerini hesapla
- */
 export function calculateZoneMatchups(
   attackZones: Record<string, ZoneStrength>,
   defenseZones: Record<string, ZoneStrength>
 ): ZoneMatchup[] {
-  // A'nın hücum bölgeleri vs B'nin savunma bölgeleri
   const pairs: [string, string, string][] = [
-    ['leftAttack', 'rightDefense', 'A Sol Kanat → B Sağ Bek'],
-    ['rightAttack', 'leftDefense', 'A Sağ Kanat → B Sol Bek'],
-    ['centerAttack', 'centerDefense', 'A Merkez → B Merkez Savunma'],
-    ['leftMidfield', 'rightMidfield', 'A Sol Orta → B Sağ Orta'],
-    ['centerMidfield', 'centerMidfield', 'A Merkez Orta → B Merkez Orta'],
-    ['rightMidfield', 'leftMidfield', 'A Sağ Orta → B Sol Orta'],
+    ['leftAttack', 'rightDefense', 'A Sol Kanat -> B Sag Bek'],
+    ['rightAttack', 'leftDefense', 'A Sag Kanat -> B Sol Bek'],
+    ['centerAttack', 'centerDefense', 'A Merkez -> B Merkez Savunma'],
+    ['leftMidfield', 'rightMidfield', 'A Sol Orta -> B Sag Orta'],
+    ['centerMidfield', 'centerMidfield', 'A Merkez Orta -> B Merkez Orta'],
+    ['rightMidfield', 'leftMidfield', 'A Sag Orta -> B Sol Orta'],
   ];
 
-  return pairs.map(([atkKey, defKey, label]) => {
+  return pairs.map(([atkKey, defKey]) => {
     const atk = attackZones[atkKey];
     const def = defenseZones[defKey];
     const advPct = sigmoid(atk.attackPower, def.defensePower);
@@ -245,27 +203,52 @@ export function calculateZoneMatchups(
   });
 }
 
-/**
- * Hücum tipi seçimi — hangi bölgeden saldırı?
- * En zayıf rakibe göre ağırlıklı seçim
- */
+// ═══════════════════════════════════════════════
+// BOLGE SECIMI (exp tabanli)
+// ═══════════════════════════════════════════════
+
+export type AttackZone = 'left' | 'center' | 'right';
+
+export interface ZoneChoice {
+  zone: AttackZone;
+  advantagePct: number;
+}
+
+export function selectZoneWeighted(matchups: ZoneMatchup[]): ZoneChoice {
+  const leftMatchup = matchups.find(m => m.attackZone.includes('Sol Hucum') || m.attackZone.includes('Sol Orta'));
+  const centerMatchup = matchups.find(m => m.attackZone.includes('Merkez Hucum') || m.attackZone.includes('Merkez Orta'));
+  const rightMatchup = matchups.find(m => m.attackZone.includes('Sag Hucum') || m.attackZone.includes('Sag Orta'));
+
+  const leftAdv = leftMatchup ? leftMatchup.advantagePct : 50;
+  const centerAdv = centerMatchup ? centerMatchup.advantagePct : 50;
+  const rightAdv = rightMatchup ? rightMatchup.advantagePct : 50;
+
+  const wLeft = Math.exp(leftAdv / 15);
+  const wCenter = Math.exp(centerAdv / 15);
+  const wRight = Math.exp(rightAdv / 15);
+
+  const total = wLeft + wCenter + wRight;
+  let r = Math.random() * total;
+
+  if (r < wLeft) return { zone: 'left', advantagePct: leftAdv };
+  r -= wLeft;
+  if (r < wCenter) return { zone: 'center', advantagePct: centerAdv };
+  return { zone: 'right', advantagePct: rightAdv };
+}
+
+// ═══════════════════════════════════════════════
+// ESKI FONKSIYON (uyumluluk)
+// ═══════════════════════════════════════════════
+
 export function selectAttackZone(matchups: ZoneMatchup[]): {
   zone: string;
   type: 'left' | 'center' | 'right';
 } {
-  // Her matchup için ağırlık = advantagePct
-  const attackOptions: { zone: string; type: 'left' | 'center' | 'right'; weight: number }[] = [
-    { zone: 'leftAttack', type: 'left', weight: matchups[0].advantagePct },
-    { zone: 'rightAttack', type: 'right', weight: matchups[1].advantagePct },
-    { zone: 'centerAttack', type: 'center', weight: matchups[2].advantagePct },
-  ];
-
-  // Ağırlıklı seçim
-  const totalWeight = attackOptions.reduce((s, o) => s + o.weight, 0);
-  let r = Math.random() * totalWeight;
-  for (const opt of attackOptions) {
-    r -= opt.weight;
-    if (r <= 0) return { zone: opt.zone, type: opt.type };
-  }
-  return { zone: 'centerAttack', type: 'center' };
+  const choice = selectZoneWeighted(matchups);
+  const zoneMap: Record<AttackZone, string> = {
+    left: 'leftAttack',
+    center: 'centerAttack',
+    right: 'rightAttack',
+  };
+  return { zone: zoneMap[choice.zone], type: choice.zone };
 }

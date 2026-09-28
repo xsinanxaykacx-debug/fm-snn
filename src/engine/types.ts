@@ -5,48 +5,48 @@ export type Position = 'GK' | 'DC' | 'DL' | 'DR' | 'DM' | 'MC' | 'ML' | 'MR' | '
 // ═══════════════════════════════════════════════
 export interface Attributes {
   // TEKNİK (9)
-  passing: number;         // Pas
-  firstTouch: number;      // İlk Kontrol
-  dribbling: number;       // Dripling
-  crossing: number;        // Orta
-  shooting: number;        // Şut
-  finishing: number;       // Bitiricilik
-  technique: number;       // Teknik
-  heading: number;         // Kafa
-  setPieces: number;       // Duran Top
+  passing: number;
+  firstTouch: number;
+  dribbling: number;
+  crossing: number;
+  shooting: number;
+  finishing: number;
+  technique: number;
+  heading: number;
+  setPieces: number;
 
   // ZİHİNSEL (10)
-  decisions: number;       // Karar
-  vision: number;          // Vizyon
-  anticipation: number;    // Sezgi
-  positioning: number;     // Pozisyon
-  offTheBall: number;      // Topsuz Alan
-  concentration: number;   // Konsantrasyon
-  composure: number;       // Soğukkanlılık
-  workRate: number;        // Çalışkanlık
-  teamwork: number;        // Takım Oyunu
-  bravery: number;         // Cesaret
+  decisions: number;
+  vision: number;
+  anticipation: number;
+  positioning: number;
+  offTheBall: number;
+  concentration: number;
+  composure: number;
+  workRate: number;
+  teamwork: number;
+  bravery: number;
 
   // FİZİKSEL (6)
-  pace: number;            // Hız
-  acceleration: number;    // İvme
-  agility: number;         // Çeviklik
-  stamina: number;         // Dayanıklılık
-  strength: number;        // Güç
-  balance: number;         // Denge
+  pace: number;
+  acceleration: number;
+  agility: number;
+  stamina: number;
+  strength: number;
+  balance: number;
 
   // SAVUNMA (4)
-  marking: number;         // Markaj
-  tackling: number;        // Müdahale
-  ballWinning: number;     // Top Kapma
-  defensivePositioning: number; // Savunma Pozisyonu
+  marking: number;
+  tackling: number;
+  ballWinning: number;
+  defensivePositioning: number;
 
-  // KALECİ (5) — sadece GK için
-  reflexes: number;        // Refleks
-  gkPositioning: number;   // Kaleci Pozisyonu
-  handling: number;        // Elle Kontrol
-  oneOnOne: number;        // Bire Bir
-  aerialReach: number;     // Hava Topu
+  // KALECİ (5)
+  reflexes: number;
+  gkPositioning: number;
+  handling: number;
+  oneOnOne: number;
+  aerialReach: number;
 }
 
 export interface Player {
@@ -56,9 +56,9 @@ export interface Player {
   nationality: string;
   position: Position;
   attributes: Attributes;
-  condition: number;       // 0-100
-  morale: number;          // 0-100
-  form: number;            // 0-100
+  condition: number;
+  morale: number;
+  form: number;
   wage: number;
   value: number;
   clubId: string | null;
@@ -75,6 +75,10 @@ export interface Tactic {
   mentality: 'defensive' | 'balanced' | 'attacking';
   pressing: 'low' | 'medium' | 'high';
   tempo: 'slow' | 'normal' | 'fast';
+  // ⚡ YENİ
+  width: 'narrow' | 'normal' | 'wide';
+  directness: 'short' | 'mixed' | 'direct';
+  defensiveLine: 'deep' | 'normal' | 'high';
 }
 
 export interface Club {
@@ -92,7 +96,7 @@ export interface Club {
 
 export interface MatchEvent {
   minute: number;
-  type: 'goal' | 'yellow' | 'red' | 'injury' | 'chance' | 'save' | 'miss';
+  type: 'goal' | 'yellow' | 'red' | 'injury' | 'chance' | 'save' | 'miss' | 'cross' | 'dribble';
   playerId?: string;
   clubId: string;
   description: string;
@@ -103,6 +107,16 @@ export interface MatchStats {
   shots: { home: number; away: number };
   onTarget: { home: number; away: number };
   chances: { home: number; away: number };
+  // ⚡ YENİ
+  xG?: { home: number; away: number };
+  passes?: { home: number; away: number };
+  passesCompleted?: { home: number; away: number };
+  dribbles?: { home: number; away: number };
+  dribblesSuccess?: { home: number; away: number };
+  crosses?: { home: number; away: number };
+  crossesSuccess?: { home: number; away: number };
+  dangerousAttacks?: { home: number; away: number };
+  recoveries?: { home: number; away: number };
 }
 
 export interface Match {
@@ -150,16 +164,16 @@ export interface GameState {
 }
 
 // ═══════════════════════════════════════════════
-// TAKIM BİRİMLERİ (6 boyut — Katman 3)
+// TAKIM BİRİMLERİ (Katman 3)
 // ═══════════════════════════════════════════════
 export interface TeamUnits {
-  attack: number;       // Hücum gücü (0-100)
-  midfield: number;     // Orta saha kontrolü (0-100)
-  defense: number;      // Savunma sağlamlığı (0-100)
-  wings: number;        // Kanat oyunu (0-100)
-  transition: number;   // Geçiş/kontra hızı (0-100)
-  goalkeeper: number;   // Kaleci kalitesi (0-100)
-  overall: number;      // Genel ortalama
+  attack: number;
+  midfield: number;
+  defense: number;
+  wings: number;
+  transition: number;
+  goalkeeper: number;
+  overall: number;
 }
 
 export interface UnitComparison {
@@ -167,6 +181,6 @@ export interface UnitComparison {
   icon: string;
   homeValue: number;
   awayValue: number;
-  advantagePct: number;  // 0-100 (50 = eşit)
+  advantagePct: number;
   favored: 'home' | 'away' | 'neutral';
 }

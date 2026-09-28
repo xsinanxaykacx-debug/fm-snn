@@ -42,79 +42,108 @@ export function Tactics() {
 
   const posOnPitch = positionsOnPitch[tactic.formation];
 
+  const renderButtonGroup = <T extends string>(
+    label: string,
+    options: { key: T; label: string }[],
+    value: T,
+    onChange: (v: T) => void
+  ) => (
+    <div>
+      <label className="text-sm text-slate-400 block mb-2">{label}</label>
+      <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+        {options.map(o => (
+          <button
+            key={o.key}
+            onClick={() => onChange(o.key)}
+            className={`py-2 rounded-md text-xs font-medium transition-colors ${
+              value === o.key ? 'bg-accent text-white' : 'bg-pitch-700 hover:bg-pitch-600'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="card">
         <h2 className="text-lg font-bold mb-4">🎯 Taktik Ayarları</h2>
 
         <div className="space-y-4">
-          <div>
-            <label className="text-sm text-slate-400 block mb-2">Formasyon</label>
-            <div className="grid grid-cols-2 gap-2">
-              {FORMATIONS.map(f => (
-                <button
-                  key={f}
-                  onClick={() => setTactic({ formation: f })}
-                  className={`py-2 rounded-md text-sm font-medium transition-colors ${
-                    tactic.formation === f ? 'bg-accent text-white' : 'bg-pitch-700 hover:bg-pitch-600'
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-          </div>
+          {renderButtonGroup<Formation>(
+            'Formasyon',
+            FORMATIONS.map(f => ({ key: f, label: f })),
+            tactic.formation,
+            (v) => setTactic({ formation: v })
+          )}
 
-          <div>
-            <label className="text-sm text-slate-400 block mb-2">Zihniyet</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['defensive', 'balanced', 'attacking'] as const).map(m => (
-                <button
-                  key={m}
-                  onClick={() => setTactic({ mentality: m })}
-                  className={`py-2 rounded-md text-sm transition-colors ${
-                    tactic.mentality === m ? 'bg-accent text-white' : 'bg-pitch-700 hover:bg-pitch-600'
-                  }`}
-                >
-                  {m === 'defensive' ? '🛡️ Defansif' : m === 'balanced' ? '⚖️ Dengeli' : '⚔️ Hücum'}
-                </button>
-              ))}
-            </div>
-          </div>
+          {renderButtonGroup(
+            'Zihniyet',
+            [
+              { key: 'defensive' as const, label: '🛡️ Defansif' },
+              { key: 'balanced' as const, label: '⚖️ Dengeli' },
+              { key: 'attacking' as const, label: '⚔️ Hücum' },
+            ],
+            tactic.mentality,
+            (v) => setTactic({ mentality: v })
+          )}
 
-          <div>
-            <label className="text-sm text-slate-400 block mb-2">Pres</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['low', 'medium', 'high'] as const).map(m => (
-                <button
-                  key={m}
-                  onClick={() => setTactic({ pressing: m })}
-                  className={`py-2 rounded-md text-sm transition-colors ${
-                    tactic.pressing === m ? 'bg-accent text-white' : 'bg-pitch-700 hover:bg-pitch-600'
-                  }`}
-                >
-                  {m === 'low' ? 'Düşük' : m === 'medium' ? 'Orta' : 'Yüksek'}
-                </button>
-              ))}
-            </div>
-          </div>
+          {renderButtonGroup(
+            'Pres',
+            [
+              { key: 'low' as const, label: 'Düşük' },
+              { key: 'medium' as const, label: 'Orta' },
+              { key: 'high' as const, label: 'Yüksek' },
+            ],
+            tactic.pressing,
+            (v) => setTactic({ pressing: v })
+          )}
 
-          <div>
-            <label className="text-sm text-slate-400 block mb-2">Tempo</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['slow', 'normal', 'fast'] as const).map(m => (
-                <button
-                  key={m}
-                  onClick={() => setTactic({ tempo: m })}
-                  className={`py-2 rounded-md text-sm transition-colors ${
-                    tactic.tempo === m ? 'bg-accent text-white' : 'bg-pitch-700 hover:bg-pitch-600'
-                  }`}
-                >
-                  {m === 'slow' ? 'Yavaş' : m === 'normal' ? 'Normal' : 'Hızlı'}
-                </button>
-              ))}
-            </div>
-          </div>
+          {renderButtonGroup(
+            'Tempo',
+            [
+              { key: 'slow' as const, label: 'Yavaş' },
+              { key: 'normal' as const, label: 'Normal' },
+              { key: 'fast' as const, label: 'Hızlı' },
+            ],
+            tactic.tempo,
+            (v) => setTactic({ tempo: v })
+          )}
+
+          {renderButtonGroup(
+            'Genişlik',
+            [
+              { key: 'narrow' as const, label: 'Dar' },
+              { key: 'normal' as const, label: 'Normal' },
+              { key: 'wide' as const, label: 'Geniş' },
+            ],
+            tactic.width,
+            (v) => setTactic({ width: v })
+          )}
+
+          {renderButtonGroup(
+            'Pas Tarzı',
+            [
+              { key: 'short' as const, label: 'Kısa' },
+              { key: 'mixed' as const, label: 'Karışık' },
+              { key: 'direct' as const, label: 'Direkt' },
+            ],
+            tactic.directness,
+            (v) => setTactic({ directness: v })
+          )}
+
+          {renderButtonGroup(
+            'Savunma Hattı',
+            [
+              { key: 'deep' as const, label: 'Derin' },
+              { key: 'normal' as const, label: 'Normal' },
+              { key: 'high' as const, label: 'Yüksek' },
+            ],
+            tactic.defensiveLine,
+            (v) => setTactic({ defensiveLine: v })
+          )}
         </div>
       </div>
 

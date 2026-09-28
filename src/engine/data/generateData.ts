@@ -215,11 +215,14 @@ export function generateGameData(): { clubs: Record<string, Club>; players: Reco
       stadiumCapacity: rand(15000, 60000),
       reputation,
       formation: pick(FORMATIONS),
-      tactic: {
+            tactic: {
         formation: pick(FORMATIONS),
         mentality: 'balanced',
         pressing: 'medium',
         tempo: 'normal',
+        width: 'normal',
+        directness: 'mixed',
+        defensiveLine: 'normal',
       },
       isUser: false,
     };
