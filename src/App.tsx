@@ -1,6 +1,6 @@
 // src/App.tsx
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from './store/gameStore';
 import { Dashboard } from './components/Dashboard';
 import { Squad } from './components/Squad';
@@ -11,18 +11,31 @@ import { Transfers } from './components/Transfers';
 import { Training } from './components/Training';
 import { Stats } from './components/Stats';
 import { SeasonEndModal } from './components/SeasonEndModal';
+import { PressConferenceModal } from './components/PressConferenceModal';
 
 type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training' | 'stats';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
   const [showSeasonEnd, setShowSeasonEnd] = useState(false);
+  const [showPress, setShowPress] = useState(false);
+
   const newGame = useGameStore(s => s.newGame);
   const season = useGameStore(s => s.season);
   const week = useGameStore(s => s.currentWeek);
   const seasonOver = useGameStore(s => s.seasonOver);
   const userClub = useGameStore(s => s.clubs[s.userClubId]);
   const budget = userClub?.budget ?? 0;
+  const pendingPressMatch = useGameStore(s => s.pendingPressMatch);
+  const applyPressEffects = useGameStore(s => s.applyPressEffects);
+  const clearPendingPress = useGameStore(s => s.clearPendingPress);
+
+  // Basın toplantısı otomatik açılsın
+  useEffect(() => {
+    if (pendingPressMatch && !showPress) {
+      setShowPress(true);
+    }
+  }, [pendingPressMatch, showPress]);
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'dashboard', label: '📋 Ana Sayfa' },
@@ -37,7 +50,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-pitch-900">
-      {/* HEADER */}
       <header className="bg-pitch-800 border-b border-pitch-700 px-6 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -66,7 +78,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* NAVİGASYON — ORTALI */}
       <nav className="bg-pitch-800 border-b border-pitch-700 px-6">
         <div className="flex justify-center items-center gap-1 overflow-x-auto">
           {tabs.map(t => (
@@ -85,7 +96,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* İÇERİK */}
       <main className="p-6 max-w-7xl mx-auto">
         {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
         {tab === 'match' && <MatchDay />}
@@ -100,6 +110,21 @@ export default function App() {
       {/* SEZON SONU MODAL */}
       {showSeasonEnd && (
         <SeasonEndModal onClose={() => setShowSeasonEnd(false)} />
+      )}
+
+      {/* BASIN TOPLANTISI MODAL */}
+      {showPress && pendingPressMatch && (
+        <PressConferenceModal
+          matchResult={pendingPressMatch}
+          onComplete={(effects) => {
+            applyPressEffects(effects.moraleDelta, effects.boardDelta);
+            setShowPress(false);
+          }}
+          onClose={() => {
+            clearPendingPress();
+            setShowPress(false);
+          }}
+        />
       )}
     </div>
   );

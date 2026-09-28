@@ -21,6 +21,19 @@ interface Store extends GameState {
   setLineup: (lineup: string[]) => void;
   swapPlayers: (idA: string, idB: string) => void;
   resetLineup: () => void;
+
+  // Basın toplantısı etkisi
+  applyPressEffects: (moraleDelta: number, boardDelta: number) => void;
+
+  // Basın toplantısı için bekleyen maç
+  pendingPressMatch: {
+    homeScore: number;
+    awayScore: number;
+    opponentName: string;
+    opponentId: string;
+    isHome: boolean;
+  } | null;
+  clearPendingPress: () => void;
 }
 
 function createInitialState(): GameState {
@@ -51,8 +64,9 @@ export const useGameStore = create<Store>()(
   persist(
     (set, get) => ({
       ...createInitialState(),
+      pendingPressMatch: null,
 
-      newGame: () => set(createInitialState()),
+      newGame: () => set({ ...createInitialState(), pendingPressMatch: null }),
 
       setTactic: (partial) => {
         const state = get();
@@ -88,6 +102,43 @@ export const useGameStore = create<Store>()(
 
       resetLineup: () => set({ userLineup: [] }),
 
+      // ═══ BASIN TOPLANTISI ETKİSİ ═══
+      applyPressEffects: (moraleDelta, boardDelta) => {
+        const state = get();
+        const userClub = state.clubs[state.userClubId];
+        if (!userClub) return;
+
+        // Takım moralini güncelle (tüm oyuncular)
+        const newPlayers = { ...state.players };
+        for (const id in newPlayers) {
+          if (newPlayers[id].clubId === state.userClubId) {
+            newPlayers[id] = {
+              ...newPlayers[id],
+              morale: Math.max(10, Math.min(100, newPlayers[id].morale + moraleDelta)),
+            };
+          }
+        }
+
+        // Yönetim güveni (kulüp reputation gibi düşün)
+        const newReputation = Math.max(1, Math.min(20, userClub.reputation + Math.floor(boardDelta / 2)));
+
+        const news = [...state.news];
+        if (moraleDelta > 0) {
+          news.unshift(`🎙️ Basın toplantısı sonrası takım morali arttı (+${moraleDelta})`);
+        } else if (moraleDelta < 0) {
+          news.unshift(`🎙️ Basın toplantısı sonrası takım morali düştü (${moraleDelta})`);
+        }
+
+        set({
+          players: newPlayers,
+          clubs: { ...state.clubs, [state.userClubId]: { ...userClub, reputation: newReputation } },
+          news: news.slice(0, 30),
+          pendingPressMatch: null,
+        });
+      },
+
+      clearPendingPress: () => set({ pendingPressMatch: null }),
+
       playWeek: () => {
         const state = get();
         if (state.seasonOver) return;
@@ -97,6 +148,8 @@ export const useGameStore = create<Store>()(
         const newTable = { ...state.table };
         let newPlayers = { ...state.players };
         const news = [...state.news];
+
+        let userMatch: any = null;
 
         for (const m of weekMatches) {
           const home = state.clubs[m.homeId!];
@@ -119,6 +172,15 @@ export const useGameStore = create<Store>()(
             const scoreStr = `${our}-${their}`;
             const verdict = our > their ? '🏆 Kazandık' : our < their ? '😞 Kaybettik' : '🤝 Berabere';
             news.unshift(`Hafta ${state.currentWeek}: ${opponent} karşısında ${scoreStr} — ${verdict}`);
+
+            // Basın toplantısı için kaydet
+            userMatch = {
+              homeScore: result.homeScore,
+              awayScore: result.awayScore,
+              opponentName: isHome ? away.name : home.name,
+              opponentId: isHome ? away.id : home.id,
+              isHome,
+            };
           }
         }
 
@@ -160,26 +222,19 @@ export const useGameStore = create<Store>()(
           currentWeek: seasonOver ? state.currentWeek : nextWeek,
           news: news.slice(0, 30),
           seasonOver,
+          pendingPressMatch: userMatch,
         });
       },
 
-      // ═══════════════════════════════════════════════
-      // SEZON GEÇİŞİ — SEZON İSTATİSTİKLERİNİ SIFIRLA
-      // ═══════════════════════════════════════════════
       advanceSeason: () => {
         const state = get();
-
-        // Oyuncuları geliştir (yaşlanma, gelişim)
         let newPlayers = developPlayers(state.players);
 
-        // ═══ SEZON İSTATİSTİKLERİNİ SIFIRLA (kariyer korunur) ═══
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           if (p.careerStats) {
             p.careerStats = {
               ...p.careerStats,
-              // Kariyer aynen kalır
-              // Sezon sıfırlanır
               seasonAppearances: 0,
               seasonGoals: 0,
               seasonAssists: 0,
@@ -204,7 +259,7 @@ export const useGameStore = create<Store>()(
           table,
           players: newPlayers,
           seasonOver: false,
-          news: [`🏆 Sezon ${season} başladı! Kariyer istatistikleri korundu, sezon istatistikleri sıfırlandı.`, ...state.news].slice(0, 30),
+          news: [`🏆 Sezon ${season} başladı!`, ...state.news].slice(0, 30),
         });
       },
 
@@ -249,16 +304,12 @@ export const useGameStore = create<Store>()(
 
       setTrainingFocus: (focus) => {
         const state = get();
-        set({
-          training: { ...state.training, focus },
-        });
+        set({ training: { ...state.training, focus } });
       },
 
       setTrainingIntensity: (intensity) => {
         const state = get();
-        set({
-          training: { ...state.training, intensity },
-        });
+        set({ training: { ...state.training, intensity } });
       },
     }),
     { name: 'fm-clone-save' }
