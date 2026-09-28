@@ -3,7 +3,6 @@ import type {
   Club,
   Formation,
   Player,
-  PlayerPosition,
   Position,
   Tactic,
 } from '../types';
@@ -40,14 +39,12 @@ function randomNationality(): string {
   return NATIONALITIES[Math.floor(Math.random() * NATIONALITIES.length)];
 }
 
+// ═══════════════════════════════════════════════
+// ATTRIBUTE ÜRETİMİ
+// ═══════════════════════════════════════════════
+
 function randomAttributes(position: Position): Attributes {
   const base = () => randomBetween(30, 80);
-
-  // Mevkiye göre öncelikli attribute'lar
-  const boost = (key: keyof Attributes, amount: number) => {
-    // Bu fonksiyon sadece bir attribute'u boost etmek için kullanılır
-    return amount;
-  };
 
   const a: Attributes = {
     passing: base(),
@@ -125,18 +122,28 @@ function randomAttributes(position: Position): Attributes {
     a.technique = randomBetween(60, 88);
   }
 
-  // Değerleri 30-95 arasına sıkıştır
+  // Tüm değerleri 20-95 arasına sıkıştır
   for (const key in a) {
     const k = key as keyof Attributes;
-    a[k] = Math.max(20, Math.min(95, a[k]));
+    const val = a[k];
+    if (typeof val === 'number' && !isNaN(val)) {
+      a[k] = Math.max(20, Math.min(95, val));
+    } else {
+      a[k] = 50;
+    }
   }
 
   return a;
 }
 
+// ═══════════════════════════════════════════════
+// SKOR HESABI (attribute'dan)
+// ═══════════════════════════════════════════════
+
 function scoreAttributes(a: Attributes, position: Position): number {
   if (position === 'GK') {
-    return (a.goalkeeper * 0.3 + a.reflexes * 0.25 + a.handling * 0.2 + a.oneOnOne * 0.15 + a.gkPositioning * 0.1);
+    const gk = (typeof a.goalkeeper === 'number' && !isNaN(a.goalkeeper)) ? a.goalkeeper : (a.reflexes ?? 50);
+    return (gk * 0.3 + a.reflexes * 0.25 + a.handling * 0.2 + a.oneOnOne * 0.15 + a.gkPositioning * 0.1);
   }
   if (['DC', 'DL', 'DR'].includes(position)) {
     return (a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1);
@@ -175,9 +182,12 @@ export function generatePlayer(position: Position, clubId: string, index: number
   const attributes = randomAttributes(position);
   const score = scoreAttributes(attributes, position);
 
-  const value = Math.round((score / 100) ** 3 * 40_000_000 + age * 100_000);
-  const wage = Math.round(value / 200);
-
+  const ratingFactor = Math.max(0, (score - 40) / 60);
+const value = Math.round(
+  Math.pow(ratingFactor, 3) * 60_000_000 +
+  age * 50_000
+);
+const wage = Math.round(value / 500);
   return {
     id: `player_${clubId}_${index}`,
     name: randomName(),
@@ -227,9 +237,9 @@ const CLUB_DATA: { name: string; shortName: string; reputation: number }[] = [
 
 const FORMATIONS: Formation[] = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1'];
 
-function defaultTactic(): Tactic {
+function defaultTactic(formation: Formation): Tactic {
   return {
-    formation: '4-4-2',
+    formation,
     mentality: 'balanced',
     pressing: 'medium',
     tempo: 'normal',
@@ -261,16 +271,12 @@ export function generateGameData(): {
       stadiumCapacity: randomBetween(15_000, 60_000),
       reputation: data.reputation,
       formation,
-      tactic: {
-        ...defaultTactic(),
-        formation,
-      },
+      tactic: defaultTactic(formation),
       isUser: false,
     };
 
     clubs[clubId] = club;
 
-    // Kadro üret
     for (const pos of SQUAD_TEMPLATE) {
       const player = generatePlayer(pos, clubId, playerIndex++);
       players[player.id] = player;
@@ -281,7 +287,7 @@ export function generateGameData(): {
 }
 
 // ═══════════════════════════════════════════════
-// İLK 11
+// OYUNCU REYTİNGİ
 // ═══════════════════════════════════════════════
 
 export function scorePlayer(p: Player): number {
@@ -291,7 +297,8 @@ export function scorePlayer(p: Player): number {
   let score: number;
 
   if (pos === 'GK') {
-    score = a.goalkeeper * 0.3 + a.reflexes * 0.25 + a.handling * 0.2 + a.oneOnOne * 0.15 + a.gkPositioning * 0.1;
+    const gk = (typeof a.goalkeeper === 'number' && !isNaN(a.goalkeeper)) ? a.goalkeeper : (a.reflexes ?? 50);
+    score = gk * 0.3 + a.reflexes * 0.25 + a.handling * 0.2 + a.oneOnOne * 0.15 + a.gkPositioning * 0.1;
   } else if (['DC', 'DL', 'DR'].includes(pos)) {
     score = a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1;
   } else if (['DM', 'MC'].includes(pos)) {
@@ -308,13 +315,17 @@ export function scorePlayer(p: Player): number {
     score = 50;
   }
 
-  // Kondisyon etkisi
   const condFactor = 0.5 + (p.condition / 100) * 0.5;
   const moraleFactor = 0.9 + (p.morale / 100) * 0.1;
   const formFactor = 0.85 + (p.form / 100) * 0.15;
 
-  return Math.round(score * condFactor * moraleFactor * formFactor);
+  const result = score * condFactor * moraleFactor * formFactor;
+  return Number.isFinite(result) ? Math.round(result) : 50;
 }
+
+// ═══════════════════════════════════════════════
+// İLK 11
+// ═══════════════════════════════════════════════
 
 export function getStartingXI(
   clubId: string,
@@ -338,10 +349,10 @@ export function getStartingXI(
   }
 
   const needs: Record<Formation, Partial<Record<Position, number>>> = {
-    '4-4-2': { GK: 1, DC: 2, DL: 1, DR: 1, ML: 1, MR: 1, MC: 2, ST: 2 },
-    '4-3-3': { GK: 1, DC: 2, DL: 1, DR: 1, MC: 3, AML: 1, AMR: 1, ST: 1 },
-    '3-5-2': { GK: 1, DC: 3, DL: 1, DR: 1, MC: 3, ST: 2 },
-    '4-2-3-1': { GK: 1, DC: 2, DL: 1, DR: 1, DM: 2, AMC: 1, AML: 1, AMR: 1, ST: 1 },
+    '4-4-2':    { GK: 1, DC: 2, DL: 1, DR: 1, ML: 1, MR: 1, MC: 2, ST: 2 },
+    '4-3-3':    { GK: 1, DC: 2, DL: 1, DR: 1, MC: 3, AML: 1, AMR: 1, ST: 1 },
+    '3-5-2':    { GK: 1, DC: 3, DL: 1, DR: 1, MC: 3, ST: 2 },
+    '4-2-3-1':  { GK: 1, DC: 2, DL: 1, DR: 1, DM: 2, AMC: 1, AML: 1, AMR: 1, ST: 1 },
   };
 
   const need = needs[formation];
@@ -359,7 +370,6 @@ export function getStartingXI(
         result.push(candidates[i]);
         used.add(candidates[i].id);
       } else {
-        // Uygun oyuncu yoksa, herhangi birini koy
         const fallback = clubPlayers.find(p => !used.has(p.id));
         if (fallback) {
           result.push(fallback);
@@ -369,7 +379,6 @@ export function getStartingXI(
     }
   }
 
-  // Eksik varsa, kalan oyuncularla doldur
   for (const p of clubPlayers) {
     if (result.length >= 11) break;
     if (!used.has(p.id)) {
