@@ -39,7 +39,7 @@ function ensureInjuredPlayers(teamState: any): void {
 }
 
 // ═══════════════════════════════════════════════
-// İSTATİSTİK GÜNCELLEME (Kariyer + Sezon)
+// İSTATİSTİK GÜNCELLEME (Kariyer + Sezon + recentRatings)
 // ═══════════════════════════════════════════════
 
 interface StatsUpdate {
@@ -105,14 +105,20 @@ function updateCareerStats(
     const divisor = Math.max(1, stats.appearances);
     stats.avgRating = Math.round((newTotal / divisor) * 100) / 100;
 
-    // ═══ SEZON ORTALAMA REYTİNG ═══
+    // SEZON ORTALAMA
     const prevSeasonTotal = stats.seasonAvgRating * Math.max(0, stats.seasonAppearances - 1);
     const newSeasonTotal = prevSeasonTotal + update.rating;
     const seasonDivisor = Math.max(1, stats.seasonAppearances);
     stats.seasonAvgRating = Math.round((newSeasonTotal / seasonDivisor) * 100) / 100;
   }
 
-  players[playerId] = { ...player, careerStats: stats };
+  // ═══ SON 5 MAÇ REYTİNGİ ═══
+  let recentRatings = player.recentRatings ?? [];
+  if (update.rating !== undefined && update.rating > 0) {
+    recentRatings = [...recentRatings, update.rating].slice(-5);
+  }
+
+  players[playerId] = { ...player, careerStats: stats, recentRatings };
 }
 
 // ═══════════════════════════════════════════════

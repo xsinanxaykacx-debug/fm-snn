@@ -45,7 +45,6 @@ export interface Attributes {
 }
 
 export interface CareerStats {
-  // Kariyer (hep birikir)
   appearances: number;
   goals: number;
   assists: number;
@@ -55,7 +54,6 @@ export interface CareerStats {
   minutesPlayed: number;
   motm: number;
 
-  // Bu sezon (her sezon sıfırlanır)
   seasonAppearances: number;
   seasonGoals: number;
   seasonAssists: number;
@@ -72,6 +70,7 @@ export interface Player {
   age: number;
   nationality: string;
   position: Position;
+  secondaryPositions: Position[];     // ← YENİ
   attributes: Attributes;
   condition: number;
   morale: number;
@@ -89,6 +88,7 @@ export interface Player {
   redCard: boolean;
 
   careerStats: CareerStats;
+  recentRatings: number[];            // ← YENİ (son 5 maç)
 }
 
 export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1';
@@ -197,10 +197,6 @@ export interface GameState {
   training: TrainingState;
   userLineup: string[];
 }
-
-// ═══════════════════════════════════════════════
-// TAKIM BİRİMLERİ
-// ═══════════════════════════════════════════════
 
 export interface TeamUnits {
   attack: number;

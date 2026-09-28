@@ -8,10 +8,6 @@ import type {
   Tactic,
 } from '../types';
 
-// ═══════════════════════════════════════════════
-// YARDIMCILAR
-// ═══════════════════════════════════════════════
-
 const FIRST_NAMES = [
   'Luis', 'Marco', 'Carlos', 'Diego', 'Juan', 'Pedro', 'Miguel', 'Sergio', 'Andres', 'Javier',
   'Emre', 'Mehmet', 'Can', 'Hakan', 'Ozan', 'Yusuf', 'Burak', 'Arda', 'Cenk', 'Kerem',
@@ -50,7 +46,6 @@ export function createEmptyCareerStats(): CareerStats {
     avgRating: 0,
     minutesPlayed: 0,
     motm: 0,
-
     seasonAppearances: 0,
     seasonGoals: 0,
     seasonAssists: 0,
@@ -60,6 +55,35 @@ export function createEmptyCareerStats(): CareerStats {
     seasonMinutesPlayed: 0,
     seasonMotm: 0,
   };
+}
+
+// ═══════════════════════════════════════════════
+// İKİNCİL MEVKİ ÜRETİMİ
+// ═══════════════════════════════════════════════
+
+const SECONDARY_POSITION_MAP: Record<Position, Position[]> = {
+  'GK':  [],
+  'DC':  ['DM'],
+  'DL':  ['ML', 'DC'],
+  'DR':  ['MR', 'DC'],
+  'DM':  ['MC', 'DC'],
+  'MC':  ['DM', 'AMC'],
+  'ML':  ['AML', 'DL'],
+  'MR':  ['AMR', 'DR'],
+  'AMC': ['MC', 'ST'],
+  'AML': ['ML', 'ST'],
+  'AMR': ['MR', 'ST'],
+  'ST':  ['AMC', 'AML', 'AMR'],
+};
+
+function generateSecondaryPositions(position: Position): Position[] {
+  const candidates = SECONDARY_POSITION_MAP[position] ?? [];
+  if (candidates.length === 0) return [];
+
+  // %60 ihtimalle 1, %30 ihtimalle 2 ikincil mevki
+  const count = Math.random() < 0.6 ? 1 : Math.random() < 0.3 ? 2 : 0;
+  const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
 }
 
 // ═══════════════════════════════════════════════
@@ -113,7 +137,6 @@ function randomAttributes(position: Position): Attributes {
     aerialReach: randomBetween(10, 30),
   };
 
-  // Mevki bazlı boost
   if (position === 'GK') {
     a.goalkeeper = randomBetween(60, 90);
     a.reflexes = randomBetween(60, 90);
@@ -145,7 +168,6 @@ function randomAttributes(position: Position): Attributes {
     a.technique = randomBetween(60, 88);
   }
 
-  // Tüm değerleri 20-95 arasına sıkıştır
   for (const key in a) {
     const k = key as keyof Attributes;
     const val = a[k];
@@ -179,10 +201,6 @@ function scoreAttributes(a: Attributes, position: Position): number {
   return 50;
 }
 
-// ═══════════════════════════════════════════════
-// OYUNCU ÜRETİMİ
-// ═══════════════════════════════════════════════
-
 const SQUAD_TEMPLATE: Position[] = [
   'GK', 'GK',
   'DC', 'DC', 'DC', 'DC',
@@ -208,13 +226,11 @@ export function generatePlayer(position: Position, clubId: string, index: number
   );
   const wage = Math.round(value / 500);
 
-  // Kariyer istatistikleri (mevcut yaşa göre makul başlangıç)
   const ageFactor = Math.max(0, age - 18);
   const initialApps = ageFactor * randomBetween(15, 30);
   const initialAvgRating = ageFactor > 0 ? Math.round((5.8 + Math.random() * 1.2) * 100) / 100 : 0;
 
   const careerStats: CareerStats = {
-    // Kariyer
     appearances: initialApps,
     goals: 0,
     assists: 0,
@@ -223,8 +239,6 @@ export function generatePlayer(position: Position, clubId: string, index: number
     avgRating: initialAvgRating,
     minutesPlayed: ageFactor * randomBetween(1000, 2500),
     motm: 0,
-
-    // Sezon (yeni sezon başlangıcı — sıfır)
     seasonAppearances: 0,
     seasonGoals: 0,
     seasonAssists: 0,
@@ -241,6 +255,7 @@ export function generatePlayer(position: Position, clubId: string, index: number
     age,
     nationality: randomNationality(),
     position,
+    secondaryPositions: generateSecondaryPositions(position),
     attributes,
     condition: 100,
     morale: randomBetween(50, 90),
@@ -257,12 +272,9 @@ export function generatePlayer(position: Position, clubId: string, index: number
     injured: false,
     redCard: false,
     careerStats,
+    recentRatings: [],
   };
 }
-
-// ═══════════════════════════════════════════════
-// KULÜP ÜRETİMİ
-// ═══════════════════════════════════════════════
 
 const CLUB_DATA: { name: string; shortName: string; reputation: number }[] = [
   { name: 'İstanbul FK',      shortName: 'İST', reputation: 10 },
@@ -334,10 +346,6 @@ export function generateGameData(): {
   return { clubs, players };
 }
 
-// ═══════════════════════════════════════════════
-// OYUNCU REYTİNGİ
-// ═══════════════════════════════════════════════
-
 export function scorePlayer(p: Player): number {
   const a = p.attributes;
   const pos = p.position;
@@ -370,10 +378,6 @@ export function scorePlayer(p: Player): number {
   const result = score * condFactor * moraleFactor * formFactor;
   return Number.isFinite(result) ? Math.round(result) : 50;
 }
-
-// ═══════════════════════════════════════════════
-// İLK 11
-// ═══════════════════════════════════════════════
 
 export function getStartingXI(
   clubId: string,
