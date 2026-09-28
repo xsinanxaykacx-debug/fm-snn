@@ -1,3 +1,5 @@
+// src/App.tsx
+
 import { useState } from 'react';
 import { useGameStore } from './store/gameStore';
 import { Dashboard } from './components/Dashboard';
@@ -7,8 +9,9 @@ import { Table } from './components/Table';
 import { MatchDay } from './components/MatchDay';
 import { Transfers } from './components/Transfers';
 import { Training } from './components/Training';
+import { Stats } from './components/Stats';
 
-type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training';
+type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training' | 'stats';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -25,6 +28,7 @@ export default function App() {
     { key: 'tactics', label: '🎯 Taktik' },
     { key: 'training', label: '🏃 Antrenman' },
     { key: 'table', label: '📊 Puan Durumu' },
+    { key: 'stats', label: '🏆 İstatistikler' },
     { key: 'transfer', label: '💸 Transfer' },
   ];
 
@@ -70,6 +74,7 @@ export default function App() {
         {tab === 'tactics' && <Tactics />}
         {tab === 'training' && <Training />}
         {tab === 'table' && <Table />}
+        {tab === 'stats' && <Stats />}
         {tab === 'transfer' && <Transfers />}
       </main>
     </div>
