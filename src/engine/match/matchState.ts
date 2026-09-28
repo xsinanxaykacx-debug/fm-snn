@@ -81,8 +81,6 @@ export function updateDynamicTactics(state: MatchState): void {
   const { minute, homeScore, awayScore, home, away } = state;
 
   const isLate = minute > 70;
-  const isVeryLate = minute > 80;
-  void isVeryLate;
 
   if (homeScore < awayScore) {
     if (isLate) {

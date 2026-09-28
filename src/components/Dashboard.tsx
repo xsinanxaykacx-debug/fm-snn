@@ -1,14 +1,151 @@
 // src/components/Dashboard.tsx
 
+import { useEffect, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { sortedTable } from '../engine/league/table';
 import { TeamBadge } from './TeamBadge';
 import { FormBadge } from './FormBadge';
 import { getTeamColor } from '../utils/teamColors';
 
+declare global {
+  interface Window {
+    Chart: any;
+  }
+}
+
 interface Props {
   onNavigate: (tab: any) => void;
 }
+
+// ═══════════════════════════════════════════════
+// FORM GRAFİĞİ (xG trendi)
+// ═══════════════════════════════════════════════
+
+function FormChart({ clubId }: { clubId: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<any>(null);
+  const state = useGameStore();
+
+  useEffect(() => {
+    if (!canvasRef.current || !window.Chart) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    // Son 8 maçı al
+    const last8 = [...state.fixtures]
+      .filter(m => m.played && (m.homeId === clubId || m.awayId === clubId))
+      .sort((a, b) => (a.week ?? 0) - (b.week ?? 0))
+      .slice(-8);
+
+    const labels = last8.map(m => `H${m.week}`);
+    const xGFor: number[] = [];
+    const xGAgainst: number[] = [];
+    const goalsFor: number[] = [];
+    const goalsAgainst: number[] = [];
+
+    last8.forEach(m => {
+      const isHome = m.homeId === clubId;
+      const stats = m.stats as any;
+      xGFor.push(isHome ? (stats.xG?.home ?? 0) : (stats.xG?.away ?? 0));
+      xGAgainst.push(isHome ? (stats.xG?.away ?? 0) : (stats.xG?.home ?? 0));
+      goalsFor.push(isHome ? m.homeScore : m.awayScore);
+      goalsAgainst.push(isHome ? m.awayScore : m.homeScore);
+    });
+
+    chartRef.current = new window.Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'xG (Biz)',
+            data: xGFor,
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 3,
+          },
+          {
+            label: 'xG (Rakip)',
+            data: xGAgainst,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 3,
+          },
+          {
+            label: 'Gol (Biz)',
+            data: goalsFor,
+            borderColor: '#06b6d4',
+            borderDash: [5, 5],
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 2,
+          },
+          {
+            label: 'Gol (Rakip)',
+            data: goalsAgainst,
+            borderColor: '#f59e0b',
+            borderDash: [5, 5],
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 2,
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: { color: '#94a3b8', font: { size: 10 } },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#64748b', font: { size: 10 } },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+          },
+          y: {
+            ticks: { color: '#64748b', font: { size: 10 } },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            beginAtZero: true,
+          },
+        },
+      }
+    });
+
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
+  }, [clubId, state.fixtures]);
+
+  if (!state.fixtures.some(m => m.played && (m.homeId === clubId || m.awayId === clubId))) {
+    return (
+      <div className="h-48 flex items-center justify-center text-slate-500 text-xs">
+        Henüz oynanmış maç yok
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-48">
+      <canvas ref={canvasRef} />
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// ANA COMPONENT
+// ═══════════════════════════════════════════════
 
 export function Dashboard({ onNavigate }: Props) {
   const state = useGameStore();
@@ -17,7 +154,6 @@ export function Dashboard({ onNavigate }: Props) {
   const userPos = table.findIndex(r => r.clubId === state.userClubId) + 1;
   const userRow = table.find(r => r.clubId === state.userClubId);
 
-  // Sıradaki maç
   const nextMatch = state.fixtures.find(
     m => m.week === state.currentWeek && !m.played &&
       (m.homeId === state.userClubId || m.awayId === state.userClubId)
@@ -27,7 +163,6 @@ export function Dashboard({ onNavigate }: Props) {
     : null;
   const isHome = nextMatch?.homeId === state.userClubId;
 
-  // Son 5 maç
   const last5 = [...state.fixtures]
     .filter(m => m.played && (m.homeId === state.userClubId || m.awayId === state.userClubId))
     .sort((a, b) => (b.week ?? 0) - (a.week ?? 0))
@@ -43,19 +178,17 @@ export function Dashboard({ onNavigate }: Props) {
       return {
         match: m,
         result,
-        opponent: state.clubs[oppId],
+        opponent: state.clubs[oppId!],
         ourScore,
         theirScore,
         isHome: isUserHome,
       };
     });
 
-  // Sakatlar
   const injured = Object.values(state.players)
     .filter(p => p.clubId === state.userClubId && p.injuryWeeks > 0)
     .slice(0, 3);
 
-  // Cezalılar
   const suspended = Object.values(state.players)
     .filter(p => p.clubId === state.userClubId && p.suspensionWeeks > 0)
     .slice(0, 3);
@@ -64,7 +197,7 @@ export function Dashboard({ onNavigate }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* ═══ HEADER ═══ */}
+      {/* HEADER */}
       <div
         className="glass-panel rounded-xl p-5 flex items-center gap-4"
         style={{
@@ -88,9 +221,8 @@ export function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ═══ GRID ═══ */}
+      {/* GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sıradaki Maç */}
         {opponent && nextMatch ? (
           <div
             className="glass-panel rounded-xl p-5"
@@ -139,7 +271,6 @@ export function Dashboard({ onNavigate }: Props) {
           </div>
         )}
 
-        {/* Lig Durumu */}
         <div className="glass-panel rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold text-white">📊 Lig Durumu</h3>
@@ -174,7 +305,21 @@ export function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ═══ SON 5 MAÇ ═══ */}
+      {/* FORM GRAFİĞİ */}
+      <div className="glass-panel rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-bold text-white">📈 Form Grafiği (Son 8 Maç)</h3>
+          <div className="text-[10px] text-slate-500 flex gap-3">
+            <span>🟢 xG (Biz)</span>
+            <span>🔴 xG (Rakip)</span>
+            <span>🔵 Gol (Biz)</span>
+            <span>🟠 Gol (Rakip)</span>
+          </div>
+        </div>
+        <FormChart clubId={state.userClubId} />
+      </div>
+
+      {/* SON 5 MAÇ */}
       {last5.length > 0 && (
         <div className="glass-panel rounded-xl p-5">
           <h3 className="text-lg font-bold mb-3 text-white">📈 Son Maçlar</h3>
@@ -203,7 +348,7 @@ export function Dashboard({ onNavigate }: Props) {
         </div>
       )}
 
-      {/* ═══ SAKATLAR + CEZALILAR + FİNANS ═══ */}
+      {/* SAKATLAR + CEZALILAR + FİNANS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="glass-panel rounded-xl p-5">
           <h3 className="text-sm font-bold mb-2 text-white">🏥 Sakatlar</h3>
@@ -252,7 +397,7 @@ export function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ═══ HABERLER ═══ */}
+      {/* HABERLER */}
       <div className="glass-panel rounded-xl p-5">
         <h3 className="text-lg font-bold mb-3 text-white">📰 Son Haberler</h3>
         <ul className="space-y-2">

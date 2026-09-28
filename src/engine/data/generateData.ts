@@ -1,5 +1,6 @@
 import type {
   Attributes,
+  CareerStats,
   Club,
   Formation,
   Player,
@@ -37,6 +38,19 @@ function randomName(): string {
 
 function randomNationality(): string {
   return NATIONALITIES[Math.floor(Math.random() * NATIONALITIES.length)];
+}
+
+function createEmptyCareerStats(): CareerStats {
+  return {
+    appearances: 0,
+    goals: 0,
+    assists: 0,
+    yellowCards: 0,
+    redCards: 0,
+    avgRating: 0,
+    minutesPlayed: 0,
+    motm: 0,
+  };
 }
 
 // ═══════════════════════════════════════════════
@@ -136,10 +150,6 @@ function randomAttributes(position: Position): Attributes {
   return a;
 }
 
-// ═══════════════════════════════════════════════
-// SKOR HESABI (attribute'dan)
-// ═══════════════════════════════════════════════
-
 function scoreAttributes(a: Attributes, position: Position): number {
   if (position === 'GK') {
     const gk = (typeof a.goalkeeper === 'number' && !isNaN(a.goalkeeper)) ? a.goalkeeper : (a.reflexes ?? 50);
@@ -183,12 +193,25 @@ export function generatePlayer(position: Position, clubId: string, index: number
   const score = scoreAttributes(attributes, position);
 
   const ratingFactor = Math.max(0, (score - 40) / 60);
-const value = Math.round(
-  Math.pow(ratingFactor, 3) * 60_000_000 +
-  age * 50_000
-);
+  const value = Math.round(
+    Math.pow(ratingFactor, 3) * 60_000_000 +
+    age * 50_000
+  );
+  const wage = Math.round(value / 500);
 
-const wage = Math.round(value / 500);
+  // Kariyer istatistikleri (mevcut yaşa göre makul başlangıç)
+  const ageFactor = Math.max(0, age - 18);
+  const careerStats: CareerStats = {
+    appearances: ageFactor * randomBetween(15, 30),
+    goals: 0,
+    assists: 0,
+    yellowCards: 0,
+    redCards: 0,
+    avgRating: ageFactor > 0 ? Math.round((5.8 + Math.random() * 1.2) * 100) / 100 : 0,
+    minutesPlayed: ageFactor * randomBetween(1000, 2500),
+    motm: 0,
+  };
+
   return {
     id: `player_${clubId}_${index}`,
     name: randomName(),
@@ -210,6 +233,7 @@ const wage = Math.round(value / 500);
     sentOff: false,
     injured: false,
     redCard: false,
+    careerStats,
   };
 }
 
@@ -338,7 +362,6 @@ export function getStartingXI(
     p => p.clubId === clubId && p.injuryWeeks === 0 && p.suspensionWeeks === 0
   );
 
-  // Kullanıcı lineup'ı varsa ve geçerliyse, onu kullan
   if (userLineup && userLineup.length === 11) {
     const lineupPlayers = userLineup
       .map(id => players[id])

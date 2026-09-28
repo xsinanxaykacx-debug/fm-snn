@@ -185,6 +185,15 @@ function getBarColor(value: number): string {
   return 'bg-red-500';
 }
 
+function CareerStat({ label, value, color }: { label: string; value: number | string; color?: string }) {
+  return (
+    <div className="text-center bg-pitch-800/40 rounded-lg p-2">
+      <p className="text-[9px] text-slate-500 uppercase">{label}</p>
+      <p className={`text-sm font-bold mt-0.5 ${color ?? 'text-slate-200'}`}>{value}</p>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════
 // ANA COMPONENT
 // ═══════════════════════════════════════════════
@@ -205,6 +214,20 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
   const clubColor = getTeamColor(clubId);
   const a = player.attributes;
   const initials = player.name.split(' ').map(n => n[0]).join('').slice(0, 2);
+
+  const stats = player.careerStats ?? {
+    appearances: 0,
+    goals: 0,
+    assists: 0,
+    yellowCards: 0,
+    redCards: 0,
+    avgRating: 0,
+    minutesPlayed: 0,
+    motm: 0,
+  };
+
+  const hasPlayed = stats.appearances > 0;
+  const hasRating = stats.avgRating > 0;
 
   return (
     <div
@@ -271,9 +294,39 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
             <InfoBox label="Form" value={`${player.form}%`} valueColor={player.form >= 70 ? 'text-green-400' : player.form >= 50 ? 'text-yellow-400' : 'text-red-400'} />
           </div>
 
+          {/* ═══ KARİYER İSTATİSTİKLERİ ═══ */}
+          <div className="glass-card p-4 rounded-xl">
+            <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">🏆 Kariyer İstatistikleri</h4>
+
+            {!hasPlayed ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-slate-500">Henüz profesyonel maç oynamadı</p>
+                <p className="text-xs text-slate-600 mt-1">Genç oyuncu — potansiyeli yüksek</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                  <CareerStat label="Maç" value={stats.appearances} />
+                  <CareerStat label="Gol" value={stats.goals} color={stats.goals > 0 ? 'text-green-400' : undefined} />
+                  <CareerStat label="Asist" value={stats.assists} color={stats.assists > 0 ? 'text-blue-400' : undefined} />
+                  <CareerStat label="Sarı Kart" value={stats.yellowCards} color={stats.yellowCards > 0 ? 'text-yellow-400' : undefined} />
+                  <CareerStat label="Kırmızı" value={stats.redCards} color={stats.redCards > 0 ? 'text-red-400' : undefined} />
+                  <CareerStat label="MVP" value={stats.motm} color={stats.motm > 0 ? 'text-purple-400' : undefined} />
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <CareerStat
+                    label="Ort. Reyting"
+                    value={hasRating ? stats.avgRating.toFixed(2) : '---'}
+                    color={hasRating ? 'text-accent' : 'text-slate-500'}
+                  />
+                  <CareerStat label="Dakika" value={stats.minutesPlayed.toLocaleString()} />
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Radar + Attribute tablosu */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Radar */}
             <div className="glass-card p-4 rounded-xl">
               <h4 className="text-xs font-bold text-slate-300 uppercase mb-3 text-center">
                 📊 Özellik Poligonu
@@ -281,7 +334,6 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
               <PlayerRadar player={player} />
             </div>
 
-            {/* Teknik / Zihinsel / Fiziksel */}
             <div className="glass-card p-4 rounded-xl">
               <div className="grid grid-cols-3 gap-3 text-xs">
                 <div>
