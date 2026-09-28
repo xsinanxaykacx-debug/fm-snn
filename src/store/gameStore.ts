@@ -1,3 +1,5 @@
+// src/store/gameStore.ts
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { GameState, Player, Club, TrainingFocus } from '../engine/types';
@@ -7,6 +9,7 @@ import { initTable, updateTable } from '../engine/league/table';
 import { simulateMatch } from '../engine/match/simulate';
 import { developPlayers } from '../engine/progression/training';
 import { applyTrainingToSquad } from '../engine/progression/trainingSystem';
+import { useInboxStore } from './useInboxStore';
 
 interface Store extends GameState {
   newGame: () => void;
@@ -22,10 +25,8 @@ interface Store extends GameState {
   swapPlayers: (idA: string, idB: string) => void;
   resetLineup: () => void;
 
-  // Basın toplantısı etkisi
   applyPressEffects: (moraleDelta: number, boardDelta: number) => void;
 
-  // Basın toplantısı için bekleyen maç
   pendingPressMatch: {
     homeScore: number;
     awayScore: number;
@@ -60,13 +61,174 @@ function createInitialState(): GameState {
   };
 }
 
+// ═══════════════════════════════════════════════
+// INBOX MESAJ YARDIMCILARI
+// ═══════════════════════════════════════════════
+
+/**
+ * Aynı oyuncu için zaten aktif sakatlık mesajı var mı kontrol et
+ */
+function hasActiveInjuryMessage(playerName: string): boolean {
+  const inbox = useInboxStore.getState();
+  return inbox.messages.some(
+    m => m.category === 'INJURY' &&
+         m.title.includes(playerName) &&
+         m.content.includes('sakatlandı')
+  );
+}
+
+/**
+ * Bu hafta sakatlanan oyuncular için mesaj ekle (sadece ilk seferinde)
+ */
+function addInjuryMessages(
+  players: Record<string, Player>,
+  userClubId: string,
+  season: number,
+  week: number
+): void {
+  const inbox = useInboxStore.getState();
+
+  const injuredPlayers = Object.values(players).filter(
+    p => p.clubId === userClubId && p.injuryWeeks > 0
+  );
+
+  injuredPlayers.forEach(p => {
+    if (!hasActiveInjuryMessage(p.name)) {
+      inbox.addMessage({
+        season,
+        week,
+        sender: '🏥 Sağlık Heyeti',
+        title: `Sakatlık Raporu: ${p.name}`,
+        content: `${p.name} sakatlandı. Tahmini iyileşme süresi: ${p.injuryWeeks} hafta.`,
+        category: 'INJURY',
+      });
+    }
+  });
+}
+
+/**
+ * Transfer teklifi üret (%15 ihtimalle)
+ */
+function maybeAddTransferOffer(
+  players: Record<string, Player>,
+  clubs: Record<string, Club>,
+  userClubId: string,
+  season: number,
+  week: number
+): void {
+  if (Math.random() > 0.15) return;
+
+  const inbox = useInboxStore.getState();
+
+  const userSquad = Object.values(players).filter(
+    p => p.clubId === userClubId && p.injuryWeeks === 0 && p.suspensionWeeks === 0
+  );
+
+  const candidates = userSquad.filter(p => p.value > 500_000);
+  if (candidates.length === 0) return;
+
+  const target = candidates[Math.floor(Math.random() * candidates.length)];
+  const otherClubs = Object.values(clubs).filter(c => c.id !== userClubId);
+  if (otherClubs.length === 0) return;
+
+  const biddingClub = otherClubs[Math.floor(Math.random() * otherClubs.length)];
+  const offerAmount = Math.round(target.value * (1.1 + Math.random() * 0.5));
+
+  // Aynı oyuncu için zaten bekleyen teklif var mı?
+  const existingOffer = inbox.messages.some(
+    m => m.category === 'TRANSFER' &&
+         m.transferOffer?.playerId === target.id &&
+         m.transferOffer?.status === 'PENDING'
+  );
+  if (existingOffer) return;
+
+  inbox.addMessage({
+    season,
+    week,
+    sender: `📨 ${biddingClub.name} Yönetim Kurulu`,
+    title: `${target.name} için transfer teklifi`,
+    content: `${biddingClub.name}, ${target.name} için resmi bonservis teklifinde bulundu. Teklifi değerlendirmek ister misiniz?`,
+    category: 'TRANSFER',
+    transferOffer: {
+      id: `off-${Date.now()}`,
+      playerId: target.id,
+      playerName: target.name,
+      playerPosition: target.position,
+      playerAge: target.age,
+      playerValue: target.value,
+      biddingClubId: biddingClub.id,
+      biddingClubName: biddingClub.name,
+      offerAmount,
+      type: 'BUY',
+      status: 'PENDING',
+    },
+  });
+}
+
+/**
+ * Yönetim mesajı (her 10 haftada bir)
+ */
+function maybeAddBoardMessage(
+  table: Record<string, any>,
+  userClubId: string,
+  season: number,
+  week: number
+): void {
+  if (week % 10 !== 0) return;
+
+  const inbox = useInboxStore.getState();
+
+  // Aynı hafta için zaten mesaj var mı?
+  const existing = inbox.messages.some(
+    m => m.category === 'BOARD' && m.week === week && m.season === season
+  );
+  if (existing) return;
+
+  const sorted = Object.values(table).sort((a: any, b: any) => b.points - a.points);
+  const userPos = sorted.findIndex((r: any) => r.clubId === userClubId) + 1;
+
+  let title = '';
+  let content = '';
+
+  if (userPos <= 4) {
+    title = '🏆 Yönetim: Harika gidiyorsunuz!';
+    content = `Ligde ${userPos}. sıradasınız. Yönetim kurulu performansınızdan çok memnun. Böyle devam edin!`;
+  } else if (userPos <= 8) {
+    title = '👔 Yönetim: Orta sıra hedefi';
+    content = `Ligde ${userPos}. sıradasınız. Avrupa kupaları için mücadeleye devam.`;
+  } else if (userPos <= 12) {
+    title = '⚠️ Yönetim: Daha fazlasını bekliyoruz';
+    content = `Ligde ${userPos}. sıradasınız. Yönetim kurulu daha iyi performans bekliyor.`;
+  } else {
+    title = '🔴 Yönetim: Acil toparlanma lazım';
+    content = `Ligde ${userPos}. sıradasınız. Yönetim kurulu ciddi endişeli. Sonuçları iyileştirmelisiniz.`;
+  }
+
+  inbox.addMessage({
+    season,
+    week,
+    sender: '👔 Yönetim Kurulu',
+    title,
+    content,
+    category: 'BOARD',
+  });
+}
+
+// ═══════════════════════════════════════════════
+// STORE
+// ═══════════════════════════════════════════════
+
 export const useGameStore = create<Store>()(
   persist(
     (set, get) => ({
       ...createInitialState(),
       pendingPressMatch: null,
 
-      newGame: () => set({ ...createInitialState(), pendingPressMatch: null }),
+      newGame: () => {
+        // Inbox'ı temizle
+        useInboxStore.getState().clearAll();
+        set({ ...createInitialState(), pendingPressMatch: null });
+      },
 
       setTactic: (partial) => {
         const state = get();
@@ -102,13 +264,11 @@ export const useGameStore = create<Store>()(
 
       resetLineup: () => set({ userLineup: [] }),
 
-      // ═══ BASIN TOPLANTISI ETKİSİ ═══
       applyPressEffects: (moraleDelta, boardDelta) => {
         const state = get();
         const userClub = state.clubs[state.userClubId];
         if (!userClub) return;
 
-        // Takım moralini güncelle (tüm oyuncular)
         const newPlayers = { ...state.players };
         for (const id in newPlayers) {
           if (newPlayers[id].clubId === state.userClubId) {
@@ -119,7 +279,6 @@ export const useGameStore = create<Store>()(
           }
         }
 
-        // Yönetim güveni (kulüp reputation gibi düşün)
         const newReputation = Math.max(1, Math.min(20, userClub.reputation + Math.floor(boardDelta / 2)));
 
         const news = [...state.news];
@@ -173,7 +332,6 @@ export const useGameStore = create<Store>()(
             const verdict = our > their ? '🏆 Kazandık' : our < their ? '😞 Kaybettik' : '🤝 Berabere';
             news.unshift(`Hafta ${state.currentWeek}: ${opponent} karşısında ${scoreStr} — ${verdict}`);
 
-            // Basın toplantısı için kaydet
             userMatch = {
               homeScore: result.homeScore,
               awayScore: result.awayScore,
@@ -184,6 +342,7 @@ export const useGameStore = create<Store>()(
           }
         }
 
+        // ═══ OYUNCU DURUM GÜNCELLEMELERİ ═══
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           p.condition = Math.max(40, p.condition - Math.floor(Math.random() * 15));
@@ -224,12 +383,26 @@ export const useGameStore = create<Store>()(
           seasonOver,
           pendingPressMatch: userMatch,
         });
+
+        // ═══════════════════════════════════════════════
+        // OTOMATİK INBOX MESAJLARI
+        // ═══════════════════════════════════════════════
+
+        // 1. Sakatlık mesajları (duplicate kontrolü ile)
+        addInjuryMessages(newPlayers, state.userClubId, state.season, state.currentWeek);
+
+        // 2. Transfer teklifi (%15 ihtimalle)
+        maybeAddTransferOffer(newPlayers, state.clubs, state.userClubId, state.season, state.currentWeek);
+
+        // 3. Yönetim mesajı (her 10 haftada bir)
+        maybeAddBoardMessage(newTable, state.userClubId, state.season, state.currentWeek);
       },
 
       advanceSeason: () => {
         const state = get();
         let newPlayers = developPlayers(state.players);
 
+        // Sezon istatistiklerini sıfırla (kariyer korunur)
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           if (p.careerStats) {
@@ -261,6 +434,16 @@ export const useGameStore = create<Store>()(
           seasonOver: false,
           news: [`🏆 Sezon ${season} başladı!`, ...state.news].slice(0, 30),
         });
+
+        // Yeni sezon mesajı
+        useInboxStore.getState().addMessage({
+          season,
+          week: 1,
+          sender: '📋 Lig Yönetimi',
+          title: `Sezon ${season} başladı!`,
+          content: `Yeni sezon başladı. Transfer dönemi açık, hedeflerinizi belirleyin. Başarılar!`,
+          category: 'BOARD',
+        });
       },
 
       transferBuy: (playerId) => {
@@ -283,6 +466,16 @@ export const useGameStore = create<Store>()(
           transferList: state.transferList.filter(id => id !== playerId),
           news: [`✅ ${player.name} transfer edildi!`, ...state.news].slice(0, 30),
         });
+
+        // Transfer mesajı
+        useInboxStore.getState().addMessage({
+          season: state.season,
+          week: state.currentWeek,
+          sender: '💰 Transfer Ofisi',
+          title: `${player.name} transfer edildi`,
+          content: `${player.name} £${(player.value / 1_000_000).toFixed(2)}M karşılığında kadroya katıldı.`,
+          category: 'TRANSFER',
+        });
       },
 
       transferSell: (playerId) => {
@@ -299,6 +492,16 @@ export const useGameStore = create<Store>()(
           players: { ...state.players, [playerId]: updatedPlayer },
           clubs: { ...state.clubs, [state.userClubId]: updatedClub },
           news: [`💸 ${player.name} satıldı (+£${((player.value * 0.9) / 1_000_000).toFixed(2)}M)`, ...state.news].slice(0, 30),
+        });
+
+        // Satış mesajı
+        useInboxStore.getState().addMessage({
+          season: state.season,
+          week: state.currentWeek,
+          sender: '💰 Finans Departmanı',
+          title: `${player.name} satıldı`,
+          content: `${player.name} £${((player.value * 0.9) / 1_000_000).toFixed(2)}M karşılığında satıldı. Bütçe güncellendi.`,
+          category: 'FINANCE',
         });
       },
 

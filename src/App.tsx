@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useGameStore } from './store/gameStore';
+import { useInboxStore } from './store/useInboxStore';
 import { Dashboard } from './components/Dashboard';
 import { Squad } from './components/Squad';
 import { Tactics } from './components/Tactics';
@@ -12,8 +13,9 @@ import { Training } from './components/Training';
 import { Stats } from './components/Stats';
 import { SeasonEndModal } from './components/SeasonEndModal';
 import { PressConferenceModal } from './components/PressConferenceModal';
+import { InboxView } from './components/InboxView';
 
-type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training' | 'stats';
+type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training' | 'stats' | 'inbox';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -30,14 +32,16 @@ export default function App() {
   const applyPressEffects = useGameStore(s => s.applyPressEffects);
   const clearPendingPress = useGameStore(s => s.clearPendingPress);
 
-  // Basın toplantısı otomatik açılsın
+  const inboxMessages = useInboxStore(s => s.messages);
+  const unreadCount = inboxMessages.filter(m => !m.isRead).length;
+
   useEffect(() => {
     if (pendingPressMatch && !showPress) {
       setShowPress(true);
     }
   }, [pendingPressMatch, showPress]);
 
-  const tabs: { key: Tab; label: string }[] = [
+  const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'dashboard', label: '📋 Ana Sayfa' },
     { key: 'match', label: '⚽ Maç' },
     { key: 'squad', label: '👥 Kadro' },
@@ -45,6 +49,7 @@ export default function App() {
     { key: 'training', label: '🏃 Antrenman' },
     { key: 'table', label: '📊 Puan Durumu' },
     { key: 'stats', label: '🏆 İstatistikler' },
+    { key: 'inbox', label: '📬 Gelen Kutusu', badge: unreadCount },
     { key: 'transfer', label: '💸 Transfer' },
   ];
 
@@ -84,13 +89,18 @@ export default function App() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`relative px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                 tab === t.key
                   ? 'text-accent border-b-2 border-accent'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               {t.label}
+              {t.badge !== undefined && t.badge > 0 && (
+                <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
+                  {t.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -104,15 +114,14 @@ export default function App() {
         {tab === 'training' && <Training />}
         {tab === 'table' && <Table />}
         {tab === 'stats' && <Stats />}
+        {tab === 'inbox' && <InboxView />}
         {tab === 'transfer' && <Transfers />}
       </main>
 
-      {/* SEZON SONU MODAL */}
       {showSeasonEnd && (
         <SeasonEndModal onClose={() => setShowSeasonEnd(false)} />
       )}
 
-      {/* BASIN TOPLANTISI MODAL */}
       {showPress && pendingPressMatch && (
         <PressConferenceModal
           matchResult={pendingPressMatch}
