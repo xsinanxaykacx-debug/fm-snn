@@ -187,6 +187,7 @@ const value = Math.round(
   Math.pow(ratingFactor, 3) * 60_000_000 +
   age * 50_000
 );
+
 const wage = Math.round(value / 500);
   return {
     id: `player_${clubId}_${index}`,
