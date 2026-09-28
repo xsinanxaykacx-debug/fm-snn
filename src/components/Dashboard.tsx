@@ -27,10 +27,10 @@ export function Dashboard({ onNavigate }: Props) {
     : null;
   const isHome = nextMatch?.homeId === state.userClubId;
 
-  // Son 5 maç (form)
+  // Son 5 maç
   const last5 = [...state.fixtures]
     .filter(m => m.played && (m.homeId === state.userClubId || m.awayId === state.userClubId))
-    .sort((a, b) => b.week - a.week)
+    .sort((a, b) => (b.week ?? 0) - (a.week ?? 0))
     .slice(0, 5)
     .map(m => {
       const isUserHome = m.homeId === state.userClubId;
@@ -64,17 +64,17 @@ export function Dashboard({ onNavigate }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* ═══ HEADER: Kulüp özeti ═══ */}
+      {/* ═══ HEADER ═══ */}
       <div
-        className="card flex items-center gap-4"
+        className="glass-panel rounded-xl p-5 flex items-center gap-4"
         style={{
-          background: `linear-gradient(135deg, ${userColor.bg}15 0%, ${userColor.bg}05 100%)`,
+          background: `linear-gradient(135deg, ${userColor.bg}20 0%, ${userColor.bg}05 100%)`,
           borderColor: `${userColor.bg}40`,
         }}
       >
         <TeamBadge clubId={state.userClubId} shortName={userClub?.shortName ?? '???'} size="xl" />
         <div className="flex-1">
-          <h2 className="text-2xl font-bold">{userClub?.name}</h2>
+          <h2 className="text-2xl font-bold text-white">{userClub?.name}</h2>
           <p className="text-sm text-slate-400">
             Sezon {state.season} • Hafta {state.currentWeek}
           </p>
@@ -88,19 +88,19 @@ export function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ═══ GRID: Sıradaki Maç + Lig Durumu ═══ */}
+      {/* ═══ GRID ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sıradaki Maç */}
         {opponent && nextMatch ? (
           <div
-            className="card"
+            className="glass-panel rounded-xl p-5"
             style={{
               background: `linear-gradient(135deg, ${getTeamColor(opponent.id).bg}20 0%, transparent 100%)`,
               borderColor: `${getTeamColor(opponent.id).bg}50`,
             }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">⚽ Sıradaki Maç</h3>
+              <h3 className="text-lg font-bold text-white">⚽ Sıradaki Maç</h3>
               <span className="text-xs text-slate-400">
                 {isHome ? '🏠 Ev Sahibi' : '✈️ Deplasman'}
               </span>
@@ -134,15 +134,15 @@ export function Dashboard({ onNavigate }: Props) {
             </button>
           </div>
         ) : (
-          <div className="card flex items-center justify-center text-slate-500 py-12">
+          <div className="glass-panel rounded-xl p-5 flex items-center justify-center text-slate-500 py-12">
             Bu hafta maçın yok.
           </div>
         )}
 
-        {/* Lig Durumu (ilk 5) */}
-        <div className="card">
+        {/* Lig Durumu */}
+        <div className="glass-panel rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold">📊 Lig Durumu</h3>
+            <h3 className="text-lg font-bold text-white">📊 Lig Durumu</h3>
             <button
               onClick={() => onNavigate('table')}
               className="text-xs text-accent hover:underline"
@@ -155,7 +155,6 @@ export function Dashboard({ onNavigate }: Props) {
             {table.slice(0, 5).map((row, i) => {
               const club = state.clubs[row.clubId];
               const isUser = row.clubId === state.userClubId;
-              const color = getTeamColor(row.clubId);
               return (
                 <div
                   key={row.clubId}
@@ -165,9 +164,9 @@ export function Dashboard({ onNavigate }: Props) {
                 >
                   <span className="w-5 text-slate-500 text-xs">{i + 1}.</span>
                   <TeamBadge clubId={row.clubId} shortName={club?.shortName ?? '???'} size="xs" />
-                  <span className="flex-1 truncate">{club?.shortName}</span>
+                  <span className="flex-1 truncate text-slate-200">{club?.shortName}</span>
                   <span className="text-xs text-slate-400">{row.played} maç</span>
-                  <span className="font-bold text-xs w-8 text-right">{row.points}</span>
+                  <span className="font-bold text-xs w-8 text-right text-white">{row.points}</span>
                 </div>
               );
             })}
@@ -175,10 +174,10 @@ export function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ═══ SON 5 MAÇ FORMU ═══ */}
+      {/* ═══ SON 5 MAÇ ═══ */}
       {last5.length > 0 && (
-        <div className="card">
-          <h3 className="text-lg font-bold mb-3">📈 Son Maçlar</h3>
+        <div className="glass-panel rounded-xl p-5">
+          <h3 className="text-lg font-bold mb-3 text-white">📈 Son Maçlar</h3>
           <div className="space-y-2">
             {last5.map(({ match, result, opponent: opp, ourScore, theirScore, isHome }) => (
               <div
@@ -191,12 +190,12 @@ export function Dashboard({ onNavigate }: Props) {
                   {isHome ? '🏠' : '✈️'}
                 </span>
                 <TeamBadge clubId={opp?.id ?? ''} shortName={opp?.shortName ?? '???'} size="xs" />
-                <span className="flex-1 text-sm truncate">{opp?.name}</span>
-                <span className="font-bold text-sm">
+                <span className="flex-1 text-sm truncate text-slate-200">{opp?.name}</span>
+                <span className="font-bold text-sm text-white">
                   {ourScore} - {theirScore}
                 </span>
                 <span className="text-xs text-slate-500 w-20 text-right">
-                  xG: {match.stats.xG?.home?.toFixed(1) ?? '?'} - {match.stats.xG?.away?.toFixed(1) ?? '?'}
+                  xG: {(match.stats as any)?.xG?.home?.toFixed(1) ?? '?'} - {(match.stats as any)?.xG?.away?.toFixed(1) ?? '?'}
                 </span>
               </div>
             ))}
@@ -206,16 +205,15 @@ export function Dashboard({ onNavigate }: Props) {
 
       {/* ═══ SAKATLAR + CEZALILAR + FİNANS ═══ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Sakatlar */}
-        <div className="card">
-          <h3 className="text-sm font-bold mb-2">🏥 Sakatlar</h3>
+        <div className="glass-panel rounded-xl p-5">
+          <h3 className="text-sm font-bold mb-2 text-white">🏥 Sakatlar</h3>
           {injured.length === 0 ? (
             <p className="text-xs text-slate-500">✅ Sakat oyuncu yok</p>
           ) : (
             <div className="space-y-1">
               {injured.map(p => (
                 <div key={p.id} className="flex items-center gap-2 text-xs">
-                  <span className="flex-1 truncate">{p.name}</span>
+                  <span className="flex-1 truncate text-slate-300">{p.name}</span>
                   <span className="text-red-400">🚑 {p.injuryWeeks}h</span>
                 </div>
               ))}
@@ -223,16 +221,15 @@ export function Dashboard({ onNavigate }: Props) {
           )}
         </div>
 
-        {/* Cezalılar */}
-        <div className="card">
-          <h3 className="text-sm font-bold mb-2">🟨 Cezalılar</h3>
+        <div className="glass-panel rounded-xl p-5">
+          <h3 className="text-sm font-bold mb-2 text-white">🟨 Cezalılar</h3>
           {suspended.length === 0 ? (
             <p className="text-xs text-slate-500">✅ Cezalı oyuncu yok</p>
           ) : (
             <div className="space-y-1">
               {suspended.map(p => (
                 <div key={p.id} className="flex items-center gap-2 text-xs">
-                  <span className="flex-1 truncate">{p.name}</span>
+                  <span className="flex-1 truncate text-slate-300">{p.name}</span>
                   <span className="text-yellow-400">🟨 {p.suspensionWeeks}h</span>
                 </div>
               ))}
@@ -240,25 +237,24 @@ export function Dashboard({ onNavigate }: Props) {
           )}
         </div>
 
-        {/* Finans */}
-        <div className="card">
-          <h3 className="text-sm font-bold mb-2">💰 Finans</h3>
+        <div className="glass-panel rounded-xl p-5">
+          <h3 className="text-sm font-bold mb-2 text-white">💰 Finans</h3>
           <div className="stat-row">
-            <span className="text-xs">Transfer</span>
+            <span className="text-xs text-slate-400">Transfer</span>
             <span className="font-bold text-accent text-sm">
               £{((userClub?.budget ?? 0) / 1_000_000).toFixed(2)}M
             </span>
           </div>
           <div className="stat-row">
-            <span className="text-xs">Maaş</span>
-            <span className="text-sm">£{((userClub?.wageBudget ?? 0) / 1_000).toFixed(0)}K</span>
+            <span className="text-xs text-slate-400">Maaş</span>
+            <span className="text-sm text-slate-200">£{((userClub?.wageBudget ?? 0) / 1_000).toFixed(0)}K</span>
           </div>
         </div>
       </div>
 
       {/* ═══ HABERLER ═══ */}
-      <div className="card">
-        <h3 className="text-lg font-bold mb-3">📰 Son Haberler</h3>
+      <div className="glass-panel rounded-xl p-5">
+        <h3 className="text-lg font-bold mb-3 text-white">📰 Son Haberler</h3>
         <ul className="space-y-2">
           {state.news.slice(0, 6).map((n, i) => (
             <li

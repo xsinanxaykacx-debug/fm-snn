@@ -58,13 +58,9 @@ function StatRow({ label, homeValue, awayValue, homeColor, awayColor, suffix = '
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
-        <span className="font-bold text-slate-200">
-          {homeValue}{suffix}
-        </span>
+        <span className="font-bold text-slate-200">{homeValue}{suffix}</span>
         <span className="text-slate-400">{label}</span>
-        <span className="font-bold text-slate-200">
-          {awayValue}{suffix}
-        </span>
+        <span className="font-bold text-slate-200">{awayValue}{suffix}</span>
       </div>
       <div className="flex gap-1 h-1.5">
         <div className="flex-1 bg-pitch-700 rounded-l overflow-hidden flex justify-end">
@@ -103,14 +99,11 @@ export function MatchDay() {
 
   const lastPlayedMatch = [...state.fixtures]
     .filter(m => m.played && (m.homeId === state.userClubId || m.awayId === state.userClubId))
-    .sort((a, b) => b.week - a.week)[0];
+    .sort((a, b) => (b.week ?? 0) - (a.week ?? 0))[0];
 
-  // ─────────────────────────────────────────────
-  // Bu haftanın maçları (mini kart)
-  // ─────────────────────────────────────────────
   const renderMatch = (m: Match) => {
-    const home = state.clubs[m.homeId];
-    const away = state.clubs[m.awayId];
+    const home = state.clubs[m.homeId!];
+    const away = state.clubs[m.awayId!];
     const isUser = m.homeId === state.userClubId || m.awayId === state.userClubId;
 
     return (
@@ -124,29 +117,26 @@ export function MatchDay() {
       >
         <div className="flex justify-between items-center gap-2">
           <div className="flex-1 flex items-center justify-end gap-2">
-            <span className="text-sm font-medium">{home?.shortName}</span>
-            <TeamBadge clubId={m.homeId} shortName={home?.shortName ?? '???'} size="xs" />
+            <span className="text-sm font-medium text-slate-200">{home?.shortName}</span>
+            <TeamBadge clubId={m.homeId!} shortName={home?.shortName ?? '???'} size="xs" />
           </div>
-          <span className={`px-3 font-bold text-sm ${m.played ? '' : 'text-slate-500'}`}>
+          <span className={`px-3 font-bold text-sm ${m.played ? 'text-white' : 'text-slate-500'}`}>
             {m.played ? `${m.homeScore} - ${m.awayScore}` : 'vs'}
           </span>
           <div className="flex-1 flex items-center gap-2">
-            <TeamBadge clubId={m.awayId} shortName={away?.shortName ?? '???'} size="xs" />
-            <span className="text-sm font-medium">{away?.shortName}</span>
+            <TeamBadge clubId={m.awayId!} shortName={away?.shortName ?? '???'} size="xs" />
+            <span className="text-sm font-medium text-slate-200">{away?.shortName}</span>
           </div>
         </div>
       </div>
     );
   };
 
-  // ─────────────────────────────────────────────
-  // Maç önizleme (oynanmamışsa)
-  // ─────────────────────────────────────────────
   const renderPreview = () => {
     if (!thisWeekMatch || thisWeekMatch.played) return null;
 
-    const home = state.clubs[thisWeekMatch.homeId];
-    const away = state.clubs[thisWeekMatch.awayId];
+    const home = state.clubs[thisWeekMatch.homeId!];
+    const away = state.clubs[thisWeekMatch.awayId!];
     const homeUnits = calculateTeamUnits(home, state.players);
     const awayUnits = calculateTeamUnits(away, state.players);
     const comparison = compareUnits(homeUnits, awayUnits);
@@ -156,29 +146,27 @@ export function MatchDay() {
 
     return (
       <div
-        className="card"
+        className="glass-panel rounded-xl p-5"
         style={{
           background: `linear-gradient(135deg, ${homeColor}10 0%, transparent 40%, transparent 60%, ${awayColor}10 100%)`,
         }}
       >
-        <h2 className="text-lg font-bold mb-4 text-center">🔮 Maç Önizleme — Hafta {thisWeekMatch.week}</h2>
+        <h2 className="text-lg font-bold mb-4 text-center text-white">🔮 Maç Önizleme — Hafta {thisWeekMatch.week}</h2>
 
-        {/* Takım başlıkları */}
         <div className="flex items-center justify-center gap-6 mb-6">
           <div className="flex flex-col items-center">
             <TeamBadge clubId={home.id} shortName={home.shortName} size="xl" />
-            <p className="text-sm font-bold mt-2">{home.name}</p>
+            <p className="text-sm font-bold mt-2 text-white">{home.name}</p>
             <p className="text-xs text-slate-500">🏠 Ev Sahibi</p>
           </div>
           <div className="text-2xl font-bold text-slate-500">VS</div>
           <div className="flex flex-col items-center">
             <TeamBadge clubId={away.id} shortName={away.shortName} size="xl" />
-            <p className="text-sm font-bold mt-2">{away.name}</p>
+            <p className="text-sm font-bold mt-2 text-white">{away.name}</p>
             <p className="text-xs text-slate-500">✈️ Deplasman</p>
           </div>
         </div>
 
-        {/* Karşılaştırma barları */}
         <div className="space-y-3 mb-6">
           {comparison.map(c => {
             const homeWidth = Math.min(100, c.homeValue);
@@ -219,7 +207,6 @@ export function MatchDay() {
           })}
         </div>
 
-        {/* Genel güç */}
         <div className="grid grid-cols-2 gap-3 text-xs mb-6">
           <div
             className="p-3 rounded text-center border"
@@ -243,7 +230,6 @@ export function MatchDay() {
           </div>
         </div>
 
-        {/* Oyna butonu */}
         <button
           onClick={playWeek}
           className="w-full py-4 rounded-md font-bold text-white text-lg transition-all hover:scale-[1.02] animate-pulse-glow"
@@ -258,15 +244,12 @@ export function MatchDay() {
     );
   };
 
-  // ─────────────────────────────────────────────
-  // Maç detayı (son oynanan)
-  // ─────────────────────────────────────────────
   const renderMatchDetail = () => {
     const match = lastPlayedMatch;
     if (!match) return null;
 
-    const home = state.clubs[match.homeId];
-    const away = state.clubs[match.awayId];
+    const home = state.clubs[match.homeId!];
+    const away = state.clubs[match.awayId!];
     const isUserHome = match.homeId === state.userClubId;
     const ourScore = isUserHome ? match.homeScore : match.awayScore;
     const theirScore = isUserHome ? match.awayScore : match.homeScore;
@@ -292,20 +275,18 @@ export function MatchDay() {
     const awayXG = stats.xG?.away ?? 0;
 
     return (
-      <div className="card space-y-6">
-        {/* Başlık */}
+      <div className="glass-panel rounded-xl p-5 space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">📺 Son Maç — Hafta {match.week}</h2>
+          <h2 className="text-lg font-bold text-white">📺 Son Maç — Hafta {match.week}</h2>
           <span className={`text-sm font-bold px-3 py-1 rounded border ${resultConfig.bg} ${resultConfig.color}`}>
             {resultConfig.label}
           </span>
         </div>
 
-        {/* SKORBOARD */}
         <div className="flex items-center justify-center gap-6 py-4">
           <div className="flex flex-col items-center flex-1">
             <TeamBadge clubId={home.id} shortName={home.shortName} size="xl" />
-            <p className="text-sm font-bold mt-2">{home.name}</p>
+            <p className="text-sm font-bold mt-2 text-white">{home.name}</p>
           </div>
           <div className="flex flex-col items-center">
             <div className="text-5xl font-bold tabular-nums">
@@ -317,11 +298,10 @@ export function MatchDay() {
           </div>
           <div className="flex flex-col items-center flex-1">
             <TeamBadge clubId={away.id} shortName={away.shortName} size="xl" />
-            <p className="text-sm font-bold mt-2">{away.name}</p>
+            <p className="text-sm font-bold mt-2 text-white">{away.name}</p>
           </div>
         </div>
 
-        {/* İSTATİSTİKLER */}
         <div className="space-y-4 pt-4 border-t border-pitch-700">
           <h3 className="text-sm font-bold text-slate-400">📊 MAÇ İSTATİSTİKLERİ</h3>
 
@@ -359,7 +339,6 @@ export function MatchDay() {
           />
         </div>
 
-        {/* EVENT TIMELINE */}
         <div className="pt-4 border-t border-pitch-700">
           <h3 className="text-sm font-bold text-slate-400 mb-3">📅 DAKİKA DAKİKA</h3>
 
@@ -397,11 +376,10 @@ export function MatchDay() {
 
   return (
     <div className="space-y-6">
-      {/* HAFTA BAŞLIĞI + BU HAFTANIN MAÇLARI */}
-      <div className="card">
+      <div className="glass-panel rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-bold">Hafta {state.currentWeek} / {state.season}</h2>
+            <h2 className="text-xl font-bold text-white">Hafta {state.currentWeek} / {state.season}</h2>
             <p className="text-sm text-slate-400">{userClub?.name}</p>
           </div>
           {!state.seasonOver ? (

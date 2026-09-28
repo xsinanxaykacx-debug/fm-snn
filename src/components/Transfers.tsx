@@ -5,7 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import { scorePlayer } from '../engine/data/generateData';
 import type { Player, Position } from '../engine/types';
 import { TeamBadge } from './TeamBadge';
-import { getTeamColor } from '../utils/teamColors';
+import { PlayerDetailModal } from './PlayerDetailModal';
 
 // ═══════════════════════════════════════════════
 // MEVKİ RENKLERİ
@@ -27,10 +27,6 @@ function getRatingColor(rating: number): string {
   if (rating >= 50) return 'text-orange-400';
   return 'text-red-400';
 }
-
-// ═══════════════════════════════════════════════
-// FİLTRELER
-// ═══════════════════════════════════════════════
 
 const POSITIONS: (Position | 'ALL')[] = [
   'ALL', 'GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST',
@@ -55,28 +51,25 @@ interface PlayerRowProps {
   clubId: string;
   clubShort: string;
   canAfford: boolean;
-  isUser: boolean;
   onBuy: () => void;
+  onDetail: () => void;
 }
 
-function PlayerRow({ player, clubName, clubId, clubShort, canAfford, isUser, onBuy }: PlayerRowProps) {
+function PlayerRow({ player, clubName, clubId, clubShort, canAfford, onBuy, onDetail }: PlayerRowProps) {
   const rating = scorePlayer(player);
   const posColor = getPosColor(player.position);
-  const clubColor = getTeamColor(clubId);
 
   return (
-    <div className="card hover:bg-pitch-700/30 transition-colors">
-      <div className="flex items-center gap-3">
-        {/* Mevki rozeti */}
+    <div className="glass-panel rounded-xl p-3 hover:bg-pitch-700/20 transition-colors">
+      <div className="flex items-center gap-3 cursor-pointer" onClick={onDetail}>
         <div className={`w-12 h-12 rounded-lg ${posColor.bg} border-2 ${posColor.border} flex flex-col items-center justify-center flex-shrink-0`}>
           <span className={`text-[10px] font-bold ${posColor.text}`}>{player.position}</span>
           <span className={`text-lg font-bold ${getRatingColor(rating)}`}>{rating}</span>
         </div>
 
-        {/* İsim + kulüp */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <p className="font-bold text-sm truncate">{player.name}</p>
+            <p className="font-bold text-sm truncate text-white">{player.name}</p>
             {player.injuryWeeks > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-900/60 text-red-300">
                 🚑 {player.injuryWeeks}h
@@ -93,7 +86,6 @@ function PlayerRow({ player, clubName, clubId, clubShort, canAfford, isUser, onB
           </div>
         </div>
 
-        {/* Değer */}
         <div className="text-right flex-shrink-0">
           <p className="text-xs text-slate-400">Değer</p>
           <p className="font-bold text-sm text-accent">£{(player.value / 1_000_000).toFixed(2)}M</p>
@@ -102,29 +94,21 @@ function PlayerRow({ player, clubName, clubId, clubShort, canAfford, isUser, onB
           </p>
         </div>
 
-        {/* Satın Al butonu */}
         <div className="flex-shrink-0">
-          {isUser ? (
-            <span className="text-xs text-slate-500 px-3 py-1.5 rounded bg-pitch-700">
-              Sende
-            </span>
-          ) : (
-            <button
-              disabled={!canAfford}
-              onClick={onBuy}
-              className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
-                canAfford
-                  ? 'bg-accent hover:bg-accent-hover text-white'
-                  : 'bg-pitch-700 text-slate-500 cursor-not-allowed'
-              }`}
-            >
-              {canAfford ? '💸 Satın Al' : '❌ Yetersiz'}
-            </button>
-          )}
+          <button
+            disabled={!canAfford}
+            onClick={(e) => { e.stopPropagation(); onBuy(); }}
+            className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+              canAfford
+                ? 'bg-accent hover:bg-accent-hover text-white'
+                : 'bg-pitch-700 text-slate-500 cursor-not-allowed'
+            }`}
+          >
+            {canAfford ? '💸 Satın Al' : '❌ Yetersiz'}
+          </button>
         </div>
       </div>
 
-      {/* Mini istatistikler */}
       <div className="grid grid-cols-6 gap-2 mt-2 pt-2 border-t border-pitch-700/30">
         <MiniStat label="Hız" value={player.attributes.pace} />
         <MiniStat label="Şut" value={player.attributes.shooting} />
@@ -163,18 +147,16 @@ export function Transfers() {
   const [filterPos, setFilterPos] = useState<Position | 'ALL'>('ALL');
   const [searchText, setSearchText] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('rating');
-  const [maxValue, setMaxValue] = useState<number>(100); // milyon £
+  const [maxValue, setMaxValue] = useState<number>(100);
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
-  // Tüm oyuncuları al (kullanıcı hariç)
   let available = Object.values(state.players)
     .filter(p => p.clubId && p.clubId !== state.userClubId);
 
-  // Mevki filtresi
   if (filterPos !== 'ALL') {
     available = available.filter(p => p.position === filterPos);
   }
 
-  // Arama
   if (searchText.trim()) {
     const q = searchText.toLowerCase();
     available = available.filter(p =>
@@ -183,16 +165,13 @@ export function Transfers() {
     );
   }
 
-  // Değer filtresi
   available = available.filter(p => (p.value / 1_000_000) <= maxValue);
 
-  // Sıralama
   available = available.sort((a, b) => {
     if (sortBy === 'rating') return scorePlayer(b) - scorePlayer(a);
     if (sortBy === 'value') return b.value - a.value;
     if (sortBy === 'age') return a.age - b.age;
     if (sortBy === 'potential') {
-      // Genç + yüksek reyting = potansiyel
       const aScore = scorePlayer(a) * (35 - Math.min(a.age, 35));
       const bScore = scorePlayer(b) * (35 - Math.min(b.age, 35));
       return bScore - aScore;
@@ -207,11 +186,11 @@ export function Transfers() {
 
   return (
     <div className="space-y-4">
-      {/* ═══ BÜTÇE ═══ */}
-      <div className="card">
+      {/* BÜTÇE */}
+      <div className="glass-panel rounded-xl p-5">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="text-lg font-bold">💰 Transfer Pazarı</h2>
+            <h2 className="text-lg font-bold text-white">💰 Transfer Pazarı</h2>
             <p className="text-xs text-slate-400">
               {available.length} oyuncu mevcut
             </p>
@@ -222,7 +201,6 @@ export function Transfers() {
           </div>
         </div>
 
-        {/* Bütçe çubuğu */}
         <div className="w-full h-2 bg-pitch-700 rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-accent to-green-400 transition-all duration-500"
@@ -235,20 +213,16 @@ export function Transfers() {
         </div>
       </div>
 
-      {/* ═══ FİLTRELER ═══ */}
-      <div className="card space-y-3">
-        {/* Arama */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="🔍 Oyuncu veya kulüp ara..."
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            className="flex-1 bg-pitch-700 border border-pitch-600 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent"
-          />
-        </div>
+      {/* FİLTRELER */}
+      <div className="glass-panel rounded-xl p-5 space-y-3">
+        <input
+          type="text"
+          placeholder="🔍 Oyuncu veya kulüp ara..."
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          className="w-full bg-pitch-700 border border-pitch-600 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent"
+        />
 
-        {/* Mevki filtresi */}
         <div className="flex flex-wrap gap-1">
           {POSITIONS.map(pos => (
             <button
@@ -265,7 +239,6 @@ export function Transfers() {
           ))}
         </div>
 
-        {/* Sıralama + Değer filtresi */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">Sırala:</span>
@@ -299,9 +272,9 @@ export function Transfers() {
         </div>
       </div>
 
-      {/* ═══ OYUNCU LİSTESİ ═══ */}
+      {/* OYUNCU LİSTESİ */}
       {displayed.length === 0 ? (
-        <div className="card text-center text-slate-400 py-12">
+        <div className="glass-panel rounded-xl p-5 text-center text-slate-400 py-12">
           <p className="text-lg mb-2">🔍 Sonuç bulunamadı</p>
           <p className="text-xs">Filtreleri değiştirmeyi dene</p>
         </div>
@@ -318,12 +291,12 @@ export function Transfers() {
                 clubName={club?.name ?? '???'}
                 clubShort={club?.shortName ?? '???'}
                 canAfford={canAfford}
-                isUser={false}
                 onBuy={() => {
                   if (confirm(`${p.name}'ı £${(p.value / 1_000_000).toFixed(2)}M karşılığında satın almak istediğine emin misin?`)) {
                     buy(p.id);
                   }
                 }}
+                onDetail={() => setSelectedPlayer(p)}
               />
             );
           })}
@@ -334,6 +307,16 @@ export function Transfers() {
         <p className="text-xs text-slate-500 text-center">
           İlk 50 oyuncu gösteriliyor. Filtreleri kullanarak daraltabilirsin.
         </p>
+      )}
+
+      {/* MODAL */}
+      {selectedPlayer && (
+        <PlayerDetailModal
+          player={selectedPlayer}
+          clubId={selectedPlayer.clubId ?? ''}
+          clubName={state.clubs[selectedPlayer.clubId ?? '']?.name ?? ''}
+          onClose={() => setSelectedPlayer(null)}
+        />
       )}
     </div>
   );
