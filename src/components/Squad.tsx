@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { scorePlayer } from '../engine/data/generateData';
 import type { Player, Position } from '../engine/types';
+import { PlayerDetailModal } from './PlayerDetailModal';
 
 // ═══════════════════════════════════════════════
 // MEVKİ RENKLERİ
@@ -32,10 +33,6 @@ function getConditionColor(value: number): string {
   if (value >= 40) return 'bg-orange-500';
   return 'bg-red-500';
 }
-
-// ═══════════════════════════════════════════════
-// BAR COMPONENT
-// ═══════════════════════════════════════════════
 
 function Bar({ value, color, label }: { value: number; color: string; label: string }) {
   return (
@@ -67,7 +64,6 @@ function PlayerCard({ player, onClick }: { player: Player; onClick: () => void }
       onClick={onClick}
       className={`card cursor-pointer hover:scale-[1.02] transition-all border ${posColor.border} ${posColor.bg} relative`}
     >
-      {/* Sakat/cezalı badge */}
       {player.injuryWeeks > 0 && (
         <div className="absolute top-2 right-2 text-xs px-1.5 py-0.5 rounded bg-red-900/80 text-red-200">
           🚑 {player.injuryWeeks}h
@@ -79,7 +75,6 @@ function PlayerCard({ player, onClick }: { player: Player; onClick: () => void }
         </div>
       )}
 
-      {/* Üst: mevki + genel */}
       <div className="flex items-center justify-between mb-3">
         <div className={`text-xs font-bold px-2 py-1 rounded ${posColor.bg} ${posColor.text} border ${posColor.border}`}>
           {player.position}
@@ -89,20 +84,17 @@ function PlayerCard({ player, onClick }: { player: Player; onClick: () => void }
         </div>
       </div>
 
-      {/* İsim + yaş */}
       <div className="mb-3">
         <p className="text-sm font-bold truncate">{player.name}</p>
         <p className="text-xs text-slate-400">{player.age} yaş • {player.nationality}</p>
       </div>
 
-      {/* Barlar */}
       <div className="space-y-2 mb-3">
         <Bar value={player.condition} color={getConditionColor(player.condition)} label="Kondisyon" />
         <Bar value={player.form} color={getConditionColor(player.form)} label="Form" />
         <Bar value={player.morale} color={getConditionColor(player.morale)} label="Moral" />
       </div>
 
-      {/* Alt: değer */}
       <div className="flex items-center justify-between text-xs pt-2 border-t border-pitch-700/50">
         <span className="text-slate-400">Değer</span>
         <span className="font-bold text-accent">£{(player.value / 1_000_000).toFixed(2)}M</span>
@@ -137,6 +129,7 @@ export function Squad() {
 
   const [view, setView] = useState<'cards' | 'table'>('cards');
   const [posFilter, setPosFilter] = useState<Position | 'ALL'>('ALL');
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   const allSquad = Object.values(state.players)
     .filter(p => p.clubId === state.userClubId);
@@ -162,7 +155,7 @@ export function Squad() {
 
   return (
     <div className="space-y-4">
-      {/* ═══ ÖZET ═══ */}
+      {/* ÖZET */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="card">
           <p className="text-xs text-slate-400">Oyuncu Sayısı</p>
@@ -184,10 +177,9 @@ export function Squad() {
         </div>
       </div>
 
-      {/* ═══ FİLTRE + GÖRÜNÜM ═══ */}
+      {/* FİLTRE + GÖRÜNÜM */}
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          {/* Görünüm toggle */}
           <div className="flex gap-2">
             <button
               onClick={() => setView('cards')}
@@ -207,7 +199,6 @@ export function Squad() {
             </button>
           </div>
 
-          {/* Mevki filtresi */}
           <div className="flex flex-wrap gap-1">
             {POSITION_FILTERS.map(pf => (
               <button
@@ -230,24 +221,20 @@ export function Squad() {
         </p>
       </div>
 
-      {/* ═══ KART GÖRÜNÜMÜ ═══ */}
+      {/* KART GÖRÜNÜMÜ */}
       {view === 'cards' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {squad.map(player => (
             <PlayerCard
               key={player.id}
               player={player}
-              onClick={() => {
-                if (confirm(`${player.name}'ı satmak istediğine emin misin?`)) {
-                  sellPlayer(player.id);
-                }
-              }}
+              onClick={() => setSelectedPlayer(player)}
             />
           ))}
         </div>
       )}
 
-      {/* ═══ TABLO GÖRÜNÜMÜ ═══ */}
+      {/* TABLO GÖRÜNÜMÜ */}
       {view === 'table' && (
         <div className="card overflow-x-auto">
           <table className="w-full text-xs">
@@ -280,10 +267,11 @@ export function Squad() {
                 return (
                   <tr
                     key={p.id}
-                    className={`border-b border-pitch-700/50 hover:bg-pitch-700/30 ${
+                    className={`border-b border-pitch-700/50 hover:bg-pitch-700/30 cursor-pointer ${
                       p.injuryWeeks > 0 ? 'bg-red-900/20' :
                       p.suspensionWeeks > 0 ? 'bg-yellow-900/20' : ''
                     }`}
+                    onClick={() => setSelectedPlayer(p)}
                   >
                     <td className="py-1.5 font-medium whitespace-nowrap">
                       {p.name}
@@ -319,7 +307,8 @@ export function Squad() {
                     <td className="whitespace-nowrap text-accent">£{(p.value / 1_000_000).toFixed(2)}M</td>
                     <td>
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           if (confirm(`${p.name}'ı satmak istediğine emin misin?`)) {
                             sellPlayer(p.id);
                           }
@@ -335,6 +324,16 @@ export function Squad() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* MODAL */}
+      {selectedPlayer && (
+        <PlayerDetailModal
+          player={selectedPlayer}
+          clubId={state.userClubId}
+          clubName={state.clubs[state.userClubId]?.name ?? ''}
+          onClose={() => setSelectedPlayer(null)}
+        />
       )}
     </div>
   );

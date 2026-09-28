@@ -26,6 +26,11 @@
     @apply flex justify-between py-1 border-b border-pitch-700 text-sm;
   }
 }
+
+/* ═══════════════════════════════════════════════ */
+/* ANİMASYONLAR */
+/* ═══════════════════════════════════════════════ */
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -52,4 +57,69 @@
 
 .animate-pulse-glow {
   animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════ */
+/* GLASSMORPHISM */
+/* ═══════════════════════════════════════════════ */
+
+.glass-panel {
+  background: rgba(22, 28, 38, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-card {
+  background: rgba(30, 38, 51, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-modal {
+  background: rgba(15, 19, 26, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ═══════════════════════════════════════════════ */
+/* MODAL ANİMASYONLARI */
+/* ═══════════════════════════════════════════════ */
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-modal-in {
+  animation: modalFadeIn 0.25s ease-out;
+}
+
+.animate-backdrop-in {
+  animation: backdropFadeIn 0.2s ease-out;
+}
+
+/* ═══════════════════════════════════════════════ */
+/* RADAR GRAFİĞİ */
+/* ═══════════════════════════════════════════════ */
+
+.radar-container {
+  position: relative;
+  width: 100%;
+  max-width: 280px;
+  height: 260px;
+  margin: 0 auto;
 }

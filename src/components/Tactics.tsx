@@ -1,7 +1,10 @@
+// src/components/Tactics.tsx
+
 import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import type { Formation, Player, Position } from '../engine/types';
 import { getStartingXI, scorePlayer } from '../engine/data/generateData';
+import { PlayerDetailModal } from './PlayerDetailModal';
 
 const FORMATIONS: Formation[] = ['4-4-2', '4-3-3', '3-5-2', '4-2-3-1'];
 
@@ -60,56 +63,47 @@ const POSITIONS_ON_PITCH: Record<Formation, { pos: string; x: number; y: number 
 };
 
 // ═══════════════════════════════════════════════
-// OYUNCU KARTI
+// OYUNCU KARTI (saha içi)
 // ═══════════════════════════════════════════════
 
 interface PlayerChipProps {
   player: Player;
-  compact?: boolean;
-  draggable?: boolean;
+  slotIndex?: number;
   onDragStart?: (e: React.DragEvent, playerId: string, slotIndex?: number) => void;
   onDragEnd?: () => void;
+  onDoubleClick?: () => void;
   isDragging?: boolean;
-  slotIndex?: number;
 }
 
 function PlayerChip({
   player,
-  compact = false,
-  draggable = true,
+  slotIndex,
   onDragStart,
   onDragEnd,
+  onDoubleClick,
   isDragging = false,
-  slotIndex,
 }: PlayerChipProps) {
   const posColor = getPosColor(player.position);
   const rating = safeScore(player);
 
   return (
     <div
-      draggable={draggable}
+      draggable
       onDragStart={(e) => onDragStart?.(e, player.id, slotIndex)}
       onDragEnd={onDragEnd}
+      onDoubleClick={onDoubleClick}
       className={`cursor-grab active:cursor-grabbing transition-all ${
-        isDragging ? 'opacity-40 scale-95' : draggable ? 'hover:scale-105' : ''
+        isDragging ? 'opacity-40 scale-95' : 'hover:scale-105'
       }`}
     >
-      <div
-        className={`${compact ? 'px-2 py-1' : 'px-2 py-1.5'} rounded-md border-2 ${posColor.border} ${posColor.bg} backdrop-blur-sm shadow-lg`}
-      >
+      <div className={`px-2 py-1 rounded-md border-2 ${posColor.border} ${posColor.bg} backdrop-blur-sm shadow-lg`}>
         <div className="flex items-center gap-1.5">
           <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${posColor.bg} ${posColor.text}`}>
             {player.position}
           </span>
-          {!compact && (
-            <span className="text-[10px] font-medium text-white truncate max-w-[70px]">
-              {player.name.split(' ').pop()}
-            </span>
-          )}
-          <span className={`text-[10px] font-bold ${
+          <span className={`text-xs font-bold ${
             rating >= 70 ? 'text-green-300' :
-            rating >= 60 ? 'text-yellow-300' :
-            rating >= 50 ? 'text-orange-300' : 'text-red-300'
+            rating >= 60 ? 'text-yellow-300' : 'text-orange-300'
           }`}>
             {rating}
           </span>
@@ -120,7 +114,7 @@ function PlayerChip({
 }
 
 // ═══════════════════════════════════════════════
-// DROP SLOT (Saha)
+// DROP SLOT
 // ═══════════════════════════════════════════════
 
 interface DropSlotProps {
@@ -132,6 +126,7 @@ interface DropSlotProps {
   onDrop: (fromSlot: number | null, toSlot: number, fromPlayerId: string) => void;
   onDragStart: (e: React.DragEvent, playerId: string, slotIndex?: number) => void;
   onDragEnd: () => void;
+  onDetail: (p: Player) => void;
   draggingId: string | null;
 }
 
@@ -144,6 +139,7 @@ function DropSlot({
   onDrop,
   onDragStart,
   onDragEnd,
+  onDetail,
   draggingId,
 }: DropSlotProps) {
   const [isOver, setIsOver] = useState(false);
@@ -180,11 +176,11 @@ function DropSlot({
         {player ? (
           <PlayerChip
             player={player}
-            compact
+            slotIndex={slotIndex}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
+            onDoubleClick={() => onDetail(player)}
             isDragging={draggingId === player.id}
-            slotIndex={slotIndex}
           />
         ) : (
           <div className={`w-12 h-12 rounded-full border-2 border-dashed ${posColor.border} ${posColor.bg} flex items-center justify-center`}>
@@ -228,6 +224,7 @@ export function Tactics() {
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [posFilter, setPosFilter] = useState<Position | 'ALL'>('ALL');
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   const userClub = state.clubs[state.userClubId];
 
@@ -236,7 +233,6 @@ export function Tactics() {
   const tactic = userClub.tactic;
   const posOnPitch = POSITIONS_ON_PITCH[tactic.formation];
 
-  // Geçerli lineup
   const autoLineup = getStartingXI(userClub.id, state.players, tactic.formation).map(p => p.id);
   const effectiveLineup = state.userLineup.length === 11 ? state.userLineup : autoLineup;
 
@@ -244,7 +240,6 @@ export function Tactics() {
     .map(id => state.players[id])
     .filter((p): p is Player => p !== undefined);
 
-  // TÜM kadro (sahadakiler + yedekler)
   const allSquad = Object.values(state.players)
     .filter(p => p.clubId === userClub.id)
     .filter(p => posFilter === 'ALL' || p.position === posFilter)
@@ -255,7 +250,6 @@ export function Tactics() {
       return safeScore(b) - safeScore(a);
     });
 
-  // Reyting ortalamaları
   const lineupAvg = lineupPlayers.length > 0
     ? lineupPlayers.reduce((s, p) => s + safeScore(p), 0) / lineupPlayers.length
     : 0;
@@ -265,7 +259,6 @@ export function Tactics() {
     ? allSquadForAvg.reduce((s, p) => s + safeScore(p), 0) / allSquadForAvg.length
     : 0;
 
-  // Sürükle-bırak
   const handleDragStart = (e: React.DragEvent, playerId: string, slotIndex?: number) => {
     e.dataTransfer.setData('playerId', playerId);
     if (slotIndex !== undefined) {
@@ -283,20 +276,15 @@ export function Tactics() {
     const currentLineup = [...effectiveLineup];
 
     if (fromSlot === null) {
-      // Yedekten/kadrodan geliyor
-      // Zaten sahada mı?
       const existingIdx = currentLineup.indexOf(fromPlayerId);
       if (existingIdx !== -1) {
-        // Sahadaki oyuncu başka slota bırakıldı
         const temp = currentLineup[toSlot];
         currentLineup[toSlot] = fromPlayerId;
         currentLineup[existingIdx] = temp;
       } else {
-        // Yedekten geliyor — mevcut oyuncuyu yedeğe gönder
         currentLineup[toSlot] = fromPlayerId;
       }
     } else {
-      // Sahadan sahaya
       if (fromSlot === toSlot) return;
       const temp = currentLineup[toSlot];
       currentLineup[toSlot] = fromPlayerId;
@@ -308,7 +296,7 @@ export function Tactics() {
   };
 
   const handleAutoSelect = () => {
-    setLineup([]); // otomatik seçime dön
+    setLineup([]);
     setDraggingId(null);
   };
 
@@ -338,7 +326,7 @@ export function Tactics() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      {/* ═══ SOL: TAKTİK ═══ */}
+      {/* SOL: TAKTİK */}
       <div className="lg:col-span-3 card">
         <h2 className="text-base font-bold mb-3">🎯 Taktik</h2>
         <div className="space-y-3">
@@ -414,7 +402,7 @@ export function Tactics() {
         </div>
       </div>
 
-      {/* ═══ ORTA: SAHA ═══ */}
+      {/* ORTA: SAHA */}
       <div className="lg:col-span-5 card">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold">⚽ İlk 11</h2>
@@ -450,6 +438,7 @@ export function Tactics() {
               onDrop={handleDrop}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onDetail={setSelectedPlayer}
               draggingId={draggingId}
             />
           ))}
@@ -461,7 +450,7 @@ export function Tactics() {
         </div>
       </div>
 
-      {/* ═══ SAĞ: TÜM KADRO ═══ */}
+      {/* SAĞ: TÜM KADRO */}
       <div className="lg:col-span-4 card">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold">
@@ -470,7 +459,6 @@ export function Tactics() {
           <span className="text-xs text-slate-400">Ort: {squadAvg.toFixed(1)}</span>
         </div>
 
-        {/* Mevki filtresi */}
         <div className="flex flex-wrap gap-1 mb-3">
           {POSITION_FILTERS.map(pf => (
             <button
@@ -487,7 +475,6 @@ export function Tactics() {
           ))}
         </div>
 
-        {/* Oyuncu listesi */}
         <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
           {allSquad.map(player => {
             const isInLineup = effectiveLineup.includes(player.id);
@@ -500,6 +487,7 @@ export function Tactics() {
                 draggable
                 onDragStart={(e) => handleDragStart(e, player.id)}
                 onDragEnd={handleDragEnd}
+                onClick={() => setSelectedPlayer(player)}
                 className={`cursor-grab active:cursor-grabbing px-2 py-1.5 rounded-md border transition-all hover:scale-[1.02] ${
                   isInLineup
                     ? `${posColor.border} ${posColor.bg} ring-1 ring-accent/40`
@@ -539,9 +527,19 @@ export function Tactics() {
         </div>
 
         <p className="text-[10px] text-slate-500 mt-3">
-          💡 Sahaya sürükle → oyuncu değişir. Sahadan buraya sürükle → yedeğe döner.
+          💡 Sahaya sürükle → oyuncu değişir. Detay için tıkla.
         </p>
       </div>
+
+      {/* MODAL */}
+      {selectedPlayer && (
+        <PlayerDetailModal
+          player={selectedPlayer}
+          clubId={state.userClubId}
+          clubName={state.clubs[state.userClubId]?.name ?? ''}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 }
