@@ -34,39 +34,47 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-pitch-900">
+      {/* ═══ HEADER ═══ */}
       <header className="bg-pitch-800 border-b border-pitch-700 px-6 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          {/* Sol: Kulüp bilgisi */}
+          <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-accent">⚽ FM Clone</h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 truncate">
               {userClub?.name} • Sezon {season} • Hafta {week} • Bütçe: £{(budget / 1_000_000).toFixed(1)}M
             </p>
           </div>
+
+          {/* Sağ: Yeni Oyun */}
           <button
             onClick={() => { if (confirm('Yeni oyun başlatılsın mı? Mevcut kayıt silinir.')) newGame(); }}
-            className="btn-secondary text-sm"
+            className="btn-secondary text-sm flex-shrink-0"
           >
             🔄 Yeni Oyun
           </button>
         </div>
       </header>
 
-      <nav className="bg-pitch-800 border-b border-pitch-700 px-6 flex overflow-x-auto">
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
-              tab === t.key
-                ? 'text-accent border-b-2 border-accent'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* ═══ NAVİGASYON — ORTALI ═══ */}
+      <nav className="bg-pitch-800 border-b border-pitch-700 px-6">
+        <div className="flex justify-center items-center gap-1 overflow-x-auto">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                tab === t.key
+                  ? 'text-accent border-b-2 border-accent'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </nav>
 
+      {/* ═══ İÇERİK ═══ */}
       <main className="p-6 max-w-7xl mx-auto">
         {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
         {tab === 'match' && <MatchDay />}
