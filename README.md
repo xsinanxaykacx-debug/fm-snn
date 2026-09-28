@@ -1,32 +1,19 @@
-# React + TypeScript + Vite
+# ⚽ FM Clone
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Tarayıcıda oynanabilen FM/CM tarzı menajerlik oyunu.
 
-Currently, two official plugins are available:
+## 🎮 Özellikler
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **16 takım, 320 oyuncu** — tam lig sistemi
+- **Maç simülasyonu** — dakika dakika event'ler, gerçekçi istatistikler
+- **Taktik sistemi** — 4 formasyon, zihniyet, pres, tempo
+- **Antrenman sistemi** — 5 odak, 3 yoğunluk, yaş bazlı gelişim
+- **Sakatlık + Kart cezası** — 1-8 hafta sakatlık, sarı/kırmızı kart birikimi
+- **Transfer pazarı** — oyuncu al/sat
+- **Otomatik kayıt** — localStorage
 
-## React Compiler
+## 🚀 Kurulum
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+```bash
+npm install
+npm run dev
