@@ -11,21 +11,11 @@ import {
 import {
   choosePossessionTeam,
   chooseAttackZone,
-  calculateTurnoverChance,
 } from './possession';
-import {
-  chooseAction,
-  passSuccessChance,
-  dribbleSuccessChance,
-  crossSuccessChance,
-  pickPasser,
-  pickDribbler,
-  pickShooter,
-  pickDefender,
-} from './attack';
-import { calculateChance } from './chance';
-import { resolveDefense } from './defense';
+import { createAttackSequence } from './attackSequence';
+import { calculateChanceFromSequence } from './chance';
 import { resolveShot } from './goalkeeper';
+import { pickShooter } from './attack';
 
 function randomMinute(): number {
   return Math.floor(Math.random() * 90) + 1;
@@ -38,6 +28,25 @@ function pickInjuryType(severity: 'light' | 'medium' | 'severe'): string {
   const pool = severity === 'light' ? light : severity === 'medium' ? medium : severe;
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
+// ═══════════════════════════════════════════════
+// YARDIMCI: injuredPlayers guvenli erisim
+// ═══════════════════════════════════════════════
+
+function isInjured(teamState: any, playerId: string): boolean {
+  if (!teamState.injuredPlayers) return false;
+  return teamState.injuredPlayers.includes(playerId);
+}
+
+function ensureInjuredPlayers(teamState: any): void {
+  if (!teamState.injuredPlayers) {
+    teamState.injuredPlayers = [];
+  }
+}
+
+// ═══════════════════════════════════════════════
+// ANA MOTOR
+// ═══════════════════════════════════════════════
 
 export function simulateMatch(
   home: Club,
@@ -61,7 +70,12 @@ export function simulateMatch(
     ballZone: 'centerMidfield',
     events: [],
     possessionCount: { home: 0, away: 0 },
+    sequences: [],
   };
+
+  // injuredPlayers guvenli
+  ensureInjuredPlayers(state.home);
+  ensureInjuredPlayers(state.away);
 
   const totalTicks = 36;
   const minutePerTick = 2.5;
@@ -73,6 +87,8 @@ export function simulateMatch(
     state.minute = Math.min(90, baseMinute + Math.floor(Math.random() * 3));
 
     updateDynamicTactics(state);
+    processCardsInMatch(state, players, sentOff, matchYellows, pendingEvents);
+    processInjuriesInMatch(state, players, sentOff, pendingEvents);
 
     const possessionTeam = choosePossessionTeam(state);
     state.possessionCount[possessionTeam]++;
@@ -83,86 +99,44 @@ export function simulateMatch(
     const attackClub = attackState.club;
     const defendClub = defendState.club;
 
-    const { zone, advantagePct } = chooseAttackZone(state, attackState, defendState);
+    // Guvenli erisim
+    ensureInjuredPlayers(attackState);
+    ensureInjuredPlayers(defendState);
+
+    const { zone } = chooseAttackZone(state, attackState, defendState);
 
     const attackXI = getStartingXI(attackClub.id, players, attackClub.tactic.formation)
-      .filter(p => !sentOff.has(p.id));
+      .filter(p => !sentOff.has(p.id) && !isInjured(attackState, p.id));
     const defendXI = getStartingXI(defendClub.id, players, defendClub.tactic.formation)
-      .filter(p => !sentOff.has(p.id));
+      .filter(p => !sentOff.has(p.id) && !isInjured(defendState, p.id));
 
-    if (attackXI.length < 7 || defendXI.length < 7) continue;
-
-    const attacker = pickDribbler(attackXI, zone) || pickPasser(attackXI);
-    if (!attacker) continue;
-
-    const action = chooseAction(attackState, zone, attacker);
-
-    const turnoverChance = calculateTurnoverChance(attackState, defendState);
-    if (Math.random() < turnoverChance) {
-      attackState.turnovers++;
-      defendState.recoveries++;
+    if (attackXI.length < 7 || defendXI.length < 7) {
       consumeCondition(state);
       continue;
     }
 
-    let success = false;
-    const defender = pickDefender(defendXI, zone);
+    const sequence = createAttackSequence(attackState, defendState, attackXI, defendXI, zone);
+    state.sequences.push(sequence);
 
-    if (action === 'pass') {
-      attackState.passes++;
-      const prob = passSuccessChance(attacker, defender, zone, attackState.tempo);
-      success = Math.random() < prob;
-      if (success) attackState.passesCompleted++;
-    } else if (action === 'dribble') {
-      attackState.dribbles++;
-      const prob = dribbleSuccessChance(attacker, defender);
-      success = Math.random() < prob;
-      if (success) attackState.dribblesSuccess++;
-    } else if (action === 'cross') {
-      attackState.crosses++;
-      const prob = crossSuccessChance(attacker, defender);
-      success = Math.random() < prob;
-      if (success) attackState.crossesSuccess++;
-    } else if (action === 'longShot') {
-      success = true;
-    } else if (action === 'counter') {
-      const prob = dribbleSuccessChance(attacker, defender);
-      success = Math.random() < prob;
-    } else {
-      success = true;
-    }
-
-    if (success && (action === 'pass' || action === 'dribble' || action === 'cross')) {
-      const defenseResult = resolveDefense(action, attacker, defender, attackState, defendState);
-      if (defenseResult.turnover) {
-        success = false;
-        attackState.turnovers++;
-        defendState.recoveries++;
+    if (!sequence.resultedInShot || sequence.chanceQuality <= 30) {
+      if (sequence.actions.length > 0) {
+        const lastAction = sequence.actions[sequence.actions.length - 1];
+        if (!lastAction.success) {
+          attackState.turnovers++;
+          defendState.recoveries++;
+        }
       }
-    }
-
-    if (!success) {
       consumeCondition(state);
       continue;
     }
 
-    const chanceProbability = calculateChanceCreation(zone, action, advantagePct);
-    if (Math.random() > chanceProbability) {
+    const shooter = pickShooter(attackXI, sequence.finalZone) || attackXI[0];
+    if (!shooter) {
       consumeCondition(state);
       continue;
     }
 
-    const shooter = pickShooter(attackXI, zone);
-    if (!shooter) continue;
-
-    const chance = calculateChance(
-      shooter,
-      zone,
-      action,
-      attackState,
-      defendState,
-      action === 'counter'
-    );
+    const chance = calculateChanceFromSequence(sequence, shooter, attackState, defendState);
 
     attackState.shots++;
     attackState.xG += chance.xG;
@@ -170,7 +144,6 @@ export function simulateMatch(
     const gk = defendXI.find(p => p.position === 'GK') || null;
     const shotResult = resolveShot(chance, gk, defendState);
 
-    const attackerClub = attackState.club;
     const isHome = possessionTeam === 'home';
 
     if (shotResult.outcome === 'goal') {
@@ -184,14 +157,16 @@ export function simulateMatch(
       attackState.onTarget++;
       attackState.dangerousAttacks++;
 
+      const zoneLabel = getZoneLabel(sequence.finalZone);
+
       pendingEvents.push({
         minute: state.minute,
         event: {
           minute: state.minute,
           type: 'goal',
           playerId: shooter.id,
-          clubId: attackerClub.id,
-          description: `⚽ GOL! ${shooter.name} (${attackerClub.shortName}) - ${getZoneLabel(zone)} ${chance.distance.toFixed(0)}m (xG: ${chance.xG.toFixed(2)})`,
+          clubId: attackClub.id,
+          description: `GOL! ${shooter.name} (${attackClub.shortName}) - ${zoneLabel} ${chance.distance.toFixed(0)}m (xG: ${chance.xG.toFixed(2)})`,
         },
       });
     } else if (shotResult.outcome === 'save') {
@@ -203,8 +178,8 @@ export function simulateMatch(
           minute: state.minute,
           type: 'save',
           playerId: shooter.id,
-          clubId: attackerClub.id,
-          description: `🧤 ${shooter.name} şutunu ${gk?.name ?? 'kaleci'} kurtardı (${attackerClub.shortName})`,
+          clubId: attackClub.id,
+          description: `${shooter.name} sutunu ${gk?.name ?? 'kaleci'} kurtardi (${attackClub.shortName})`,
         },
       });
     } else if (shotResult.outcome === 'blocked') {
@@ -214,8 +189,8 @@ export function simulateMatch(
           minute: state.minute,
           type: 'miss',
           playerId: shooter.id,
-          clubId: attackerClub.id,
-          description: `🛡️ ${shooter.name} şutu savunmaya çarptı (${attackerClub.shortName})`,
+          clubId: attackClub.id,
+          description: `${shooter.name} sutu savunmaya carpti (${attackClub.shortName})`,
         },
       });
     } else {
@@ -225,105 +200,13 @@ export function simulateMatch(
           minute: state.minute,
           type: 'miss',
           playerId: shooter.id,
-          clubId: attackerClub.id,
-          description: `❌ ${shooter.name} şutu auta gitti (${attackerClub.shortName})`,
+          clubId: attackClub.id,
+          description: `${shooter.name} sutu auta gitti (${attackClub.shortName})`,
         },
       });
     }
 
     consumeCondition(state);
-  }
-
-  const cardCount = Math.floor(Math.random() * 5) + 2;
-
-  for (let i = 0; i < cardCount; i++) {
-    const isHome = Math.random() < 0.5;
-    const club = isHome ? home : away;
-    const teamState = isHome ? state.home : state.away;
-    const xi = getStartingXI(club.id, players, club.tactic.formation);
-    const activePlayers = xi.filter(p => !sentOff.has(p.id));
-    const defenders = activePlayers.filter(p => ['DC', 'DL', 'DR', 'DM', 'MC'].includes(p.position));
-    const pool = defenders.length > 0 ? defenders : activePlayers;
-    if (pool.length === 0) continue;
-
-    const player = pool[Math.floor(Math.random() * pool.length)];
-    if (!player) continue;
-    const cardMinute = randomMinute();
-
-    if (matchYellows.has(player.id)) {
-      players[player.id] = { ...player, suspensionWeeks: 2, yellowCards: 0 };
-      teamState.redCards++;
-      sentOff.add(player.id);
-      pendingEvents.push({
-        minute: cardMinute,
-        event: {
-          minute: cardMinute, type: 'red', playerId: player.id, clubId: club.id,
-          description: `🟥 KIRMIZI! ${player.name} ikinci sarıdan atıldı (${club.shortName})`,
-        },
-      });
-      continue;
-    }
-
-    const red = Math.random() < 0.06;
-    if (red) {
-      players[player.id] = { ...player, suspensionWeeks: 2, yellowCards: 0 };
-      teamState.redCards++;
-      sentOff.add(player.id);
-      pendingEvents.push({
-        minute: cardMinute,
-        event: {
-          minute: cardMinute, type: 'red', playerId: player.id, clubId: club.id,
-          description: `🟥 KIRMIZI! ${player.name} oyundan atıldı (${club.shortName})`,
-        },
-      });
-    } else {
-      matchYellows.add(player.id);
-      const newYellow = (player.yellowCards ?? 0) + 1;
-      if (newYellow >= 4) {
-        players[player.id] = { ...player, yellowCards: 0, suspensionWeeks: 1 };
-        pendingEvents.push({
-          minute: cardMinute,
-          event: {
-            minute: cardMinute, type: 'yellow', playerId: player.id, clubId: club.id,
-            description: `🟨 ${player.name} 4. sarıdan ceza aldı (${club.shortName})`,
-          },
-        });
-      } else {
-        players[player.id] = { ...player, yellowCards: newYellow };
-        pendingEvents.push({
-          minute: cardMinute,
-          event: {
-            minute: cardMinute, type: 'yellow', playerId: player.id, clubId: club.id,
-            description: `🟨 ${player.name} sarı kart gördü (${newYellow}/4) (${club.shortName})`,
-          },
-        });
-      }
-    }
-  }
-
-  if (Math.random() < 0.20) {
-    const isHome = Math.random() < 0.5;
-    const club = isHome ? home : away;
-    const xi = getStartingXI(club.id, players, club.tactic.formation);
-    const activePlayers = xi.filter(p => !sentOff.has(p.id));
-    if (activePlayers.length > 0) {
-      const player = activePlayers[Math.floor(Math.random() * activePlayers.length)];
-      const injuryRoll = Math.random();
-      let weeks: number;
-      let type: string;
-      if (injuryRoll < 0.6) { weeks = 1; type = pickInjuryType('light'); }
-      else if (injuryRoll < 0.88) { weeks = 2 + Math.floor(Math.random() * 3); type = pickInjuryType('medium'); }
-      else { weeks = 5 + Math.floor(Math.random() * 4); type = pickInjuryType('severe'); }
-      const injMinute = randomMinute();
-      players[player.id] = { ...player, injuryWeeks: weeks, injuryType: type };
-      pendingEvents.push({
-        minute: injMinute,
-        event: {
-          minute: injMinute, type: 'injury', playerId: player.id, clubId: club.id,
-          description: `🚑 ${player.name} sakatlandı - ${type} (${weeks} hafta)`,
-        },
-      });
-    }
   }
 
   events.push(...pendingEvents.sort((a, b) => a.minute - b.minute).map(e => e.event));
@@ -357,34 +240,160 @@ export function simulateMatch(
   };
 }
 
-function calculateChanceCreation(
-  zone: string,
-  action: string,
-  advantagePct: number
-): number {
-  // 2.67 gol/maç hedefi için
-  let base = 0.75;
-  if (zone.includes('Attack')) base = 0.95;
-  else if (zone.includes('Midfield')) base = 0.55;
+// ═══════════════════════════════════════════════
+// MAC ICI KARTLAR
+// ═══════════════════════════════════════════════
 
-  if (action === 'cross') base += 0.02;
-  else if (action === 'dribble') base += 0.03;
-  else if (action === 'longShot') base = 0.70;
-  else if (action === 'counter') base += 0.08;
+function processCardsInMatch(
+  state: MatchState,
+  players: Record<string, Player>,
+  sentOff: Set<string>,
+  matchYellows: Set<string>,
+  pendingEvents: { minute: number; event: MatchEvent }[]
+): void {
+  if (Math.random() > 0.08) return;
 
-  base += (advantagePct - 50) * 0.005;
+  const isHome = Math.random() < 0.5;
+  const club = isHome ? state.home.club : state.away.club;
+  const teamState = isHome ? state.home : state.away;
+  ensureInjuredPlayers(teamState);
 
-  return Math.max(0.30, Math.min(0.98, base));
+  const xi = getStartingXI(club.id, players, club.tactic.formation);
+  const activePlayers = xi.filter(p =>
+    !sentOff.has(p.id) && !isInjured(teamState, p.id)
+  );
+
+  const defenders = activePlayers.filter(p =>
+    ['DC', 'DL', 'DR', 'DM', 'MC'].includes(p.position)
+  );
+  const pool = defenders.length > 0 ? defenders : activePlayers;
+  if (pool.length === 0) return;
+
+  const player = pool[Math.floor(Math.random() * pool.length)];
+  if (!player) return;
+
+  const cardMinute = state.minute;
+
+  if (matchYellows.has(player.id)) {
+    players[player.id] = { ...player, suspensionWeeks: 2, yellowCards: 0 };
+    teamState.redCards++;
+    sentOff.add(player.id);
+    pendingEvents.push({
+      minute: cardMinute,
+      event: {
+        minute: cardMinute,
+        type: 'red',
+        playerId: player.id,
+        clubId: club.id,
+        description: `KIRMIZI! ${player.name} ikinci saridan atildi (${club.shortName})`,
+      },
+    });
+    return;
+  }
+
+  const red = Math.random() < 0.06;
+  if (red) {
+    players[player.id] = { ...player, suspensionWeeks: 2, yellowCards: 0 };
+    teamState.redCards++;
+    sentOff.add(player.id);
+    pendingEvents.push({
+      minute: cardMinute,
+      event: {
+        minute: cardMinute,
+        type: 'red',
+        playerId: player.id,
+        clubId: club.id,
+        description: `KIRMIZI! ${player.name} oyundan atildi (${club.shortName})`,
+      },
+    });
+  } else {
+    matchYellows.add(player.id);
+    const newYellow = (player.yellowCards ?? 0) + 1;
+    if (newYellow >= 4) {
+      players[player.id] = { ...player, yellowCards: 0, suspensionWeeks: 1 };
+      pendingEvents.push({
+        minute: cardMinute,
+        event: {
+          minute: cardMinute,
+          type: 'yellow',
+          playerId: player.id,
+          clubId: club.id,
+          description: `${player.name} 4. saridan ceza aldi (${club.shortName})`,
+        },
+      });
+    } else {
+      players[player.id] = { ...player, yellowCards: newYellow };
+      pendingEvents.push({
+        minute: cardMinute,
+        event: {
+          minute: cardMinute,
+          type: 'yellow',
+          playerId: player.id,
+          clubId: club.id,
+          description: `${player.name} sari kart gordu (${newYellow}/4) (${club.shortName})`,
+        },
+      });
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+// MAC ICI SAKATLIKLAR
+// ═══════════════════════════════════════════════
+
+function processInjuriesInMatch(
+  state: MatchState,
+  players: Record<string, Player>,
+  sentOff: Set<string>,
+  pendingEvents: { minute: number; event: MatchEvent }[]
+): void {
+  if (Math.random() > 0.015) return;
+
+  const isHome = Math.random() < 0.5;
+  const club = isHome ? state.home.club : state.away.club;
+  const teamState = isHome ? state.home : state.away;
+  ensureInjuredPlayers(teamState);
+
+  const xi = getStartingXI(club.id, players, club.tactic.formation);
+  const activePlayers = xi.filter(p =>
+    !sentOff.has(p.id) && !isInjured(teamState, p.id)
+  );
+  if (activePlayers.length === 0) return;
+
+  const player = activePlayers[Math.floor(Math.random() * activePlayers.length)];
+  if (!player) return;
+
+  const injuryRoll = Math.random();
+  let weeks: number;
+  let type: string;
+  if (injuryRoll < 0.6) { weeks = 1; type = pickInjuryType('light'); }
+  else if (injuryRoll < 0.88) { weeks = 2 + Math.floor(Math.random() * 3); type = pickInjuryType('medium'); }
+  else { weeks = 5 + Math.floor(Math.random() * 4); type = pickInjuryType('severe'); }
+
+  const injMinute = state.minute;
+  players[player.id] = { ...player, injuryWeeks: weeks, injuryType: type };
+  teamState.injuredPlayers.push(player.id);
+
+  pendingEvents.push({
+    minute: injMinute,
+    event: {
+      minute: injMinute,
+      type: 'injury',
+      playerId: player.id,
+      clubId: club.id,
+      description: `${player.name} sakatlandi - ${type} (${weeks} hafta)`,
+    },
+  });
 }
 
 function getZoneLabel(zone: string): string {
   const labels: Record<string, string> = {
     'leftAttack': 'sol kanattan',
     'centerAttack': 'merkezden',
-    'rightAttack': 'sağ kanattan',
+    'rightAttack': 'sag kanattan',
     'leftMidfield': 'sol orta',
     'centerMidfield': 'merkez orta',
-    'rightMidfield': 'sağ orta',
+    'rightMidfield': 'sag orta',
   };
   return labels[zone] || zone;
 }

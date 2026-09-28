@@ -1,4 +1,4 @@
-import type { Player } from '../types';
+import type { Player, AttackSequence } from '../types';
 import type { TeamMatchState } from './matchState';
 import { eff } from './teamAnalysis';
 
@@ -10,46 +10,35 @@ export interface Chance {
   type: 'open_play' | 'counter' | 'cross' | 'long_shot' | 'set_piece' | 'big_chance';
   xG: number;
   positionMultiplier: number;
+  chanceQuality: number;
 }
 
-export function calculateChance(
+export function calculateChanceFromSequence(
+  sequence: AttackSequence,
   shooter: Player,
-  zone: string,
-  actionType: string,
   attackingTeam: TeamMatchState,
-  defendingTeam: TeamMatchState,
-  isCounter: boolean = false
+  defendingTeam: TeamMatchState
 ): Chance {
-  let distance: number;
-  let chanceType: Chance['type'];
+  const quality = Math.max(0, Math.min(100, sequence.chanceQuality));
+  let distance = 25 - (quality / 100) * 19;
 
-  if (actionType === 'cross') {
-    distance = 5 + Math.random() * 8;
-    chanceType = 'cross';
-  } else if (actionType === 'counter' || isCounter) {
-    distance = 7 + Math.random() * 10;
-    chanceType = 'counter';
-  } else if (actionType === 'longShot') {
-    distance = 18 + Math.random() * 12;
-    chanceType = 'long_shot';
-  } else if (actionType === 'dribble') {
-    distance = 9 + Math.random() * 12;
-    chanceType = 'open_play';
-  } else {
-    distance = 8 + Math.random() * 15;
-    chanceType = 'open_play';
+  if (sequence.finalZone === 'centerAttack') {
+    distance = Math.max(6, distance - 3);
+  } else if (sequence.finalZone === 'leftAttack' || sequence.finalZone === 'rightAttack') {
+    distance = Math.max(8, distance);
   }
+
+  distance = Math.max(5, Math.min(30, distance + (Math.random() - 0.5) * 4));
 
   let angle: number;
-  if (zone === 'centerAttack') {
-    angle = 50 + Math.random() * 60;
+  if (sequence.finalZone === 'centerAttack') {
+    angle = 45 + (quality / 100) * 60;
   } else {
-    angle = 30 + Math.random() * 60;
+    angle = 25 + (quality / 100) * 50;
   }
+  angle = Math.max(15, Math.min(120, angle + (Math.random() - 0.5) * 15));
 
-  const defenderPressure = defendingTeam.analysis.pressing;
-  const pressure = 30 + Math.random() * 40 + (defenderPressure - 50) * 0.3;
-  const clampedPressure = Math.max(10, Math.min(90, pressure));
+  const pressure = Math.max(10, Math.min(95, sequence.finalPressure));
 
   const finishing = eff(shooter, 'finishing');
   const composure = eff(shooter, 'composure');
@@ -62,13 +51,12 @@ export function calculateChance(
   else if (distance <= 25) distanceFactor = 0.35;
   else distanceFactor = 0.15;
 
-  // xG baz: 0.30 (2.67 gol/maç hedefi)
-  let xg = 0.30 * distanceFactor;
-
+  // xG baz: 0.19 (2.67 gol/maç hedefi)
+  let xg = 0.19 * distanceFactor;
   xg *= 0.7 + (finishing / 100) * 0.6;
   xg *= 0.8 + (composure / 100) * 0.4;
   xg *= 0.9 + (technique / 100) * 0.2;
-  xg *= 1 - (clampedPressure / 100) * 0.5;
+  xg *= 1 - (pressure / 100) * 0.5;
 
   if (angle > 90) xg *= 0.7;
   else if (angle > 70) xg *= 0.9;
@@ -76,15 +64,22 @@ export function calculateChance(
   else xg *= 1.15;
 
   let positionMultiplier = 1.0;
-  if (chanceType === 'cross') positionMultiplier = 1.2;
-  else if (chanceType === 'counter') positionMultiplier = 1.15;
-  else if (chanceType === 'long_shot') positionMultiplier = 0.65;
-  else if (chanceType === 'open_play') positionMultiplier = 1.0;
+  let chanceType: Chance['type'] = 'open_play';
+
+  if (sequence.finalZone === 'leftAttack' || sequence.finalZone === 'rightAttack') {
+    positionMultiplier = 1.15;
+    chanceType = 'cross';
+  } else if (sequence.totalActions >= 4) {
+    positionMultiplier = 1.2;
+    chanceType = 'counter';
+  } else if (distance > 20) {
+    positionMultiplier = 0.7;
+    chanceType = 'long_shot';
+  }
 
   xg *= positionMultiplier;
 
-  const isBigChance = distance <= 10 && clampedPressure < 50 && angle > 60;
-  if (isBigChance) {
+  if (distance <= 10 && pressure < 50 && angle > 60) {
     xg *= 1.4;
     chanceType = 'big_chance';
   }
@@ -93,10 +88,11 @@ export function calculateChance(
     shooter,
     distance: Math.round(distance * 10) / 10,
     angle: Math.round(angle),
-    pressure: Math.round(clampedPressure),
+    pressure: Math.round(pressure),
     type: chanceType,
     xG: Math.max(0.01, Math.min(0.95, xg)),
     positionMultiplier,
+    chanceQuality: quality,
   };
 }
 
@@ -135,8 +131,8 @@ export function onTargetProbability(shooter: Player, xg: number): number {
   const finishing = eff(shooter, 'finishing');
 
   const quality = shooting * 0.4 + technique * 0.3 + finishing * 0.3;
-  let prob = 0.60 + (quality - 50) / 250;
-  prob += xg * 0.30;
+  let prob = 0.48 + (quality - 50) / 280;
+  prob += xg * 0.22;
 
-  return Math.max(0.30, Math.min(0.92, prob));
+  return Math.max(0.25, Math.min(0.88, prob));
 }
