@@ -383,14 +383,20 @@ export function MatchDay() {
             <p className="text-sm text-slate-400">{userClub?.name}</p>
           </div>
           {!state.seasonOver ? (
-            <button onClick={playWeek} className="btn-primary">
-              ▶ Haftayı Oyna
-            </button>
-          ) : (
-            <button onClick={advanceSeason} className="btn-primary">
-              🏁 Yeni Sezona Geç
-            </button>
-          )}
+  <button onClick={playWeek} className="btn-primary">
+    ▶ Haftayı Oyna
+  </button>
+) : (
+  <button
+    onClick={() => {
+      // Sezon sonu modalını tetikle
+      window.dispatchEvent(new CustomEvent('openSeasonEnd'));
+    }}
+    className="btn-primary animate-pulse"
+  >
+    🏆 Sezon Sonu Ödülleri
+  </button>
+)}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

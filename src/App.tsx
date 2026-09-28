@@ -10,14 +10,17 @@ import { MatchDay } from './components/MatchDay';
 import { Transfers } from './components/Transfers';
 import { Training } from './components/Training';
 import { Stats } from './components/Stats';
+import { SeasonEndModal } from './components/SeasonEndModal';
 
 type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training' | 'stats';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [showSeasonEnd, setShowSeasonEnd] = useState(false);
   const newGame = useGameStore(s => s.newGame);
   const season = useGameStore(s => s.season);
   const week = useGameStore(s => s.currentWeek);
+  const seasonOver = useGameStore(s => s.seasonOver);
   const userClub = useGameStore(s => s.clubs[s.userClubId]);
   const budget = userClub?.budget ?? 0;
 
@@ -34,10 +37,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-pitch-900">
-      {/* ═══ HEADER ═══ */}
+      {/* HEADER */}
       <header className="bg-pitch-800 border-b border-pitch-700 px-6 py-3">
         <div className="flex items-center justify-between gap-3">
-          {/* Sol: Kulüp bilgisi */}
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-accent">⚽ FM Clone</h1>
             <p className="text-xs text-slate-400 truncate">
@@ -45,17 +47,26 @@ export default function App() {
             </p>
           </div>
 
-          {/* Sağ: Yeni Oyun */}
-          <button
-            onClick={() => { if (confirm('Yeni oyun başlatılsın mı? Mevcut kayıt silinir.')) newGame(); }}
-            className="btn-secondary text-sm flex-shrink-0"
-          >
-            🔄 Yeni Oyun
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {seasonOver && (
+              <button
+                onClick={() => setShowSeasonEnd(true)}
+                className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-900 font-bold px-4 py-2 rounded text-sm animate-pulse"
+              >
+                🏆 Sezon Sonu
+              </button>
+            )}
+            <button
+              onClick={() => { if (confirm('Yeni oyun başlatılsın mı? Mevcut kayıt silinir.')) newGame(); }}
+              className="btn-secondary text-sm"
+            >
+              🔄 Yeni Oyun
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* ═══ NAVİGASYON — ORTALI ═══ */}
+      {/* NAVİGASYON — ORTALI */}
       <nav className="bg-pitch-800 border-b border-pitch-700 px-6">
         <div className="flex justify-center items-center gap-1 overflow-x-auto">
           {tabs.map(t => (
@@ -74,7 +85,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* ═══ İÇERİK ═══ */}
+      {/* İÇERİK */}
       <main className="p-6 max-w-7xl mx-auto">
         {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
         {tab === 'match' && <MatchDay />}
@@ -85,6 +96,11 @@ export default function App() {
         {tab === 'stats' && <Stats />}
         {tab === 'transfer' && <Transfers />}
       </main>
+
+      {/* SEZON SONU MODAL */}
+      {showSeasonEnd && (
+        <SeasonEndModal onClose={() => setShowSeasonEnd(false)} />
+      )}
     </div>
   );
 }
