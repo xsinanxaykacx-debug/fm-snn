@@ -18,7 +18,7 @@ interface Store extends GameState {
   setTactic: (tactic: Partial<Club['tactic']>) => void;
   advanceSeason: () => void;
   transferBuy: (playerId: string) => void;
-  transferSell: (playerId: string) => void;
+  transferSell: (playerId: string, buyerClubId?: string) => void;
   setTrainingFocus: (focus: TrainingFocus) => void;
   setTrainingIntensity: (intensity: 'light' | 'normal' | 'intense') => void;
 
@@ -369,7 +369,6 @@ export const useGameStore = create<Store>()(
           pendingPressMatch: userMatch,
         });
 
-        // Otomatik Inbox mesajları
         addInjuryMessages(newPlayers, state.userClubId, state.season, state.currentWeek);
         maybeAddTransferOffer(newPlayers, state.clubs, state.userClubId, state.season, state.currentWeek);
         maybeAddBoardMessage(newTable, state.userClubId, state.season, state.currentWeek);
@@ -378,10 +377,8 @@ export const useGameStore = create<Store>()(
       advanceSeason: () => {
         const state = get();
 
-        // 1. Oyuncuları geliştir
         let newPlayers = developPlayers(state.players);
 
-        // 2. Sezon istatistiklerini sıfırla
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           if (p.careerStats) {
@@ -400,7 +397,7 @@ export const useGameStore = create<Store>()(
           newPlayers[id] = p;
         }
 
-        // 3. AI TRANSFER WINDOW — AI takımlar transfer yapar
+        // AI TRANSFER WINDOW
         const transferResult = aiTransferWindow(
           state.clubs,
           newPlayers,
@@ -409,14 +406,12 @@ export const useGameStore = create<Store>()(
         newPlayers = transferResult.players;
         const newClubs = transferResult.clubs;
 
-        // 4. Yeni sezon fikstürü
         const season = state.season + 1;
         const fixtures = generateFixtures(newClubs, season);
         const table = initTable(Object.keys(newClubs));
 
         const news = [`🏆 Sezon ${season} başladı!`, ...state.news];
 
-        // AI transfer log'unu haberlere ekle (ilk 3)
         if (transferResult.log.length > 0) {
           news.unshift(`📨 Transfer sezonu: ${transferResult.log.length} transfer gerçekleşti`);
           transferResult.log.slice(0, 3).forEach(msg => {
@@ -435,7 +430,6 @@ export const useGameStore = create<Store>()(
           news: news.slice(0, 30),
         });
 
-        // Yeni sezon mesajı
         useInboxStore.getState().addMessage({
           season,
           week: 1,
@@ -445,7 +439,6 @@ export const useGameStore = create<Store>()(
           category: 'BOARD',
         });
 
-        // AI transfer özeti
         if (transferResult.log.length > 0) {
           useInboxStore.getState().addMessage({
             season,
@@ -489,20 +482,52 @@ export const useGameStore = create<Store>()(
         });
       },
 
-      transferSell: (playerId) => {
+      // ═══════════════════════════════════════════════
+      // TRANSFER SELL — ALICI KULÜBE GİDER
+      // ═══════════════════════════════════════════════
+      transferSell: (playerId, buyerClubId) => {
         const state = get();
         const player = state.players[playerId];
         const userClub = state.clubs[state.userClubId];
         if (!player || player.clubId !== state.userClubId || !userClub) return;
-        const updatedPlayer: Player = { ...player, clubId: null };
-        const updatedClub: Club = {
+
+        // Alıcı kulüp belirle
+        let finalBuyerId: string | null = null;
+
+        if (buyerClubId && state.clubs[buyerClubId]) {
+          finalBuyerId = buyerClubId;
+        } else {
+          // Rastgele bir alıcı seç (kullanıcı hariç)
+          const otherClubs = Object.values(state.clubs).filter(c => c.id !== state.userClubId);
+          if (otherClubs.length > 0) {
+            const buyer = otherClubs[Math.floor(Math.random() * otherClubs.length)];
+            finalBuyerId = buyer.id;
+          }
+        }
+
+        if (!finalBuyerId) return;
+
+        const updatedPlayer: Player = { ...player, clubId: finalBuyerId };
+
+        // Bütçeleri güncelle
+        const newClubs = { ...state.clubs };
+        newClubs[state.userClubId] = {
           ...userClub,
           budget: userClub.budget + Math.round(player.value * 0.9),
         };
+
+        const buyerClub = newClubs[finalBuyerId];
+        if (buyerClub && buyerClub.budget >= player.value) {
+          newClubs[finalBuyerId] = {
+            ...buyerClub,
+            budget: buyerClub.budget - player.value,
+          };
+        }
+
         set({
           players: { ...state.players, [playerId]: updatedPlayer },
-          clubs: { ...state.clubs, [state.userClubId]: updatedClub },
-          news: [`💸 ${player.name} satıldı (+£${((player.value * 0.9) / 1_000_000).toFixed(2)}M)`, ...state.news].slice(0, 30),
+          clubs: newClubs,
+          news: [`💸 ${player.name} satıldı → ${buyerClub?.shortName ?? '???'} (+£${((player.value * 0.9) / 1_000_000).toFixed(2)}M)`, ...state.news].slice(0, 30),
         });
 
         useInboxStore.getState().addMessage({
@@ -510,7 +535,7 @@ export const useGameStore = create<Store>()(
           week: state.currentWeek,
           sender: '💰 Finans Departmanı',
           title: `${player.name} satıldı`,
-          content: `${player.name} £${((player.value * 0.9) / 1_000_000).toFixed(2)}M karşılığında satıldı. Bütçe güncellendi.`,
+          content: `${player.name} £${((player.value * 0.9) / 1_000_000).toFixed(2)}M karşılığında ${buyerClub?.name ?? 'başka bir kulübe'} satıldı. Bütçe güncellendi.`,
           category: 'FINANCE',
         });
       },

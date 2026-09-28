@@ -4,10 +4,6 @@ import { useState } from 'react';
 import { useInboxStore } from '../store/useInboxStore';
 import type { InboxMessage, MessageCategory } from '../store/useInboxStore';
 import { useGameStore } from '../store/gameStore';
-import { TeamBadge } from './TeamBadge';
-// ═══════════════════════════════════════════════
-// KATEGORİ RENKLERİ
-// ═══════════════════════════════════════════════
 
 function getCategoryStyle(cat: MessageCategory): {
   icon: string;
@@ -38,12 +34,14 @@ function formatMoney(val: number): string {
   return `£${(val / 1_000_000).toFixed(2)}M`;
 }
 
-// ═══════════════════════════════════════════════
-// ANA COMPONENT
-// ═══════════════════════════════════════════════
-
 export function InboxView() {
-  const { messages, selectedMessageId, selectMessage, respondToOffer, deleteMessage, markAllAsRead } = useInboxStore();
+  const messages = useInboxStore(s => s.messages);
+  const selectedMessageId = useInboxStore(s => s.selectedMessageId);
+  const selectMessage = useInboxStore(s => s.selectMessage);
+  const respondToOffer = useInboxStore(s => s.respondToOffer);
+  const deleteMessage = useInboxStore(s => s.deleteMessage);
+  const markAllAsRead = useInboxStore(s => s.markAllAsRead);
+
   const state = useGameStore();
   const transferSell = useGameStore(s => s.transferSell);
 
@@ -63,8 +61,8 @@ export function InboxView() {
     if (!msg?.transferOffer) return;
 
     const offer = msg.transferOffer;
-    // Oyuncuyu sat
-    transferSell(offer.playerId);
+    // Alıcı kulübe gönder
+    transferSell(offer.playerId, offer.biddingClubId);
     respondToOffer(messageId, 'ACCEPT');
   };
 
@@ -72,7 +70,6 @@ export function InboxView() {
     respondToOffer(messageId, 'REJECT');
   };
 
-  // Kategori filtresi
   const categories: { key: MessageCategory | 'ALL'; label: string; icon: string }[] = [
     { key: 'ALL', label: 'Tümü', icon: '📬' },
     { key: 'TRANSFER', label: 'Transfer', icon: '📨' },
@@ -84,7 +81,6 @@ export function InboxView() {
 
   return (
     <div className="space-y-4">
-      {/* ═══ HEADER ═══ */}
       <div className="glass-panel rounded-xl p-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -112,7 +108,6 @@ export function InboxView() {
         </div>
       </div>
 
-      {/* ═══ KATEGORİ FİLTRELERİ ═══ */}
       <div className="glass-panel rounded-xl p-3">
         <div className="flex flex-wrap gap-2">
           {categories.map((cat) => (
@@ -132,10 +127,7 @@ export function InboxView() {
         </div>
       </div>
 
-      {/* ═══ İÇERİK: İKİ PANEL ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-[500px]">
-
-        {/* SOL: MESAJ LİSTESİ */}
         <div className="lg:col-span-1 glass-panel rounded-xl overflow-hidden flex flex-col max-h-[600px]">
           <div className="p-3 border-b border-pitch-700/50">
             <p className="text-xs text-slate-400 font-bold uppercase">
@@ -167,7 +159,7 @@ export function InboxView() {
                     )}
 
                     <div className="flex items-start gap-2">
-                      <div className={`text-xl flex-shrink-0 w-8 text-center`}>{cat.icon}</div>
+                      <div className="text-xl flex-shrink-0 w-8 text-center">{cat.icon}</div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-0.5">
@@ -193,7 +185,6 @@ export function InboxView() {
           </div>
         </div>
 
-        {/* SAĞ: MESAJ DETAYI */}
         <div className="lg:col-span-2 glass-panel rounded-xl p-5 overflow-y-auto max-h-[600px]">
           {selectedMessage ? (
             <MessageDetail
@@ -216,10 +207,6 @@ export function InboxView() {
   );
 }
 
-// ═══════════════════════════════════════════════
-// MESAJ DETAYI
-// ═══════════════════════════════════════════════
-
 function MessageDetail({
   message,
   onAccept,
@@ -236,7 +223,6 @@ function MessageDetail({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className={`p-4 rounded-xl border ${cat.bg} ${cat.border}`}>
         <div className="flex items-center gap-3">
           <span className="text-3xl">{cat.icon}</span>
@@ -256,14 +242,12 @@ function MessageDetail({
         </div>
       </div>
 
-      {/* İçerik */}
       <div className="bg-pitch-900/60 border border-pitch-700/40 rounded-xl p-4">
-        <p className="text-sm text-slate-300 leading-relaxed">
+        <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
           {message.content}
         </p>
       </div>
 
-      {/* Transfer Teklifi Kartı */}
       {offer && (
         <div className="glass-card border border-blue-500/30 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between border-b border-pitch-700/50 pb-3">
@@ -295,7 +279,6 @@ function MessageDetail({
             </div>
           </div>
 
-          {/* Fark göstergesi */}
           <div className="text-center text-xs">
             <span className={`font-bold ${
               offer.offerAmount > offer.playerValue ? 'text-green-400' : 'text-orange-400'
@@ -306,7 +289,6 @@ function MessageDetail({
             </span>
           </div>
 
-          {/* Aksiyonlar */}
           {offer.status === 'PENDING' ? (
             <div className="flex gap-3 pt-2">
               <button
@@ -336,7 +318,6 @@ function MessageDetail({
         </div>
       )}
 
-      {/* Sil butonu */}
       <div className="flex justify-end pt-2">
         <button
           onClick={onDelete}
