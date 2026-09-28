@@ -1,0 +1,142 @@
+import type { Player } from '../types';
+import type { TeamMatchState } from './matchState';
+import { eff } from './teamAnalysis';
+
+export interface Chance {
+  shooter: Player;
+  distance: number;
+  angle: number;
+  pressure: number;
+  type: 'open_play' | 'counter' | 'cross' | 'long_shot' | 'set_piece' | 'big_chance';
+  xG: number;
+  positionMultiplier: number;
+}
+
+export function calculateChance(
+  shooter: Player,
+  zone: string,
+  actionType: string,
+  attackingTeam: TeamMatchState,
+  defendingTeam: TeamMatchState,
+  isCounter: boolean = false
+): Chance {
+  let distance: number;
+  let chanceType: Chance['type'];
+
+  if (actionType === 'cross') {
+    distance = 5 + Math.random() * 8;
+    chanceType = 'cross';
+  } else if (actionType === 'counter' || isCounter) {
+    distance = 7 + Math.random() * 10;
+    chanceType = 'counter';
+  } else if (actionType === 'longShot') {
+    distance = 18 + Math.random() * 12;
+    chanceType = 'long_shot';
+  } else if (actionType === 'dribble') {
+    distance = 9 + Math.random() * 12;
+    chanceType = 'open_play';
+  } else {
+    distance = 8 + Math.random() * 15;
+    chanceType = 'open_play';
+  }
+
+  let angle: number;
+  if (zone === 'centerAttack') {
+    angle = 50 + Math.random() * 60;
+  } else {
+    angle = 30 + Math.random() * 60;
+  }
+
+  const defenderPressure = defendingTeam.analysis.pressing;
+  const pressure = 30 + Math.random() * 40 + (defenderPressure - 50) * 0.3;
+  const clampedPressure = Math.max(10, Math.min(90, pressure));
+
+  const finishing = eff(shooter, 'finishing');
+  const composure = eff(shooter, 'composure');
+  const technique = eff(shooter, 'technique');
+
+  let distanceFactor: number;
+  if (distance <= 6) distanceFactor = 2.0;
+  else if (distance <= 12) distanceFactor = 1.3;
+  else if (distance <= 18) distanceFactor = 0.75;
+  else if (distance <= 25) distanceFactor = 0.35;
+  else distanceFactor = 0.15;
+
+  // xG baz: 0.30 (2.67 gol/maç hedefi)
+  let xg = 0.30 * distanceFactor;
+
+  xg *= 0.7 + (finishing / 100) * 0.6;
+  xg *= 0.8 + (composure / 100) * 0.4;
+  xg *= 0.9 + (technique / 100) * 0.2;
+  xg *= 1 - (clampedPressure / 100) * 0.5;
+
+  if (angle > 90) xg *= 0.7;
+  else if (angle > 70) xg *= 0.9;
+  else if (angle > 50) xg *= 1.0;
+  else xg *= 1.15;
+
+  let positionMultiplier = 1.0;
+  if (chanceType === 'cross') positionMultiplier = 1.2;
+  else if (chanceType === 'counter') positionMultiplier = 1.15;
+  else if (chanceType === 'long_shot') positionMultiplier = 0.65;
+  else if (chanceType === 'open_play') positionMultiplier = 1.0;
+
+  xg *= positionMultiplier;
+
+  const isBigChance = distance <= 10 && clampedPressure < 50 && angle > 60;
+  if (isBigChance) {
+    xg *= 1.4;
+    chanceType = 'big_chance';
+  }
+
+  return {
+    shooter,
+    distance: Math.round(distance * 10) / 10,
+    angle: Math.round(angle),
+    pressure: Math.round(clampedPressure),
+    type: chanceType,
+    xG: Math.max(0.01, Math.min(0.95, xg)),
+    positionMultiplier,
+  };
+}
+
+export function applyGoalkeeper(
+  gk: Player | null,
+  xg: number
+): { goalProb: number; saveProb: number } {
+  if (!gk) {
+    return {
+      goalProb: xg * 1.15,
+      saveProb: 1 - xg * 1.15,
+    };
+  }
+
+  const reflexes = eff(gk, 'reflexes');
+  const positioning = eff(gk, 'gkPositioning');
+  const handling = eff(gk, 'handling');
+  const oneOnOne = eff(gk, 'oneOnOne');
+
+  const gkRating =
+    reflexes * 0.30 + positioning * 0.30 + handling * 0.20 + oneOnOne * 0.20;
+
+  const gkFactor = 1.0 - (gkRating - 50) / 400;
+
+  const adjustedXG = xg * gkFactor;
+
+  return {
+    goalProb: Math.max(0.01, Math.min(0.95, adjustedXG)),
+    saveProb: 1 - Math.max(0.01, Math.min(0.95, adjustedXG)),
+  };
+}
+
+export function onTargetProbability(shooter: Player, xg: number): number {
+  const shooting = eff(shooter, 'shooting');
+  const technique = eff(shooter, 'technique');
+  const finishing = eff(shooter, 'finishing');
+
+  const quality = shooting * 0.4 + technique * 0.3 + finishing * 0.3;
+  let prob = 0.60 + (quality - 50) / 250;
+  prob += xg * 0.30;
+
+  return Math.max(0.30, Math.min(0.92, prob));
+}
