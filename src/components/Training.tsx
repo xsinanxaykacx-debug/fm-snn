@@ -80,9 +80,6 @@ export function Training() {
           <h3 className="font-bold mb-2 text-sm text-slate-400">📊 BU HAFTA</h3>
           <div className="stat-row"><span>Odak</span><span className="font-bold">{FOCUS_INFO[state.training.focus].label}</span></div>
           <div className="stat-row"><span>Yoğunluk</span><span className="font-bold">{INTENSITY_INFO[state.training.intensity].label}</span></div>
-          <p className="text-xs text-slate-500 mt-3">
-            Maç oynandıktan sonra oyuncular bu odağa göre gelişir.
-          </p>
         </div>
       </div>
 
@@ -113,7 +110,7 @@ export function Training() {
                     <td className="py-2">{p.name}</td>
                     <td><span className="text-xs px-2 py-0.5 rounded bg-pitch-700">{p.position}</span></td>
                     <td>{p.age}</td>
-                    <td className="text-accent">{scorePlayer(p).toFixed(1)}</td>
+                    <td className="text-accent">{scorePlayer(p).toFixed(0)}</td>
                     <td className={ageGroup.cls}>{ageGroup.label}</td>
                   </tr>
                 );

@@ -23,7 +23,7 @@ export function Tactics() {
       { pos: 'GK', x: 50, y: 92 },
       { pos: 'DL', x: 15, y: 72 }, { pos: 'DC', x: 38, y: 75 }, { pos: 'DC', x: 62, y: 75 }, { pos: 'DR', x: 85, y: 72 },
       { pos: 'MC', x: 30, y: 52 }, { pos: 'MC', x: 50, y: 55 }, { pos: 'MC', x: 70, y: 52 },
-      { pos: 'ML', x: 20, y: 25 }, { pos: 'ST', x: 50, y: 15 }, { pos: 'MR', x: 80, y: 25 },
+      { pos: 'AML', x: 20, y: 25 }, { pos: 'ST', x: 50, y: 15 }, { pos: 'AMR', x: 80, y: 25 },
     ],
     '3-5-2': [
       { pos: 'GK', x: 50, y: 92 },
@@ -34,8 +34,8 @@ export function Tactics() {
     '4-2-3-1': [
       { pos: 'GK', x: 50, y: 92 },
       { pos: 'DL', x: 15, y: 72 }, { pos: 'DC', x: 38, y: 75 }, { pos: 'DC', x: 62, y: 75 }, { pos: 'DR', x: 85, y: 72 },
-      { pos: 'MC', x: 38, y: 58 }, { pos: 'MC', x: 62, y: 58 },
-      { pos: 'ML', x: 20, y: 35 }, { pos: 'MC', x: 50, y: 35 }, { pos: 'MR', x: 80, y: 35 },
+      { pos: 'DM', x: 38, y: 58 }, { pos: 'DM', x: 62, y: 58 },
+      { pos: 'AML', x: 20, y: 35 }, { pos: 'AMC', x: 50, y: 35 }, { pos: 'AMR', x: 80, y: 35 },
       { pos: 'ST', x: 50, y: 15 },
     ],
   };
@@ -121,7 +121,6 @@ export function Tactics() {
       <div className="card">
         <h2 className="text-lg font-bold mb-4">⚽ İlk 11</h2>
         <div className="relative bg-gradient-to-b from-green-800 to-green-900 rounded-lg aspect-[3/4] max-w-md mx-auto overflow-hidden">
-          {/* Saha çizgileri */}
           <div className="absolute inset-3 border-2 border-white/30 rounded"></div>
           <div className="absolute left-3 right-3 top-1/2 border-t-2 border-white/30"></div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-2 border-white/30 rounded-full"></div>
