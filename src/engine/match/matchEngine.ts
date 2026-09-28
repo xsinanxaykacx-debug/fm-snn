@@ -39,7 +39,7 @@ function ensureInjuredPlayers(teamState: any): void {
 }
 
 // ═══════════════════════════════════════════════
-// İSTATİSTİK GÜNCELLEME
+// İSTATİSTİK GÜNCELLEME (Kariyer + Sezon)
 // ═══════════════════════════════════════════════
 
 interface StatsUpdate {
@@ -70,9 +70,17 @@ function updateCareerStats(
     avgRating: 0,
     minutesPlayed: 0,
     motm: 0,
+    seasonAppearances: 0,
+    seasonGoals: 0,
+    seasonAssists: 0,
+    seasonYellowCards: 0,
+    seasonRedCards: 0,
+    seasonAvgRating: 0,
+    seasonMinutesPlayed: 0,
+    seasonMotm: 0,
   };
 
-  // Sayaçları artır
+  // ═══ KARİYER ═══
   if (update.goals) stats.goals += update.goals;
   if (update.assists) stats.assists += update.assists;
   if (update.yellowCards) stats.yellowCards += update.yellowCards;
@@ -81,12 +89,27 @@ function updateCareerStats(
   if (update.minutesPlayed) stats.minutesPlayed += update.minutesPlayed;
   if (update.motm) stats.motm += update.motm;
 
-  // Ortalama reyting hesapla — doğru formül
+  // ═══ SEZON ═══
+  if (update.goals) stats.seasonGoals += update.goals;
+  if (update.assists) stats.seasonAssists += update.assists;
+  if (update.yellowCards) stats.seasonYellowCards += update.yellowCards;
+  if (update.redCards) stats.seasonRedCards += update.redCards;
+  if (update.appearances) stats.seasonAppearances += update.appearances;
+  if (update.minutesPlayed) stats.seasonMinutesPlayed += update.minutesPlayed;
+  if (update.motm) stats.seasonMotm += update.motm;
+
+  // ═══ KARİYER ORTALAMA REYTİNG ═══
   if (update.rating !== undefined && update.rating > 0) {
     const previousTotal = stats.avgRating * Math.max(0, stats.appearances - 1);
     const newTotal = previousTotal + update.rating;
     const divisor = Math.max(1, stats.appearances);
     stats.avgRating = Math.round((newTotal / divisor) * 100) / 100;
+
+    // ═══ SEZON ORTALAMA REYTİNG ═══
+    const prevSeasonTotal = stats.seasonAvgRating * Math.max(0, stats.seasonAppearances - 1);
+    const newSeasonTotal = prevSeasonTotal + update.rating;
+    const seasonDivisor = Math.max(1, stats.seasonAppearances);
+    stats.seasonAvgRating = Math.round((newSeasonTotal / seasonDivisor) * 100) / 100;
   }
 
   players[playerId] = { ...player, careerStats: stats };
@@ -131,11 +154,9 @@ export function simulateMatch(
   const sentOff = new Set<string>();
   const matchYellows = new Set<string>();
 
-  // Maç başında forma giyen oyuncuları al
   const homeXI = getStartingXI(home.id, players, home.tactic.formation, home.isUser ? userLineup : undefined);
   const awayXI = getStartingXI(away.id, players, away.tactic.formation, away.isUser ? userLineup : undefined);
 
-  // Maç başı — maç sayısı ve dakika ekle
   for (const p of homeXI) {
     updateCareerStats(players, p.id, { appearances: 1, minutesPlayed: 90 });
   }
@@ -229,10 +250,8 @@ export function simulateMatch(
       attackState.onTarget++;
       attackState.dangerousAttacks++;
 
-      // Gol istatistiği
       updateCareerStats(players, shooter.id, { goals: 1 });
 
-      // Asist istatistiği — son pası yapan oyuncu
       const lastPass = sequence.actions
         .filter(a => a.success && (a.action === 'pass' || a.action === 'throughBall' || a.action === 'cross'))
         .slice(-1)[0];
@@ -301,8 +320,6 @@ export function simulateMatch(
   // ═══════════════════════════════════════════════
 
   const allPlayers = [...homeXI, ...awayXI];
-
-  // Takım sonuçları
   const homeGoalDiff = state.homeScore - state.awayScore;
   const awayGoalDiff = state.awayScore - state.homeScore;
 
@@ -313,35 +330,19 @@ export function simulateMatch(
     if (!p) continue;
 
     const isHomePlayer = homeXI.some(hp => hp.id === p.id);
-    const teamGoals = isHomePlayer ? state.homeScore : state.awayScore;
     const oppGoals = isHomePlayer ? state.awayScore : state.homeScore;
     const goalDiff = isHomePlayer ? homeGoalDiff : awayGoalDiff;
 
-    // Baz reyting
     let matchRating = 6.5;
-
-    // Form bonusu (0-1.0)
     matchRating += (p.form / 100) * 1.0;
-
-    // Kondisyon bonusu (0-0.5)
     matchRating += (p.condition / 100) * 0.5;
-
-    // Takım sonucu bonusu
     matchRating += goalDiff * 0.3;
 
-    // Atılan gol bonusu (gol atan oyunculara)
-    const goalsThisMatch = (p.careerStats?.goals ?? 0);
-    void goalsThisMatch;
-
-    // Kaleci clean sheet bonusu
     if (p.position === 'GK' && oppGoals === 0) {
       matchRating += 1.0;
     }
 
-    // Rastgelelik (±0.5)
     matchRating += (Math.random() - 0.5) * 1.0;
-
-    // 4.0 - 9.5 arasına sıkıştır
     matchRating = Math.max(4.0, Math.min(9.5, matchRating));
     matchRating = Math.round(matchRating * 100) / 100;
 
@@ -353,7 +354,6 @@ export function simulateMatch(
     }
   }
 
-  // MVP — en yüksek reytingli oyuncu
   if (bestPlayerId) {
     updateCareerStats(players, bestPlayerId, { motm: 1 });
   }

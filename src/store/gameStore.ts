@@ -18,7 +18,6 @@ interface Store extends GameState {
   setTrainingFocus: (focus: TrainingFocus) => void;
   setTrainingIntensity: (intensity: 'light' | 'normal' | 'intense') => void;
 
-  // YENİ
   setLineup: (lineup: string[]) => void;
   swapPlayers: (idA: string, idB: string) => void;
   resetLineup: () => void;
@@ -66,7 +65,6 @@ export const useGameStore = create<Store>()(
         });
       },
 
-      // ═══ YENİ: LİNEUP AKSİYONLARI ═══
       setLineup: (lineup) => set({ userLineup: lineup }),
 
       swapPlayers: (idA, idB) => {
@@ -78,7 +76,6 @@ export const useGameStore = create<Store>()(
         if (idxA === -1 && idxB === -1) return;
 
         if (idxA === -1) {
-          // idA lineup'ta yok, idB'nin yerine koy
           lineup[idxB] = idA;
         } else if (idxB === -1) {
           lineup[idxA] = idB;
@@ -91,7 +88,6 @@ export const useGameStore = create<Store>()(
 
       resetLineup: () => set({ userLineup: [] }),
 
-      // ═══ MAÇ OYNAMA ═══
       playWeek: () => {
         const state = get();
         if (state.seasonOver) return;
@@ -103,15 +99,14 @@ export const useGameStore = create<Store>()(
         const news = [...state.news];
 
         for (const m of weekMatches) {
-          const home = state.clubs[m.homeId];
-          const away = state.clubs[m.awayId];
+          const home = state.clubs[m.homeId!];
+          const away = state.clubs[m.awayId!];
 
-          // Kullanıcı takımı için lineup
           const lineup = (m.homeId === state.userClubId || m.awayId === state.userClubId)
             ? state.userLineup
             : undefined;
 
-          const result = simulateMatch(home, away, newPlayers, m.week, lineup);
+          const result = simulateMatch(home, away, newPlayers, m.week!, lineup);
           const idx = newFixtures.findIndex(x => x.id === m.id);
           newFixtures[idx] = result;
           updateTable(newTable, result);
@@ -127,7 +122,6 @@ export const useGameStore = create<Store>()(
           }
         }
 
-        // Oyuncu kondisyonu düşür + sakatlık/ceza sürelerini azalt
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           p.condition = Math.max(40, p.condition - Math.floor(Math.random() * 15));
@@ -153,11 +147,10 @@ export const useGameStore = create<Store>()(
           newPlayers[id] = p;
         }
 
-        // Haftalık antrenman
         newPlayers = applyTrainingToSquad(newPlayers, state.userClubId, state.training);
 
         const nextWeek = state.currentWeek + 1;
-        const maxWeek = Math.max(...newFixtures.map(m => m.week));
+        const maxWeek = Math.max(...newFixtures.map(m => m.week!));
         const seasonOver = nextWeek > maxWeek;
 
         set({
@@ -170,12 +163,40 @@ export const useGameStore = create<Store>()(
         });
       },
 
+      // ═══════════════════════════════════════════════
+      // SEZON GEÇİŞİ — SEZON İSTATİSTİKLERİNİ SIFIRLA
+      // ═══════════════════════════════════════════════
       advanceSeason: () => {
         const state = get();
-        const newPlayers = developPlayers(state.players);
+
+        // Oyuncuları geliştir (yaşlanma, gelişim)
+        let newPlayers = developPlayers(state.players);
+
+        // ═══ SEZON İSTATİSTİKLERİNİ SIFIRLA (kariyer korunur) ═══
+        for (const id in newPlayers) {
+          const p = { ...newPlayers[id] };
+          if (p.careerStats) {
+            p.careerStats = {
+              ...p.careerStats,
+              // Kariyer aynen kalır
+              // Sezon sıfırlanır
+              seasonAppearances: 0,
+              seasonGoals: 0,
+              seasonAssists: 0,
+              seasonYellowCards: 0,
+              seasonRedCards: 0,
+              seasonAvgRating: 0,
+              seasonMinutesPlayed: 0,
+              seasonMotm: 0,
+            };
+          }
+          newPlayers[id] = p;
+        }
+
         const season = state.season + 1;
         const fixtures = generateFixtures(state.clubs, season);
         const table = initTable(Object.keys(state.clubs));
+
         set({
           season,
           currentWeek: 1,
@@ -183,7 +204,7 @@ export const useGameStore = create<Store>()(
           table,
           players: newPlayers,
           seasonOver: false,
-          news: [`Sezon ${season} başladı!`, ...state.news].slice(0, 30),
+          news: [`🏆 Sezon ${season} başladı! Kariyer istatistikleri korundu, sezon istatistikleri sıfırlandı.`, ...state.news].slice(0, 30),
         });
       },
 

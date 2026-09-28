@@ -44,6 +44,28 @@ export interface Attributes {
   aerialReach: number;
 }
 
+export interface CareerStats {
+  // Kariyer (hep birikir)
+  appearances: number;
+  goals: number;
+  assists: number;
+  yellowCards: number;
+  redCards: number;
+  avgRating: number;
+  minutesPlayed: number;
+  motm: number;
+
+  // Bu sezon (her sezon sıfırlanır)
+  seasonAppearances: number;
+  seasonGoals: number;
+  seasonAssists: number;
+  seasonYellowCards: number;
+  seasonRedCards: number;
+  seasonAvgRating: number;
+  seasonMinutesPlayed: number;
+  seasonMotm: number;
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -66,19 +88,7 @@ export interface Player {
   injured: boolean;
   redCard: boolean;
 
-  // Kariyer istatistikleri
   careerStats: CareerStats;
-}
-
-export interface CareerStats {
-  appearances: number;
-  goals: number;
-  assists: number;
-  yellowCards: number;
-  redCards: number;
-  avgRating: number;
-  minutesPlayed: number;
-  motm: number;
 }
 
 export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1';

@@ -40,7 +40,7 @@ function randomNationality(): string {
   return NATIONALITIES[Math.floor(Math.random() * NATIONALITIES.length)];
 }
 
-function createEmptyCareerStats(): CareerStats {
+export function createEmptyCareerStats(): CareerStats {
   return {
     appearances: 0,
     goals: 0,
@@ -50,6 +50,15 @@ function createEmptyCareerStats(): CareerStats {
     avgRating: 0,
     minutesPlayed: 0,
     motm: 0,
+
+    seasonAppearances: 0,
+    seasonGoals: 0,
+    seasonAssists: 0,
+    seasonYellowCards: 0,
+    seasonRedCards: 0,
+    seasonAvgRating: 0,
+    seasonMinutesPlayed: 0,
+    seasonMotm: 0,
   };
 }
 
@@ -201,15 +210,29 @@ export function generatePlayer(position: Position, clubId: string, index: number
 
   // Kariyer istatistikleri (mevcut yaşa göre makul başlangıç)
   const ageFactor = Math.max(0, age - 18);
+  const initialApps = ageFactor * randomBetween(15, 30);
+  const initialAvgRating = ageFactor > 0 ? Math.round((5.8 + Math.random() * 1.2) * 100) / 100 : 0;
+
   const careerStats: CareerStats = {
-    appearances: ageFactor * randomBetween(15, 30),
+    // Kariyer
+    appearances: initialApps,
     goals: 0,
     assists: 0,
     yellowCards: 0,
     redCards: 0,
-    avgRating: ageFactor > 0 ? Math.round((5.8 + Math.random() * 1.2) * 100) / 100 : 0,
+    avgRating: initialAvgRating,
     minutesPlayed: ageFactor * randomBetween(1000, 2500),
     motm: 0,
+
+    // Sezon (yeni sezon başlangıcı — sıfır)
+    seasonAppearances: 0,
+    seasonGoals: 0,
+    seasonAssists: 0,
+    seasonYellowCards: 0,
+    seasonRedCards: 0,
+    seasonAvgRating: 0,
+    seasonMinutesPlayed: 0,
+    seasonMotm: 0,
   };
 
   return {
