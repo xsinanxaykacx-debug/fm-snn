@@ -1,10 +1,6 @@
 export type Position = 'GK' | 'DC' | 'DL' | 'DR' | 'DM' | 'MC' | 'ML' | 'MR' | 'AMC' | 'AML' | 'AMR' | 'ST';
 
-// ═══════════════════════════════════════════════
-// 30 OYUNCU ÖZELLİĞİ
-// ═══════════════════════════════════════════════
 export interface Attributes {
-  // TEKNİK (9)
   passing: number;
   firstTouch: number;
   dribbling: number;
@@ -14,8 +10,8 @@ export interface Attributes {
   technique: number;
   heading: number;
   setPieces: number;
+  longShots: number;
 
-  // ZİHİNSEL (10)
   decisions: number;
   vision: number;
   anticipation: number;
@@ -26,8 +22,8 @@ export interface Attributes {
   workRate: number;
   teamwork: number;
   bravery: number;
+  aggression: number;
 
-  // FİZİKSEL (6)
   pace: number;
   acceleration: number;
   agility: number;
@@ -35,13 +31,12 @@ export interface Attributes {
   strength: number;
   balance: number;
 
-  // SAVUNMA (4)
   marking: number;
   tackling: number;
   ballWinning: number;
   defensivePositioning: number;
 
-  // KALECİ (5)
+  goalkeeper: number;
   reflexes: number;
   gkPositioning: number;
   handling: number;
@@ -59,6 +54,7 @@ export interface Player {
   condition: number;
   morale: number;
   form: number;
+  fatigue: number;
   wage: number;
   value: number;
   clubId: string | null;
@@ -66,6 +62,9 @@ export interface Player {
   injuryType: string | null;
   yellowCards: number;
   suspensionWeeks: number;
+  sentOff: boolean;
+  injured: boolean;
+  redCard: boolean;
 }
 
 export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1';
@@ -75,7 +74,6 @@ export interface Tactic {
   mentality: 'defensive' | 'balanced' | 'attacking';
   pressing: 'low' | 'medium' | 'high';
   tempo: 'slow' | 'normal' | 'fast';
-  // ⚡ YENİ
   width: 'narrow' | 'normal' | 'wide';
   directness: 'short' | 'mixed' | 'direct';
   defensiveLine: 'deep' | 'normal' | 'high';
@@ -92,14 +90,22 @@ export interface Club {
   formation: Formation;
   tactic: Tactic;
   isUser: boolean;
+  lineup?: string[];
 }
 
 export interface MatchEvent {
   minute: number;
-  type: 'goal' | 'yellow' | 'red' | 'injury' | 'chance' | 'save' | 'miss' | 'cross' | 'dribble';
+  type:
+    | 'kickoff' | 'halftime' | 'fulltime'
+    | 'pass' | 'dribble' | 'cross' | 'counter' | 'shot'
+    | 'goal' | 'save' | 'miss' | 'blocked_shot'
+    | 'yellow' | 'red' | 'injury' | 'substitution';
   playerId?: string;
-  clubId: string;
+  clubId?: string;
+  team?: 'home' | 'away';
   description: string;
+  xG?: number;
+  weeks?: number;
 }
 
 export interface MatchStats {
@@ -107,7 +113,6 @@ export interface MatchStats {
   shots: { home: number; away: number };
   onTarget: { home: number; away: number };
   chances: { home: number; away: number };
-  // ⚡ YENİ
   xG?: { home: number; away: number };
   passes?: { home: number; away: number };
   passesCompleted?: { home: number; away: number };
@@ -117,18 +122,23 @@ export interface MatchStats {
   crossesSuccess?: { home: number; away: number };
   dangerousAttacks?: { home: number; away: number };
   recoveries?: { home: number; away: number };
+  fouls?: { home: number; away: number };
+  yellowCards?: { home: number; away: number };
+  redCards?: { home: number; away: number };
 }
 
 export interface Match {
-  id: string;
-  week: number;
-  homeId: string;
-  awayId: string;
+  id?: string;
+  week?: number;
+  homeId?: string;
+  awayId?: string;
   homeScore: number;
   awayScore: number;
   events: MatchEvent[];
-  stats: MatchStats;
-  played: boolean;
+  stats: MatchStats | any;
+  played?: boolean;
+  possession?: { home: number; away: number };
+  engine?: any;
 }
 
 export interface TableRow {
@@ -161,11 +171,13 @@ export interface GameState {
   news: string[];
   seasonOver: boolean;
   training: TrainingState;
+  userLineup: string[];
 }
 
 // ═══════════════════════════════════════════════
-// TAKIM BİRİMLERİ (Katman 3)
+// TAKIM BİRİMLERİ
 // ═══════════════════════════════════════════════
+
 export interface TeamUnits {
   attack: number;
   midfield: number;
@@ -181,6 +193,6 @@ export interface UnitComparison {
   icon: string;
   homeValue: number;
   awayValue: number;
-  advantagePct: number;
   favored: 'home' | 'away' | 'neutral';
+  advantagePct: number;
 }

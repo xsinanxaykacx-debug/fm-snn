@@ -1,3 +1,5 @@
+// src/engine/match/matchEngine.ts
+
 import type { Club, Match, MatchEvent, Player } from '../types';
 import { getStartingXI } from '../data/generateData';
 import { analyzeTeam } from './teamAnalysis';
@@ -17,10 +19,6 @@ import { calculateChanceFromSequence } from './chance';
 import { resolveShot } from './goalkeeper';
 import { pickShooter } from './attack';
 
-function randomMinute(): number {
-  return Math.floor(Math.random() * 90) + 1;
-}
-
 function pickInjuryType(severity: 'light' | 'medium' | 'severe'): string {
   const light = ['Kas Agrisi', 'Kucuk Burkulma', 'Hafif Darbe'];
   const medium = ['Hamstring', 'Ayak Bilegi', 'Diz Burkulmasi'];
@@ -28,10 +26,6 @@ function pickInjuryType(severity: 'light' | 'medium' | 'severe'): string {
   const pool = severity === 'light' ? light : severity === 'medium' ? medium : severe;
   return pool[Math.floor(Math.random() * pool.length)];
 }
-
-// ═══════════════════════════════════════════════
-// YARDIMCI: injuredPlayers guvenli erisim
-// ═══════════════════════════════════════════════
 
 function isInjured(teamState: any, playerId: string): boolean {
   if (!teamState.injuredPlayers) return false;
@@ -44,15 +38,12 @@ function ensureInjuredPlayers(teamState: any): void {
   }
 }
 
-// ═══════════════════════════════════════════════
-// ANA MOTOR
-// ═══════════════════════════════════════════════
-
 export function simulateMatch(
   home: Club,
   away: Club,
   players: Record<string, Player>,
-  week: number
+  week: number,
+  userLineup?: string[]
 ): Match {
   const events: MatchEvent[] = [];
   const pendingEvents: { minute: number; event: MatchEvent }[] = [];
@@ -71,9 +62,9 @@ export function simulateMatch(
     events: [],
     possessionCount: { home: 0, away: 0 },
     sequences: [],
+    userLineup,
   };
 
-  // injuredPlayers guvenli
   ensureInjuredPlayers(state.home);
   ensureInjuredPlayers(state.away);
 
@@ -99,16 +90,27 @@ export function simulateMatch(
     const attackClub = attackState.club;
     const defendClub = defendState.club;
 
-    // Guvenli erisim
     ensureInjuredPlayers(attackState);
     ensureInjuredPlayers(defendState);
 
     const { zone } = chooseAttackZone(state, attackState, defendState);
 
-    const attackXI = getStartingXI(attackClub.id, players, attackClub.tactic.formation)
-      .filter(p => !sentOff.has(p.id) && !isInjured(attackState, p.id));
-    const defendXI = getStartingXI(defendClub.id, players, defendClub.tactic.formation)
-      .filter(p => !sentOff.has(p.id) && !isInjured(defendState, p.id));
+    const attackLineup = attackClub.isUser ? state.userLineup : undefined;
+    const defendLineup = defendClub.isUser ? state.userLineup : undefined;
+
+    const attackXI = getStartingXI(
+      attackClub.id,
+      players,
+      attackClub.tactic.formation,
+      attackLineup
+    ).filter(p => !sentOff.has(p.id) && !isInjured(attackState, p.id));
+
+    const defendXI = getStartingXI(
+      defendClub.id,
+      players,
+      defendClub.tactic.formation,
+      defendLineup
+    ).filter(p => !sentOff.has(p.id) && !isInjured(defendState, p.id));
 
     if (attackXI.length < 7 || defendXI.length < 7) {
       consumeCondition(state);
@@ -118,7 +120,7 @@ export function simulateMatch(
     const sequence = createAttackSequence(attackState, defendState, attackXI, defendXI, zone);
     state.sequences.push(sequence);
 
-    if (!sequence.resultedInShot || sequence.chanceQuality <= 20) {
+    if (!sequence.resultedInShot || sequence.chanceQuality <= 30) {
       if (sequence.actions.length > 0) {
         const lastAction = sequence.actions[sequence.actions.length - 1];
         if (!lastAction.success) {
@@ -240,10 +242,6 @@ export function simulateMatch(
   };
 }
 
-// ═══════════════════════════════════════════════
-// MAC ICI KARTLAR
-// ═══════════════════════════════════════════════
-
 function processCardsInMatch(
   state: MatchState,
   players: Record<string, Player>,
@@ -258,7 +256,7 @@ function processCardsInMatch(
   const teamState = isHome ? state.home : state.away;
   ensureInjuredPlayers(teamState);
 
-  const xi = getStartingXI(club.id, players, club.tactic.formation);
+  const xi = getStartingXI(club.id, players, club.tactic.formation, club.isUser ? state.userLineup : undefined);
   const activePlayers = xi.filter(p =>
     !sentOff.has(p.id) && !isInjured(teamState, p.id)
   );
@@ -337,10 +335,6 @@ function processCardsInMatch(
   }
 }
 
-// ═══════════════════════════════════════════════
-// MAC ICI SAKATLIKLAR
-// ═══════════════════════════════════════════════
-
 function processInjuriesInMatch(
   state: MatchState,
   players: Record<string, Player>,
@@ -354,7 +348,7 @@ function processInjuriesInMatch(
   const teamState = isHome ? state.home : state.away;
   ensureInjuredPlayers(teamState);
 
-  const xi = getStartingXI(club.id, players, club.tactic.formation);
+  const xi = getStartingXI(club.id, players, club.tactic.formation, club.isUser ? state.userLineup : undefined);
   const activePlayers = xi.filter(p =>
     !sentOff.has(p.id) && !isInjured(teamState, p.id)
   );

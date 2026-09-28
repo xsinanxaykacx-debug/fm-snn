@@ -1,16 +1,12 @@
 import type { Club, Player } from '../types';
 import type { TeamAnalysis } from './teamAnalysis';
 
-// ═══════════════════════════════════════════════
-// MAÇ DURUMU — her takım için maç içi durum
-// ═══════════════════════════════════════════════
-
 export interface TeamMatchState {
   club: Club;
   analysis: TeamAnalysis;
   score: number;
-  condition: number;       // 0-100 (takım geneli)
-  momentum: number;        // -100 ile +100 arası
+  condition: number;
+  momentum: number;
   mentality: 'defensive' | 'balanced' | 'attacking';
   tempo: 'slow' | 'normal' | 'fast';
   pressing: 'low' | 'medium' | 'high';
@@ -19,7 +15,6 @@ export interface TeamMatchState {
   defensiveLine: 'deep' | 'normal' | 'high';
   redCards: number;
   yellowCards: number;
-  // İstatistik
   shots: number;
   onTarget: number;
   xG: number;
@@ -32,11 +27,8 @@ export interface TeamMatchState {
   dangerousAttacks: number;
   recoveries: number;
   turnovers: number;
+  injuredPlayers?: string[];
 }
-
-// ═══════════════════════════════════════════════
-// MAÇ DURUMU
-// ═══════════════════════════════════════════════
 
 export interface MatchState {
   minute: number;
@@ -45,9 +37,11 @@ export interface MatchState {
   homeScore: number;
   awayScore: number;
   possessionTeam: 'home' | 'away';
-  ballZone: string;      // 'leftDefense', 'centerMidfield', 'rightAttack' vb.
+  ballZone: string;
   events: any[];
-  possessionCount: { home: number; away: number }; // Topla oynama sayısı
+  possessionCount: { home: number; away: number };
+  sequences: any[];
+  userLineup?: string[];
 }
 
 export function createTeamMatchState(
@@ -83,21 +77,13 @@ export function createTeamMatchState(
   };
 }
 
-// ═══════════════════════════════════════════════
-// MAÇ DURUMU GÜNCELLEMELERİ
-// ═══════════════════════════════════════════════
-
-/**
- * Skor + dakika bazlı taktik değişimi
- */
 export function updateDynamicTactics(state: MatchState): void {
   const { minute, homeScore, awayScore, home, away } = state;
 
-  // Geç oyun
   const isLate = minute > 70;
   const isVeryLate = minute > 80;
+  void isVeryLate;
 
-  // Ev sahibi geride
   if (homeScore < awayScore) {
     if (isLate) {
       home.mentality = 'attacking';
@@ -118,7 +104,6 @@ export function updateDynamicTactics(state: MatchState): void {
     away.momentum = Math.max(-100, away.momentum - 3);
   }
 
-  // Deplasman geride
   if (awayScore < homeScore) {
     if (isLate) {
       away.mentality = 'attacking';
@@ -139,7 +124,6 @@ export function updateDynamicTactics(state: MatchState): void {
     home.momentum = Math.max(-100, home.momentum - 3);
   }
 
-  // Kırmızı kart varsa defansif oyna
   if (home.redCards > 0) {
     home.mentality = 'defensive';
     home.defensiveLine = 'deep';
@@ -150,9 +134,6 @@ export function updateDynamicTactics(state: MatchState): void {
   }
 }
 
-/**
- * Kondisyon tüketimi (dakika bazlı)
- */
 export function consumeCondition(state: MatchState): void {
   const homeFatigue = calcFatigue(state.home);
   const awayFatigue = calcFatigue(state.away);
@@ -164,31 +145,24 @@ export function consumeCondition(state: MatchState): void {
 function calcFatigue(team: TeamMatchState): number {
   let fatigue = 1.0;
 
-  // Pres yoğunluğu
   if (team.pressing === 'high') fatigue += 0.5;
   else if (team.pressing === 'low') fatigue -= 0.2;
 
-  // Tempo
   if (team.tempo === 'fast') fatigue += 0.4;
   else if (team.tempo === 'slow') fatigue -= 0.2;
 
-  // Mentalite
   if (team.mentality === 'attacking') fatigue += 0.3;
   else if (team.mentality === 'defensive') fatigue -= 0.1;
 
-  // Momentum
   fatigue += Math.abs(team.momentum) / 300;
 
   return fatigue;
 }
 
-/**
- * Topla oynama yüzdesi
- */
 export function calculatePossession(state: MatchState): { home: number; away: number } {
-  const homeTotal = state.possessionCount.home + state.possessionCount.away;
-  if (homeTotal === 0) return { home: 50, away: 50 };
+  const total = state.possessionCount.home + state.possessionCount.away;
+  if (total === 0) return { home: 50, away: 50 };
 
-  const homePct = Math.round((state.possessionCount.home / homeTotal) * 100);
+  const homePct = Math.round((state.possessionCount.home / total) * 100);
   return { home: homePct, away: 100 - homePct };
 }

@@ -17,6 +17,11 @@ interface Store extends GameState {
   transferSell: (playerId: string) => void;
   setTrainingFocus: (focus: TrainingFocus) => void;
   setTrainingIntensity: (intensity: 'light' | 'normal' | 'intense') => void;
+
+  // YENİ
+  setLineup: (lineup: string[]) => void;
+  swapPlayers: (idA: string, idB: string) => void;
+  resetLineup: () => void;
 }
 
 function createInitialState(): GameState {
@@ -39,6 +44,7 @@ function createInitialState(): GameState {
     news: ['Yeni sezon başladı! Başarılar dileriz.'],
     seasonOver: false,
     training: { focus: 'balanced', intensity: 'normal' },
+    userLineup: [],
   };
 }
 
@@ -60,6 +66,32 @@ export const useGameStore = create<Store>()(
         });
       },
 
+      // ═══ YENİ: LİNEUP AKSİYONLARI ═══
+      setLineup: (lineup) => set({ userLineup: lineup }),
+
+      swapPlayers: (idA, idB) => {
+        const state = get();
+        const lineup = [...state.userLineup];
+        const idxA = lineup.indexOf(idA);
+        const idxB = lineup.indexOf(idB);
+
+        if (idxA === -1 && idxB === -1) return;
+
+        if (idxA === -1) {
+          // idA lineup'ta yok, idB'nin yerine koy
+          lineup[idxB] = idA;
+        } else if (idxB === -1) {
+          lineup[idxA] = idB;
+        } else {
+          [lineup[idxA], lineup[idxB]] = [lineup[idxB], lineup[idxA]];
+        }
+
+        set({ userLineup: lineup });
+      },
+
+      resetLineup: () => set({ userLineup: [] }),
+
+      // ═══ MAÇ OYNAMA ═══
       playWeek: () => {
         const state = get();
         if (state.seasonOver) return;
@@ -73,7 +105,13 @@ export const useGameStore = create<Store>()(
         for (const m of weekMatches) {
           const home = state.clubs[m.homeId];
           const away = state.clubs[m.awayId];
-          const result = simulateMatch(home, away, newPlayers, m.week);
+
+          // Kullanıcı takımı için lineup
+          const lineup = (m.homeId === state.userClubId || m.awayId === state.userClubId)
+            ? state.userLineup
+            : undefined;
+
+          const result = simulateMatch(home, away, newPlayers, m.week, lineup);
           const idx = newFixtures.findIndex(x => x.id === m.id);
           newFixtures[idx] = result;
           updateTable(newTable, result);
@@ -184,7 +222,7 @@ export const useGameStore = create<Store>()(
         set({
           players: { ...state.players, [playerId]: updatedPlayer },
           clubs: { ...state.clubs, [state.userClubId]: updatedClub },
-          news: [`💰 ${player.name} satıldı (+£${((player.value * 0.9) / 1_000_000).toFixed(2)}M)`, ...state.news].slice(0, 30),
+          news: [`💸 ${player.name} satıldı (+£${((player.value * 0.9) / 1_000_000).toFixed(2)}M)`, ...state.news].slice(0, 30),
         });
       },
 
