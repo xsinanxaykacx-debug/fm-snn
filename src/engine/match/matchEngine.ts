@@ -118,7 +118,7 @@ export function simulateMatch(
     const sequence = createAttackSequence(attackState, defendState, attackXI, defendXI, zone);
     state.sequences.push(sequence);
 
-    if (!sequence.resultedInShot || sequence.chanceQuality <= 30) {
+    if (!sequence.resultedInShot || sequence.chanceQuality <= 20) {
       if (sequence.actions.length > 0) {
         const lastAction = sequence.actions[sequence.actions.length - 1];
         if (!lastAction.success) {

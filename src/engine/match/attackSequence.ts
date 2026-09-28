@@ -119,7 +119,7 @@ export function createAttackSequence(
     finalPressure,
     spaceCreated: avgSpace,
     chanceQuality,
-    resultedInShot: chanceQuality > 10,
+    resultedInShot: chanceQuality > 5,
     resultedInGoal: false,
     xG: 0,
   };

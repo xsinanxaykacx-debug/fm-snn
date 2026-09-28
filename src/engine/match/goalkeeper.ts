@@ -17,51 +17,48 @@ export function resolveShot(
 ): ShotResult {
   const shooter = chance.shooter;
 
-  // 1. KALEYİ BULMA
+  // ═══════════════════════════════════════════════
+  // 1. xG = P(gol) — kaleci etkisiyle
+  // ═══════════════════════════════════════════════
+
+  const { goalProb } = applyGoalkeeper(goalkeeper, chance.xG);
+
+  // ═══════════════════════════════════════════════
+  // 2. İsabetli olma olasılığı (bağımsız)
+  // ═══════════════════════════════════════════════
+
   const onTargetProb = onTargetProbability(shooter, chance.xG);
-  const onTarget = Math.random() < onTargetProb;
 
-  if (!onTarget) {
-    return {
-      outcome: 'miss',
-      onTarget: false,
-      xG: chance.xG,
-      description: `${shooter.name} şutu auta gitti`,
-    };
-  }
+  // ═══════════════════════════════════════════════
+  // 3. Tek zar atışıyla sonuç
+  // ═══════════════════════════════════════════════
 
-  // 2. KALECİ (kaleci xG'yi etkiler)
-  const { goalProb: baseGoalProb } = applyGoalkeeper(goalkeeper, chance.xG);
-
-  // 3. DÜZELTME: Toplam gol olasılığı = xG olmalı
-  // Kaleyi bulma olasılığı düşükse, kaleyi bulduktan sonra gol olasılığı yüksek olmalı
-  // Formül: adjustedGoal = xG / onTargetProb (min 0.05, max 0.95)
-  let adjustedGoalProb = chance.xG / onTargetProb;
-
-  // Kaleci etkisini de ekle (baseGoalProb / xG oranı)
-  const gkEffect = baseGoalProb / chance.xG;
-  adjustedGoalProb = adjustedGoalProb * gkEffect;
-
-  adjustedGoalProb = Math.max(0.05, Math.min(0.95, adjustedGoalProb));
-
-  // 4. SONUÇ
   const roll = Math.random();
 
-  if (roll < adjustedGoalProb) {
+  // a) GOL
+  if (roll < goalProb) {
     return {
       outcome: 'goal',
       onTarget: true,
       xG: chance.xG,
       description: `GOL! ${shooter.name}`,
     };
-  } else if (roll < adjustedGoalProb + (1 - adjustedGoalProb) * 0.7) {
+  }
+
+  // b) İsabetli ama gol değil → save veya blocked
+  const saveZone = goalProb + (1 - goalProb) * onTargetProb * 0.65;
+  const blockZone = goalProb + (1 - goalProb) * onTargetProb;
+
+  if (roll < saveZone) {
     return {
       outcome: 'save',
       onTarget: true,
       xG: chance.xG,
       description: `${shooter.name} şutunu ${goalkeeper?.name ?? 'kaleci'} kurtardı`,
     };
-  } else {
+  }
+
+  if (roll < blockZone) {
     return {
       outcome: 'blocked',
       onTarget: true,
@@ -69,6 +66,14 @@ export function resolveShot(
       description: `${shooter.name} şutu savunmaya çarptı`,
     };
   }
+
+  // c) İsabetsiz → miss
+  return {
+    outcome: 'miss',
+    onTarget: false,
+    xG: chance.xG,
+    description: `${shooter.name} şutu auta gitti`,
+  };
 }
 
 export function handleCrossChance(

@@ -52,7 +52,7 @@ export function calculateChanceFromSequence(
   else distanceFactor = 0.15;
 
   // xG baz: 0.19 (2.67 gol/maç hedefi)
-  let xg = 0.19 * distanceFactor;
+  let xg = 0.24 * distanceFactor;
   xg *= 0.7 + (finishing / 100) * 0.6;
   xg *= 0.8 + (composure / 100) * 0.4;
   xg *= 0.9 + (technique / 100) * 0.2;
@@ -131,8 +131,9 @@ export function onTargetProbability(shooter: Player, xg: number): number {
   const finishing = eff(shooter, 'finishing');
 
   const quality = shooting * 0.4 + technique * 0.3 + finishing * 0.3;
-  let prob = 0.48 + (quality - 50) / 280;
-  prob += xg * 0.22;
+  // 0.36 → 0.40
+  let prob = 0.40 + (quality - 50) / 400;
+  prob += xg * 0.10;
 
-  return Math.max(0.25, Math.min(0.88, prob));
+  return Math.max(0.25, Math.min(0.68, prob));
 }
