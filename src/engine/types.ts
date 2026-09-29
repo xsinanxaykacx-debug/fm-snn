@@ -1,3 +1,5 @@
+// src/engine/types.ts
+
 export type Position = 'GK' | 'DC' | 'DL' | 'DR' | 'DM' | 'MC' | 'ML' | 'MR' | 'AMC' | 'AML' | 'AMR' | 'ST';
 
 export interface Attributes {
@@ -231,4 +233,3 @@ export interface AssistantSettings {
   transferSuggestion: boolean;   // Transfer önerisi
   matchAnalysis: boolean;        // Maç analizi
 }
-  

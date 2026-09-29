@@ -1,131 +1,197 @@
-import type { Player, TrainingState, TrainingFocus, Attributes } from '../types';
+// src/engine/progression/trainingSystem.ts
 
-/**
- * Antrenman odağına göre hangi 30 özellik gelişir
- */
-const FOCUS_ATTRIBUTES: Record<TrainingFocus, Partial<Record<keyof Attributes, number>>> = {
+import type { Player, TrainingState, TrainingFocus } from '../types';
+import { calculateValue } from './training';
+
+// ═══════════════════════════════════════════════
+// FOCUS BİLGİLERİ
+// ═══════════════════════════════════════════════
+
+export const FOCUS_INFO: Record<TrainingFocus, {
+  icon: string;
+  label: string;
+  desc: string;
+}> = {
   attack: {
-    finishing: 1.0, shooting: 0.9, offTheBall: 0.8, firstTouch: 0.7,
-    technique: 0.6, dribbling: 0.5, composure: 0.5, passing: 0.3,
+    icon: '⚔️',
+    label: 'Hücum',
+    desc: 'Bitiricilik, şut, topsuz alan gelişir',
   },
   defense: {
-    marking: 1.0, tackling: 0.9, defensivePositioning: 0.9,
-    ballWinning: 0.7, anticipation: 0.6, strength: 0.5, concentration: 0.4,
+    icon: '🛡️',
+    label: 'Savunma',
+    desc: 'Markaj, müdahale, pozisyon gelişir',
   },
   physical: {
-    pace: 1.0, acceleration: 0.9, stamina: 0.9, strength: 0.8,
-    agility: 0.7, balance: 0.5,
+    icon: '⚡',
+    label: 'Fizik',
+    desc: 'Hız, ivme, dayanıklılık gelişir',
   },
   tactical: {
-    decisions: 1.0, vision: 0.9, positioning: 0.8, anticipation: 0.8,
-    teamwork: 0.7, concentration: 0.6, passing: 0.5,
+    icon: '🧠',
+    label: 'Taktik',
+    desc: 'Karar, vizyon, pozisyon gelişir',
   },
   balanced: {
-    passing: 0.4, firstTouch: 0.4, dribbling: 0.4, shooting: 0.4,
-    finishing: 0.4, technique: 0.4, heading: 0.4,
-    decisions: 0.4, vision: 0.4, anticipation: 0.4, positioning: 0.4,
-    offTheBall: 0.4, concentration: 0.4, composure: 0.4, workRate: 0.4,
-    teamwork: 0.4, bravery: 0.4,
-    pace: 0.4, acceleration: 0.4, agility: 0.4, stamina: 0.4, strength: 0.4, balance: 0.4,
-    marking: 0.3, tackling: 0.3, ballWinning: 0.3, defensivePositioning: 0.3,
+    icon: '⚖️',
+    label: 'Dengeli',
+    desc: 'Tüm özellikler az gelişir',
   },
 };
 
-const INTENSITY_MULT = {
-  light: 0.6,
-  normal: 1.0,
-  intense: 1.3,
+export const INTENSITY_INFO: Record<'light' | 'normal' | 'intense', {
+  icon: string;
+  label: string;
+  desc: string;
+}> = {
+  light: {
+    icon: '🌱',
+    label: 'Hafif',
+    desc: 'Az gelişir, az yorar',
+  },
+  normal: {
+    icon: '💪',
+    label: 'Normal',
+    desc: 'Dengeli gelişim',
+  },
+  intense: {
+    icon: '🔥',
+    label: 'Yoğun',
+    desc: 'Hızlı gelişir, çok yorar',
+  },
 };
 
-function ageMultiplier(age: number): number {
-  if (age <= 20) return 1.3;
-  if (age <= 23) return 1.0;
-  if (age <= 26) return 0.6;
-  if (age <= 28) return 0.15;
-  if (age <= 31) return -0.1;
-  return -0.35;
+// ═══════════════════════════════════════════════
+// ANTRENMAN UYGULAMA
+// ═══════════════════════════════════════════════
+
+function getIntensityMultiplier(intensity: 'light' | 'normal' | 'intense'): number {
+  switch (intensity) {
+    case 'light': return 0.5;
+    case 'normal': return 1.0;
+    case 'intense': return 1.8;
+    default: return 1.0;
+  }
 }
 
-export function applyTraining(player: Player, training: TrainingState): Player {
-  const focusAttrs = FOCUS_ATTRIBUTES[training.focus];
-  const intensityMult = INTENSITY_MULT[training.intensity];
-  const ageMult = ageMultiplier(player.age);
+function getFocusKeys(focus: TrainingFocus): (keyof Player['attributes'])[] {
+  switch (focus) {
+    case 'attack':
+      return ['finishing', 'shooting', 'offTheBall', 'technique', 'composure', 'longShots'];
+    case 'defense':
+      return ['marking', 'tackling', 'defensivePositioning', 'anticipation', 'positioning', 'heading', 'ballWinning'];
+    case 'physical':
+      return ['pace', 'acceleration', 'stamina', 'strength', 'agility', 'balance'];
+    case 'tactical':
+      return ['decisions', 'vision', 'positioning', 'anticipation', 'concentration', 'teamwork'];
+    case 'balanced':
+      return ['passing', 'firstTouch', 'technique', 'decisions', 'composure'];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Bir oyuncuya antrenman uygular.
+ */
+function applyTrainingToPlayer(
+  player: Player,
+  training: TrainingState
+): Player {
+  const focusKeys = getFocusKeys(training.focus);
+  const intensityMultiplier = getIntensityMultiplier(training.intensity);
+
+  // Genç oyuncular daha hızlı gelişir
+  const ageMultiplier =
+    player.age <= 21 ? 1.5 :
+    player.age <= 24 ? 1.2 :
+    player.age <= 27 ? 0.8 :
+    player.age <= 30 ? 0.4 :
+    player.age <= 33 ? 0.15 : 0.05;
 
   const newAttrs = { ...player.attributes };
   let anyChange = false;
 
-  for (const [key, weight] of Object.entries(focusAttrs) as [keyof Attributes, number][]) {
-    const growthChance = 0.10 * weight * intensityMult * Math.max(0, ageMult);
-    const declineChance = ageMult < 0 ? 0.12 * weight * Math.abs(ageMult) : 0;
+  for (const key of focusKeys) {
+    // Gelişim olasılığı (düşük)
+    const developChance = 0.05 * intensityMultiplier * ageMultiplier;
 
-    if (Math.random() < growthChance) {
-      newAttrs[key] = Math.min(99, newAttrs[key] + 1);
-      anyChange = true;
-    } else if (Math.random() < declineChance) {
-      newAttrs[key] = Math.max(5, newAttrs[key] - 1);
-      anyChange = true;
+    if (Math.random() < developChance) {
+      const current = newAttrs[key];
+      if (current < 20) {
+        newAttrs[key] = Math.min(20, current + 1);
+        anyChange = true;
+      }
     }
   }
 
   if (!anyChange) return player;
 
-  // Yeni value hesapla
-  const overall = computeOverall(newAttrs, player.position);
-  const newValue = Math.round(overall * overall * 200 * Math.max(0.3, (30 - player.age) / 10));
+  // 🔧 Overall ve value YENİ formülle
+  const overall = computeOverallFromAttrs(newAttrs, player.position);
+  const newValue = calculateValue(overall, player.age);
 
   return {
     ...player,
     attributes: newAttrs,
+    overall,
     value: newValue,
+    wage: Math.round(newValue / 500),
   };
 }
 
-function computeOverall(attrs: Attributes, position: string): number {
+/**
+ * Attribute'lardan overall hesapla (1-20)
+ */
+function computeOverallFromAttrs(
+  a: Player['attributes'],
+  position: string
+): number {
+  let score: number;
+
   if (position === 'GK') {
-    return attrs.reflexes * 0.25 + attrs.gkPositioning * 0.25 +
-           attrs.handling * 0.20 + attrs.oneOnOne * 0.15 + attrs.aerialReach * 0.15;
+    score = a.goalkeeper * 0.3 + a.reflexes * 0.25 + a.handling * 0.2 + a.oneOnOne * 0.15 + a.gkPositioning * 0.1;
+  } else if (position === 'DC') {
+    score = a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1;
+  } else if (position === 'DL' || position === 'DR') {
+    score = a.marking * 0.2 + a.tackling * 0.2 + a.defensivePositioning * 0.15 + a.pace * 0.15 + a.acceleration * 0.1 + a.stamina * 0.1 + a.crossing * 0.1;
+  } else if (position === 'DM') {
+    score = a.passing * 0.2 + a.tackling * 0.2 + a.ballWinning * 0.15 + a.positioning * 0.15 + a.decisions * 0.15 + a.workRate * 0.15;
+  } else if (position === 'MC') {
+    score = a.passing * 0.25 + a.vision * 0.2 + a.decisions * 0.2 + a.technique * 0.15 + a.workRate * 0.1 + a.stamina * 0.1;
+  } else if (position === 'ML' || position === 'MR') {
+    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.2 + a.acceleration * 0.15 + a.technique * 0.15;
+  } else if (position === 'AML' || position === 'AMR') {
+    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
+  } else if (position === 'AMC') {
+    score = a.passing * 0.2 + a.vision * 0.2 + a.technique * 0.2 + a.decisions * 0.15 + a.finishing * 0.15 + a.dribbling * 0.1;
+  } else if (position === 'ST') {
+    score = a.finishing * 0.3 + a.shooting * 0.2 + a.offTheBall * 0.2 + a.composure * 0.15 + a.technique * 0.15;
+  } else {
+    score = 10;
   }
-  const technical =
-    attrs.passing * 0.15 + attrs.firstTouch * 0.10 + attrs.dribbling * 0.10 +
-    attrs.crossing * 0.05 + attrs.shooting * 0.10 + attrs.finishing * 0.10 +
-    attrs.technique * 0.10 + attrs.heading * 0.10 + attrs.setPieces * 0.05;
-  const mental =
-    attrs.decisions * 0.15 + attrs.vision * 0.10 + attrs.anticipation * 0.10 +
-    attrs.positioning * 0.10 + attrs.offTheBall * 0.10 + attrs.concentration * 0.10 +
-    attrs.composure * 0.10 + attrs.workRate * 0.10 + attrs.teamwork * 0.10 + attrs.bravery * 0.05;
-  const physical =
-    attrs.pace * 0.25 + attrs.acceleration * 0.20 + attrs.agility * 0.15 +
-    attrs.stamina * 0.15 + attrs.strength * 0.15 + attrs.balance * 0.10;
-  const defensive =
-    attrs.marking * 0.30 + attrs.tackling * 0.30 +
-    attrs.ballWinning * 0.20 + attrs.defensivePositioning * 0.20;
-  return technical * 0.35 + mental * 0.30 + physical * 0.25 + defensive * 0.10;
+
+  return Math.max(1, Math.min(20, Math.round(score)));
 }
 
+/**
+ * Tüm kadroya antrenman uygular.
+ */
 export function applyTrainingToSquad(
   players: Record<string, Player>,
-  clubId: string,
+  userClubId: string,
   training: TrainingState
 ): Record<string, Player> {
-  const updated = { ...players };
-  for (const id in updated) {
-    if (updated[id].clubId === clubId) {
-      updated[id] = applyTraining(updated[id], training);
+  const newPlayers: Record<string, Player> = {};
+
+  for (const id in players) {
+    const p = players[id];
+    if (p.clubId === userClubId) {
+      newPlayers[id] = applyTrainingToPlayer(p, training);
+    } else {
+      newPlayers[id] = p;
     }
   }
-  return updated;
+
+  return newPlayers;
 }
-
-export const FOCUS_INFO: Record<TrainingFocus, { label: string; icon: string; desc: string }> = {
-  attack:   { label: 'Hücum',    icon: '⚔️', desc: 'Bitiricilik, şut, topsuz alan gelişir' },
-  defense:  { label: 'Savunma',  icon: '🛡️', desc: 'Markaj, müdahale, pozisyon gelişir' },
-  physical: { label: 'Fizik',    icon: '⚡', desc: 'Hız, ivme, dayanıklılık gelişir' },
-  tactical: { label: 'Taktik',   icon: '🧠', desc: 'Karar, vizyon, pozisyon gelişir' },
-  balanced: { label: 'Dengeli',  icon: '⚖️', desc: 'Tüm özellikler az gelişir' },
-};
-
-export const INTENSITY_INFO = {
-  light:   { label: 'Hafif',   icon: '🌿', desc: 'Az gelişir, az yorar' },
-  normal:  { label: 'Normal',  icon: '💪', desc: 'Dengeli gelişim' },
-  intense: { label: 'Yoğun',   icon: '🔥', desc: 'Hızlı gelişir, çok yorar' },
-};

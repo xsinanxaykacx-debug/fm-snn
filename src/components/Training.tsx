@@ -1,3 +1,5 @@
+// src/components/Training.tsx
+
 import { useGameStore } from '../store/gameStore';
 import { FOCUS_INFO, INTENSITY_INFO } from '../engine/progression/trainingSystem';
 import type { TrainingFocus } from '../engine/types';
@@ -93,6 +95,7 @@ export function Training() {
                 <th>Poz</th>
                 <th>Yaş</th>
                 <th>Genel</th>
+                <th>Değer</th>
                 <th>Gelişim</th>
               </tr>
             </thead>
@@ -110,7 +113,10 @@ export function Training() {
                     <td className="py-2">{p.name}</td>
                     <td><span className="text-xs px-2 py-0.5 rounded bg-pitch-700">{p.position}</span></td>
                     <td>{p.age}</td>
-                    <td className="text-accent">{scorePlayer(p).toFixed(0)}</td>
+                    <td className="text-accent font-bold">{p.overall}</td>
+                    <td className="text-xs text-slate-400">
+                      {(p.value / 1_000_000).toFixed(1)}M €
+                    </td>
                     <td className={ageGroup.cls}>{ageGroup.label}</td>
                   </tr>
                 );
