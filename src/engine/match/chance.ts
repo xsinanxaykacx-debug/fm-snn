@@ -55,7 +55,7 @@ export function calculateChanceFromSequence(
   else distanceFactor = 0.15;
 
   // 🔧 FIX: xG bazı 0.19 (orijinal)
-let xg = 0.19 * distanceFactor;
+let xg = 0.16 * distanceFactor;
 
 // eff() zaten 20-95 döndürüyor
 xg *= 0.7 + (finishing / 100) * 0.6;
@@ -122,7 +122,7 @@ export function applyGoalkeeper(
     reflexes * 0.30 + positioning * 0.30 + handling * 0.20 + oneOnOne * 0.20;
 
   // 🔧 FIX: gkRating 20-95 arası, (gkRating - 50) / 400 → (gkRating - 57) / 400
-  const gkFactor = 1.0 - (gkRating - 50) / 400;
+  const gkFactor = 1.0 - (gkRating - 50) / 150;
 
   const adjustedXG = xg * gkFactor;
 
