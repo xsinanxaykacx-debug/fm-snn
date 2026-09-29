@@ -13,12 +13,12 @@ const ENGINE_MIN = 20;
 const ENGINE_MAX = 95;
 
 /**
- * 1-20 arası FM değerini, motorun beklediği 20-95 aralığına çevirir.
- * Örnek: 1 → 20, 10 → 57, 20 → 95
+ * 1-20 arası FM değerini, motor ölçeğine çevirir (20-95).
+ * Örnek: 1 → 20, 10 → 55.53, 20 → 95
  */
 function scaleToEngine(value: number): number {
-  const clamped = Math.max(1, Math.min(20, value));
-  return 30 + ((clamped - 1) / 19) * 50;
+  const clamped = Math.max(FM_MIN, Math.min(FM_MAX, value));
+  return ENGINE_MIN + ((clamped - FM_MIN) / (FM_MAX - FM_MIN)) * (ENGINE_MAX - ENGINE_MIN);
 }
 
 // ═══════════════════════════════════════════════
@@ -31,7 +31,6 @@ export function eff(player: Player, key: keyof Attributes): number {
   const form = 0.85 + (player.form / 100) * 0.15;
   const morale = 0.90 + (player.morale / 100) * 0.10;
 
-  // 🔧 1-20 → 20-95
   const scaled = scaleToEngine(base);
 
   return scaled * cond * form * morale;
@@ -108,15 +107,17 @@ export function analyzeTeam(
   const amls = workingXI.filter(p => p.position === 'AML' || p.position === 'ML');
   const amrs = workingXI.filter(p => p.position === 'AMR' || p.position === 'MR');
   const mcs = workingXI.filter(p => p.position === 'MC');
-  const dms = workingXI.filter(p => p.position === 'DM');
+  const dms = workingXI.filter(p => p.position === 'DMC');
   const dcs = workingXI.filter(p => p.position === 'DC');
   const dls = workingXI.filter(p => p.position === 'DL');
   const drs = workingXI.filter(p => p.position === 'DR');
+  const wbls = workingXI.filter(p => p.position === 'WBL');
+  const wbrs = workingXI.filter(p => p.position === 'WBR');
   const gks = workingXI.filter(p => p.position === 'GK');
 
   const allMid = [...mcs, ...dms, ...amcs];
-  const allDef = [...dcs, ...dls, ...drs, ...dms];
-  const allWings = [...amls, ...amrs];
+  const allDef = [...dcs, ...dls, ...drs, ...dms, ...wbls, ...wbrs];
+  const allWings = [...amls, ...amrs, ...wbls, ...wbrs];
   const allAtt = [...sts, ...amcs, ...amls, ...amrs];
 
   const attack = (
@@ -193,10 +194,10 @@ export function analyzeTeam(
 
   const zones = {
     leftDefense: (
-      avgEff(dls, 'marking') * 0.35 +
-      avgEff(dls, 'tackling') * 0.30 +
-      avgEff(dls, 'defensivePositioning') * 0.20 +
-      avgEff(dls, 'pace') * 0.15
+      avgEff([...dls, ...wbls], 'marking') * 0.35 +
+      avgEff([...dls, ...wbls], 'tackling') * 0.30 +
+      avgEff([...dls, ...wbls], 'defensivePositioning') * 0.20 +
+      avgEff([...dls, ...wbls], 'pace') * 0.15
     ),
     centerDefense: (
       avgEff(dcs, 'marking') * 0.30 +
@@ -205,16 +206,16 @@ export function analyzeTeam(
       avgEff(dcs, 'strength') * 0.15
     ),
     rightDefense: (
-      avgEff(drs, 'marking') * 0.35 +
-      avgEff(drs, 'tackling') * 0.30 +
-      avgEff(drs, 'defensivePositioning') * 0.20 +
-      avgEff(drs, 'pace') * 0.15
+      avgEff([...drs, ...wbrs], 'marking') * 0.35 +
+      avgEff([...drs, ...wbrs], 'tackling') * 0.30 +
+      avgEff([...drs, ...wbrs], 'defensivePositioning') * 0.20 +
+      avgEff([...drs, ...wbrs], 'pace') * 0.15
     ),
     leftMidfield: (
-      avgEff([...amls, ...dls], 'passing') * 0.30 +
-      avgEff([...amls, ...dls], 'dribbling') * 0.30 +
-      avgEff([...amls, ...dls], 'pace') * 0.20 +
-      avgEff([...amls, ...dls], 'workRate') * 0.20
+      avgEff([...amls, ...dls, ...wbls], 'passing') * 0.30 +
+      avgEff([...amls, ...dls, ...wbls], 'dribbling') * 0.30 +
+      avgEff([...amls, ...dls, ...wbls], 'pace') * 0.20 +
+      avgEff([...amls, ...dls, ...wbls], 'workRate') * 0.20
     ),
     centerMidfield: (
       avgEff(allMid, 'passing') * 0.30 +
@@ -224,10 +225,10 @@ export function analyzeTeam(
       avgEff(allMid, 'workRate') * 0.10
     ),
     rightMidfield: (
-      avgEff([...amrs, ...drs], 'passing') * 0.30 +
-      avgEff([...amrs, ...drs], 'dribbling') * 0.30 +
-      avgEff([...amrs, ...drs], 'pace') * 0.20 +
-      avgEff([...amrs, ...drs], 'workRate') * 0.20
+      avgEff([...amrs, ...drs, ...wbrs], 'passing') * 0.30 +
+      avgEff([...amrs, ...drs, ...wbrs], 'dribbling') * 0.30 +
+      avgEff([...amrs, ...drs, ...wbrs], 'pace') * 0.20 +
+      avgEff([...amrs, ...drs, ...wbrs], 'workRate') * 0.20
     ),
     leftAttack: (
       avgEff(amls, 'dribbling') * 0.30 +

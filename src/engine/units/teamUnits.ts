@@ -3,12 +3,12 @@
 import type { Club, Player, TeamUnits, UnitComparison } from '../types';
 
 // ═══════════════════════════════════════════════
-// 1-20 → 30-80 DÖNÜŞÜMÜ
+// 1-20 → 20-95 DÖNÜŞÜMÜ
 // ═══════════════════════════════════════════════
 
 function scaleToEngine(value: number): number {
   const clamped = Math.max(1, Math.min(20, value));
-  return 30 + ((clamped - 1) / 19) * 50;
+  return 20 + ((clamped - 1) / 19) * 75;
 }
 
 export function effectiveAttribute(
