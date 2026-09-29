@@ -1,143 +1,102 @@
 // src/engine/match/attack.ts
 
-import type { Player, Attributes } from '../types';
-import type { TeamMatchState } from './matchState';
+import type { Player } from '../types';
 import { eff } from './teamAnalysis';
 
 // ═══════════════════════════════════════════════
-// OYUNCU SEÇİMİ
+// SAVUNMACI SEÇİMİ
 // ═══════════════════════════════════════════════
 
-/**
- * 🎯 ŞUT ÇEKECEK OYUNCUYU SEÇ
- * - GK hariç
- * - Zone'a göre ağırlıklı + atribute bazlı
- */
-export function pickShooter(xi: Player[], zone: string): Player | null {
-  // GK ASLA ŞUT ÇEKEMEZ
-  const outfieldPlayers = xi.filter(p => p.position !== 'GK');
-  if (outfieldPlayers.length === 0) return null;
+export function pickDefender(defendXI: Player[], zone: string): Player | null {
+  let positions: string[];
 
-  // Zone'a göre hangi pozisyonlar öncelikli
-  let zonePriority: Record<string, number> = {};
-
-  if (zone === 'leftAttack') {
-    zonePriority = {
-      'KFL': 10, 'ST': 8, 'GF': 7, 'AML': 6, 'AMC': 4,
-      'ML': 3, 'MC': 2, 'MR': 1, 'WBL': 1,
-    };
-  } else if (zone === 'rightAttack') {
-    zonePriority = {
-      'KFR': 10, 'ST': 8, 'GF': 7, 'AMR': 6, 'AMC': 4,
-      'MR': 3, 'MC': 2, 'ML': 1, 'WBR': 1,
-    };
+  if (zone.includes('Defense')) {
+    positions = ['ST', 'GF', 'KFL', 'KFR', 'AMC', 'AML', 'AMR'];
+  } else if (zone.includes('Midfield')) {
+    if (zone === 'centerMidfield') positions = ['MC', 'DMC', 'AMC'];
+    else if (zone === 'leftMidfield') positions = ['MC', 'ML', 'MR', 'DMC'];
+    else positions = ['MC', 'MR', 'ML', 'DMC'];
   } else if (zone === 'centerAttack') {
-    zonePriority = {
-      'ST': 10, 'GF': 9, 'AMC': 6, 'KFL': 5, 'KFR': 5,
-      'MC': 3, 'ML': 2, 'MR': 2, 'DMC': 1, 'DC': 0.5,
-    };
+    positions = ['DC', 'DMC', 'DL', 'DR'];
+  } else if (zone === 'leftAttack') {
+    positions = ['DC', 'DL', 'DMC', 'DR'];
   } else {
-    // midfield zones
-    zonePriority = {
-      'MC': 5, 'AMC': 4, 'ML': 3, 'MR': 3, 'DMC': 2,
-      'ST': 2, 'KFL': 2, 'KFR': 2, 'GF': 2,
-    };
+    positions = ['DC', 'DR', 'DMC', 'DL'];
   }
 
-  // Kadrodaki oyuncuları ağırlıklandır
-  const candidates = outfieldPlayers.map(p => {
-    const zoneWeight = zonePriority[p.position] ?? 0.3;
-
-    // Atribut bazlı ağırlık
-    const finishing = eff(p, 'finishing');
-    const shooting = eff(p, 'shooting');
-    const technique = eff(p, 'technique');
-    const composure = eff(p, 'composure');
-
-    const attrWeight =
-      finishing * 0.45 +
-      shooting * 0.25 +
-      technique * 0.15 +
-      composure * 0.15;
-
-    // Toplam ağırlık
-    const totalWeight = zoneWeight * (attrWeight / 50);
-
-    return { player: p, weight: Math.max(0.05, totalWeight) };
-  });
-
-  // Ağırlıklı rastgele seçim
-  const totalWeight = candidates.reduce((s, c) => s + c.weight, 0);
-  if (totalWeight <= 0) return candidates[0].player;
-
-  let r = Math.random() * totalWeight;
-
-  for (const c of candidates) {
-    r -= c.weight;
-    if (r <= 0) return c.player;
+  const candidates = defendXI.filter(p => positions.includes(p.position));
+  if (candidates.length === 0) {
+    return defendXI.length > 0 ? defendXI[Math.floor(Math.random() * defendXI.length)] : null;
   }
-
-  return candidates[candidates.length - 1].player;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
-/**
- * 🎯 GOL ATAN OYUNCUYU SEÇ
- * - GK hariç
- * - %70 ihtimalle şut çeken zaten golcü
- * - %30 ihtimalle kafa golü / deflection
- */
-export function pickScorer(xi: Player[], zone: string, shooter: Player): Player {
-  // GK ASLA GOL ATAMAZ
-  const outfieldPlayers = xi.filter(p => p.position !== 'GK');
-  if (outfieldPlayers.length === 0) return shooter;
+// ═══════════════════════════════════════════════
+// ŞUTÖR SEÇİMİ
+// ═══════════════════════════════════════════════
 
-  // %70 ihtimalle şut çeken zaten golcü
-  if (Math.random() < 0.70) return shooter;
+export function pickShooter(attackXI: Player[], zone: string): Player | null {
+  let positions: string[];
 
-  // %30 ihtimalle başka biri (kafa golü, deflection vs.)
-  let scorerPositions: string[] = [];
-
-  if (zone === 'leftAttack' || zone === 'rightAttack') {
-    scorerPositions = ['ST', 'GF', 'KFL', 'KFR', 'AMC', 'DC'];
+  if (zone.includes('Attack')) {
+    positions = ['ST', 'GF', 'KFL', 'KFR', 'AMC', 'AML', 'AMR'];
+  } else if (zone.includes('Midfield')) {
+    positions = ['AMC', 'MC', 'AML', 'AMR', 'ST'];
   } else {
-    scorerPositions = ['ST', 'GF', 'AMC', 'KFL', 'KFR'];
+    positions = ['ST', 'AMC', 'MC'];
   }
 
-  const candidates = outfieldPlayers.filter(
-    p =>
-      scorerPositions.includes(p.position) &&
-      p.id !== shooter.id
+  const candidates = attackXI.filter(p => positions.includes(p.position));
+  if (candidates.length === 0) return null;
+
+  // Forvetler daha olası şut çeker
+  const weighted = candidates.map(p => {
+    const isStriker = ['ST', 'GF', 'KFL', 'KFR'].includes(p.position);
+    const isAm = ['AMC', 'AML', 'AMR'].includes(p.position);
+    const isMid = ['MC', 'ML', 'MR'].includes(p.position);
+    const base = isStriker ? 3 : isAm ? 2 : isMid ? 1 : 0.5;
+    const finishing = eff(p, 'finishing');
+    return base * (0.5 + finishing / 100);
+  });
+
+  const total = weighted.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < candidates.length; i++) {
+    r -= weighted[i];
+    if (r <= 0) return candidates[i];
+  }
+  return candidates[candidates.length - 1];
+}
+
+// ═══════════════════════════════════════════════
+// GOLCÜ SEÇİMİ
+// ═══════════════════════════════════════════════
+
+export function pickScorer(attackXI: Player[], zone: string, shooter: Player): Player {
+  // Şutör zaten en olası golcü
+  if (Math.random() < 0.6) return shooter;
+
+  const candidates = attackXI.filter(p =>
+    p.id !== shooter.id &&
+    p.position !== 'GK' &&
+    ['ST', 'GF', 'KFL', 'KFR', 'AMC', 'AML', 'AMR', 'MC'].includes(p.position)
   );
 
   if (candidates.length === 0) return shooter;
 
-  const weights = candidates.map(p => {
+  const weighted = candidates.map(p => {
     const finishing = eff(p, 'finishing');
-    const heading = eff(p, 'heading');
     const offTheBall = eff(p, 'offTheBall');
-    return Math.max(1, finishing * 0.5 + heading * 0.3 + offTheBall * 0.2);
+    const isStriker = ['ST', 'GF', 'KFL', 'KFR'].includes(p.position);
+    const base = isStriker ? 2 : 1;
+    return base * (finishing * 0.5 + offTheBall * 0.5) / 50;
   });
 
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  let r = Math.random() * totalWeight;
+  const total = weighted.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
   for (let i = 0; i < candidates.length; i++) {
-    r -= weights[i];
+    r -= weighted[i];
     if (r <= 0) return candidates[i];
   }
-
   return candidates[candidates.length - 1];
-}
-
-/**
- * 🎯 SAVUNMA OYUNCUSU SEÇ (attackSequence kullanıyor)
- */
-export function pickDefender(defendingXI: Player[], zone: string): Player | null {
-  let positions: string[];
-  if (zone === 'leftAttack') positions = ['DR', 'DC', 'DMC', 'WBR'];
-  else if (zone === 'rightAttack') positions = ['DL', 'DC', 'DMC', 'WBL'];
-  else positions = ['DC', 'DMC'];
-
-  const candidates = defendingXI.filter(p => positions.includes(p.position));
-  if (candidates.length === 0) return defendingXI[0] || null;
-  return candidates[Math.floor(Math.random() * candidates.length)];
 }

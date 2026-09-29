@@ -1,6 +1,6 @@
 // src/engine/match/matchEngine.ts
 
-import type { Club, Match, MatchEvent, Player } from '../types';
+import type { Club, Match, MatchEvent, Player, ActionDebugInfo } from '../types';
 import { getStartingXI } from '../data/generateData';
 import { analyzeTeam, eff } from './teamAnalysis';
 import {
@@ -14,7 +14,7 @@ import {
   choosePossessionTeam,
   chooseAttackZone,
 } from './possession';
-import { createAttackSequence } from './attackSequence';
+import { createAttackSequence, setAttackDebugCallback } from './attackSequence';
 import { calculateChanceFromSequence } from './chance';
 import { resolveShot } from './goalkeeper';
 import { pickShooter, pickScorer } from './attack';
@@ -118,8 +118,15 @@ export function simulateMatch(
   away: Club,
   players: Record<string, Player>,
   week: number,
-  userLineup?: string[]
+  userLineup?: string[],
+  debugCallback?: (info: ActionDebugInfo) => void
 ): Match {
+  if (debugCallback) {
+    setAttackDebugCallback(debugCallback);
+  } else {
+    setAttackDebugCallback(null);
+  }
+
   const events: MatchEvent[] = [];
   const pendingEvents: { minute: number; event: MatchEvent }[] = [];
 
@@ -235,17 +242,9 @@ export function simulateMatch(
     const sequence = createAttackSequence(attackState, defendState, attackXI2, defendXI2, zone);
     state.sequences.push(sequence);
 
-    // ═══════════════════════════════════════════════
-    // ŞUT KARARI — chanceQuality'ye bağlı olasılık
-    // ═══════════════════════════════════════════════
-    // chanceQuality 0–100 arası bir "şans kalitesi" metriği.
-    // Bunu doğrudan şut olasılığına çeviriyoruz:
-    //   chanceQuality = 40  → %40 şut olasılığı
-    //   chanceQuality = 70  → %70 şut olasılığı
-    // Tavan %85, taban %5 (çok düşük kaliteli sequence'lar da nadiren şut üretsin).
     const shotProbability = Math.max(
       0.05,
-      Math.min(0.90, sequence.chanceQuality / 72)
+      Math.min(0.90, sequence.chanceQuality / 82)
     );
 
     if (!sequence.resultedInShot || Math.random() > shotProbability) {

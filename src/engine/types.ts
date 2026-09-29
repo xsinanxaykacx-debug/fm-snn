@@ -111,7 +111,6 @@ export interface CareerStats {
   seasonMinutesPlayed: number;
   seasonMotm: number;
 
-  // 🆕 KUPA İSTATİSTİKLERİ
   cupAppearances: number;
   cupGoals: number;
   cupAssists: number;
@@ -262,7 +261,6 @@ export interface Match {
   possession?: { home: number; away: number };
   engine?: any;
 
-  // 🆕 KUPA MAÇI
   isCup?: boolean;
   cupRound?: CupRound;
   penalties?: {
@@ -270,10 +268,12 @@ export interface Match {
     away: number;
   };
   winnerId?: string;
+
+  sequences?: AttackSequence[];
 }
 
 // ═══════════════════════════════════════════════
-// 🆕 KUPA TİPLERİ
+// KUPA TİPLERİ
 // ═══════════════════════════════════════════════
 
 export type CupRound = 'round1' | 'quarter' | 'semi' | 'final';
@@ -346,7 +346,6 @@ export interface GameState {
   assistant: AssistantSettings;
   academy: AcademyState;
 
-  // 🆕 KUPA
   cup: CupState;
 }
 
@@ -430,4 +429,25 @@ export interface ContractOffer {
   currentYears: number;
   offeredYears: number;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+}
+
+// ═══════════════════════════════════════════════
+// DEBUG: ACTION SOURCE
+// ═══════════════════════════════════════════════
+
+export interface ActionDebugInfo {
+  actionIndex: number;
+  action: string;
+  zone: string;
+  attackerId: string;
+  attackerName: string;
+  attackerPosition: string;
+  attackerPower: number;
+  defenderId: string | null;
+  defenderName: string | null;
+  defenderPosition: string | null;
+  defenderPower: number;
+  diff: number;
+  probability: number;
+  success: boolean;
 }

@@ -40,8 +40,6 @@ describe('Maç Motoru — Aksiyon Dağılımı', () => {
       const home = clubList[homeIdx];
       const away = clubList[awayIdx];
 
-      // 🎯 HER MAÇTAN ÖNCE OYUNCULARI SIFIRLA
-      // (yorgunluk, sakatlık, kart birikmesin)
       for (const p of Object.values(data.players)) {
         p.condition = 100;
         p.morale = 80;
@@ -149,5 +147,5 @@ describe('Maç Motoru — Aksiyon Dağılımı', () => {
     lines.push('');
 
     console.log(lines.join('\n'));
-  }, 60000); // ⏱️ 60 saniye timeout
+  }, 60000);
 });

@@ -19,7 +19,6 @@ export function resolveShot(
 ): ShotResult {
   const shooter = chance.shooter;
 
-  // 1. KALEYİ BULMA
   const onTargetProb = onTargetProbability(shooter, chance.xG);
   const onTarget = Math.random() < onTargetProb;
 
@@ -32,19 +31,12 @@ export function resolveShot(
     };
   }
 
-  // 2. KALECİ ETKİSİ
   const { goalProb: baseGoalProb } = applyGoalkeeper(goalkeeper, chance.xG);
+  const gkEffect = baseGoalProb / chance.xG;
 
-  // xG = toplam gol olasılığı. Kaleci zaten xG içinde hesaba katıldı.
-  // Sadece kaleci kalitesinden gelen küçük bir düzeltme uygula.
-  const gkEffect = baseGoalProb / chance.xG; // ~0.90-1.10 arası
-
-  // İsabetli şut başına gol olasılığı = (xG * gkEffect) / onTargetProb
   let adjustedGoalProb = (chance.xG * gkEffect) / onTargetProb;
-
   adjustedGoalProb = Math.max(0.05, Math.min(0.95, adjustedGoalProb));
 
-  // 3. SONUÇ
   const roll = Math.random();
 
   if (roll < adjustedGoalProb) {
