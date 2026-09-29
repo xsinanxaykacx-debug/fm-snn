@@ -1,6 +1,6 @@
 // src/engine/match/matchEngine.ts
 
-import type { Club, Match, MatchEvent, Player, ActionDebugInfo } from '../types';
+import type { Club, Match, MatchEvent, Player, ActionDebugInfo, ShotDebugInfo } from '../types';
 import { getStartingXI } from '../data/generateData';
 import { analyzeTeam, eff } from './teamAnalysis';
 import {
@@ -18,6 +18,16 @@ import { createAttackSequence, setAttackDebugCallback } from './attackSequence';
 import { calculateChanceFromSequence } from './chance';
 import { resolveShot } from './goalkeeper';
 import { pickShooter, pickScorer } from './attack';
+
+// ═══════════════════════════════════════════════
+// DEBUG HOOK — SHOT
+// ═══════════════════════════════════════════════
+
+let shotDebugCallback: ((info: ShotDebugInfo) => void) | null = null;
+
+export function setShotDebugCallback(cb: ((info: ShotDebugInfo) => void) | null): void {
+  shotDebugCallback = cb;
+}
 
 // ═══════════════════════════════════════════════
 // YARDIMCILAR
@@ -259,6 +269,9 @@ export function simulateMatch(
       continue;
     }
 
+    // 🆕 Şut alındı
+    sequence.shotTaken = true;
+
     const shooter = pickShooter(attackXI2, sequence.finalZone) || attackXI2[0];
     if (!shooter) {
       consumeCondition(state);
@@ -269,11 +282,37 @@ export function simulateMatch(
 
     const chance = calculateChanceFromSequence(sequence, shooter, attackState, defendState);
 
+    // 🆕 sequence.xG'yi güncelle
+    sequence.xG = chance.xG;
+
     attackState.shots++;
     attackState.xG += chance.xG;
 
     const gk = defendXI2.find(p => p.position === 'GK') || null;
     const shotResult = resolveShot(chance, gk, defendState);
+
+    // 🆕 Şut sonucunu sequence'a yaz
+    sequence.shotOutcome = shotResult.outcome;
+    sequence.shotOnTarget = shotResult.onTarget;
+
+    // 🆕 Shot debug hook
+    if (shotDebugCallback) {
+      shotDebugCallback({
+        sequenceChanceQuality: sequence.chanceQuality,
+        sequenceFinalZone: sequence.finalZone,
+        sequenceTotalActions: sequence.totalActions,
+        shooterId: shooter.id,
+        shooterName: shooter.name,
+        shooterPosition: shooter.position,
+        xG: chance.xG,
+        distance: chance.distance,
+        angle: chance.angle,
+        pressure: chance.pressure,
+        outcome: shotResult.outcome,
+        onTarget: shotResult.onTarget,
+        isHome: possessionTeam === 'home',
+      });
+    }
 
     const isHome = possessionTeam === 'home';
 

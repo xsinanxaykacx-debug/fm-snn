@@ -415,6 +415,9 @@ export interface AttackSequence {
   resultedInShot: boolean;
   resultedInGoal: boolean;
   xG: number;
+  shotTaken?: boolean;
+  shotOutcome?: 'goal' | 'save' | 'miss' | 'blocked';
+  shotOnTarget?: boolean;
 }
 
 // ═══════════════════════════════════════════════
@@ -450,4 +453,24 @@ export interface ActionDebugInfo {
   diff: number;
   probability: number;
   success: boolean;
+}
+
+// ═══════════════════════════════════════════════
+// DEBUG: SHOT
+// ═══════════════════════════════════════════════
+
+export interface ShotDebugInfo {
+  sequenceChanceQuality: number;
+  sequenceFinalZone: string;
+  sequenceTotalActions: number;
+  shooterId: string;
+  shooterName: string;
+  shooterPosition: string;
+  xG: number;
+  distance: number;
+  angle: number;
+  pressure: number;
+  outcome: 'goal' | 'save' | 'miss' | 'blocked';
+  onTarget: boolean;
+  isHome: boolean;
 }
