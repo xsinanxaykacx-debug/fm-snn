@@ -587,7 +587,6 @@ export const useGameStore = create<Store>()(
               lineup
             );
 
-            // Beraberlik → penaltılar
             if (result.homeScore === result.awayScore) {
               const homeUnits = home.reputation;
               const awayUnits = away.reputation;
@@ -1528,6 +1527,43 @@ export const useGameStore = create<Store>()(
     }),
     {
       name: 'fm-clone-save',
+
+      // 🎯 KRİTİK: Sadece gerekli alanları kaydet, sequences HARİÇ
+      partialize: (state) => ({
+        season: state.season,
+        currentWeek: state.currentWeek,
+        userClubId: state.userClubId,
+        clubs: state.clubs,
+        players: state.players,
+        // 🎯 fixtures'dan sequences'ı çıkar (save boyutunu küçültür)
+        fixtures: state.fixtures.map(f => ({
+          id: f.id,
+          week: f.week,
+          homeId: f.homeId,
+          awayId: f.awayId,
+          homeScore: f.homeScore,
+          awayScore: f.awayScore,
+          events: f.events,  // Event'ler kalabilir (küçük)
+          stats: f.stats,
+          played: f.played,
+          possession: f.possession,
+          isCup: f.isCup,
+          cupRound: f.cupRound,
+          penalties: f.penalties,
+          winnerId: f.winnerId,
+          // sequences: f.sequences,  // ❌ DAHİL DEĞİL
+        })),
+        table: state.table,
+        transferList: state.transferList,
+        news: state.news,
+        seasonOver: state.seasonOver,
+        training: state.training,
+        userLineup: state.userLineup,
+        assistant: state.assistant,
+        academy: state.academy,
+        cup: state.cup,
+      }),
+
       merge: (persistedState: any, currentState: Store) => {
         const merged = { ...currentState, ...persistedState };
 

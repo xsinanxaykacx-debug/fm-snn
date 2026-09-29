@@ -39,8 +39,7 @@ export function createAttackSequence(
   });
 
   // Taşıma istatistiği
-  attackingTeam.dribbles++;
-  attackingTeam.dribblesSuccess++;
+  
 
   for (let i = 0; i < maxActions; i++) {
     const defender = pickDefender(defendXI, currentZone);
@@ -191,11 +190,12 @@ function chooseSequenceAction(
   }
 
   if (isAttack) {
-    if (r < 0.25) return 'throughBall';
-    if (r < 0.50) return 'dribble';
-    if (r < 0.75) return 'pass';
-    if (r < 0.90) return 'run';
-    return 'pass';
+    if (r < 0.15) return 'throughBall';  // %15
+    if (r < 0.50) return 'pass';          // %35
+    if (r < 0.70) return 'dribble';       // %20
+    if (r < 0.90) return 'pass';          // %20
+    if (r < 0.95) return 'run';           // %5
+    return 'recycle';                      // %5
   }
 
   if (directness === 'direct' && r < 0.25) return 'throughBall';
