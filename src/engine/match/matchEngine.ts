@@ -160,8 +160,9 @@ export function simulateMatch(
   ensureInjuredPlayers(state.home);
   ensureInjuredPlayers(state.away);
 
-  const totalTicks = 36;
-  const minutePerTick = 2.5;
+  // 🔧 90 TICK: Her dakika için 1 tick (90 saniyelik gösterim için)
+  const totalTicks = 90;
+  const minutePerTick = 1;
   const sentOff = new Set<string>();
   const matchYellows = new Set<string>();
 
@@ -252,10 +253,11 @@ export function simulateMatch(
     const sequence = createAttackSequence(attackState, defendState, attackXI2, defendXI2, zone);
     state.sequences.push(sequence);
 
+    // 🔧 90 TICK İÇİN: Şut olasılığı 2.5x düşürüldü
     const shotProbability = Math.max(
-  0.05,
-  Math.min(0.90, 0.30 + sequence.chanceQuality / 200)
-);
+      0.05,
+      Math.min(0.90, (0.30 + sequence.chanceQuality / 200) / 2.5)
+    );
 
     if (!sequence.resultedInShot || Math.random() > shotProbability) {
       if (sequence.actions.length > 0) {
@@ -269,7 +271,6 @@ export function simulateMatch(
       continue;
     }
 
-    // 🆕 Şut alındı
     sequence.shotTaken = true;
 
     const shooter = pickShooter(attackXI2, sequence.finalZone) || attackXI2[0];
@@ -282,7 +283,6 @@ export function simulateMatch(
 
     const chance = calculateChanceFromSequence(sequence, shooter, attackState, defendState);
 
-    // 🆕 sequence.xG'yi güncelle
     sequence.xG = chance.xG;
 
     attackState.shots++;
@@ -291,11 +291,9 @@ export function simulateMatch(
     const gk = defendXI2.find(p => p.position === 'GK') || null;
     const shotResult = resolveShot(chance, gk, defendState);
 
-    // 🆕 Şut sonucunu sequence'a yaz
     sequence.shotOutcome = shotResult.outcome;
     sequence.shotOnTarget = shotResult.onTarget;
 
-    // 🆕 Shot debug hook
     if (shotDebugCallback) {
       shotDebugCallback({
         sequenceChanceQuality: sequence.chanceQuality,
