@@ -11,11 +11,12 @@ import { MatchDay } from './components/MatchDay';
 import { Transfers } from './components/Transfers';
 import { Training } from './components/Training';
 import { Stats } from './components/Stats';
+import { Settings } from './components/Settings';
 import { SeasonEndModal } from './components/SeasonEndModal';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { InboxView } from './components/InboxView';
 
-type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training' | 'stats' | 'inbox';
+type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training' | 'stats' | 'inbox' | 'settings';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -31,15 +32,23 @@ export default function App() {
   const pendingPressMatch = useGameStore(s => s.pendingPressMatch);
   const applyPressEffects = useGameStore(s => s.applyPressEffects);
   const clearPendingPress = useGameStore(s => s.clearPendingPress);
+  const simulateAssistantPress = useGameStore(s => s.simulateAssistantPress);
+  const assistant = useGameStore(s => s.assistant);
 
   const inboxMessages = useInboxStore(s => s.messages);
   const unreadCount = inboxMessages.filter(m => !m.isRead).length;
 
   useEffect(() => {
     if (pendingPressMatch && !showPress) {
-      setShowPress(true);
+      if (assistant?.pressConference) {
+        // Asistan otomatik gider
+        simulateAssistantPress();
+      } else {
+        // Manuel basın toplantısı
+        setShowPress(true);
+      }
     }
-  }, [pendingPressMatch, showPress]);
+  }, [pendingPressMatch, showPress, assistant, simulateAssistantPress]);
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'dashboard', label: '📋 Ana Sayfa' },
@@ -51,6 +60,7 @@ export default function App() {
     { key: 'stats', label: '🏆 İstatistikler' },
     { key: 'inbox', label: '📬 Gelen Kutusu', badge: unreadCount },
     { key: 'transfer', label: '💸 Transfer' },
+    { key: 'settings', label: '⚙️ Ayarlar' },
   ];
 
   return (
@@ -116,6 +126,7 @@ export default function App() {
         {tab === 'stats' && <Stats />}
         {tab === 'inbox' && <InboxView />}
         {tab === 'transfer' && <Transfers />}
+        {tab === 'settings' && <Settings />}
       </main>
 
       {showSeasonEnd && (

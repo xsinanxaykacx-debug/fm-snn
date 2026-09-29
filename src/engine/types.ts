@@ -202,6 +202,7 @@ export interface GameState {
   seasonOver: boolean;
   training: TrainingState;
   userLineup: string[];
+  assistant: AssistantSettings;
 }
 
 export interface TeamUnits {
@@ -222,3 +223,12 @@ export interface UnitComparison {
   favored: 'home' | 'away' | 'neutral';
   advantagePct: number;
 }
+
+export interface AssistantSettings {
+  pressConference: boolean;      // Basın toplantısı
+  training: boolean;             // Antrenman
+  lineupSuggestion: boolean;     // Kadro önerisi
+  transferSuggestion: boolean;   // Transfer önerisi
+  matchAnalysis: boolean;        // Maç analizi
+}
+  
