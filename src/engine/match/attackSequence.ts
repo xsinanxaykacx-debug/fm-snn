@@ -1,3 +1,5 @@
+// src/engine/match/attackSequence.ts
+
 import type { Player, AttackSequence, AttackSequenceAction } from '../types';
 import type { TeamMatchState } from './matchState';
 import { eff } from './teamAnalysis';
@@ -36,6 +38,10 @@ export function createAttackSequence(
     description: `${currentPlayer.name} topu aldi`,
   });
 
+  // Taşıma istatistiği
+  attackingTeam.dribbles++;
+  attackingTeam.dribblesSuccess++;
+
   for (let i = 0; i < maxActions; i++) {
     const defender = pickDefender(defendXI, currentZone);
     const pressure = calculateDefenderPressure(defender, defendingTeam);
@@ -52,6 +58,20 @@ export function createAttackSequence(
       attackingTeam,
       defendingTeam
     );
+
+    // 🆕 İSTATİSTİK ARTTIR (her aksiyon için)
+    if (actionType === 'pass' || actionType === 'throughBall' || actionType === 'recycle') {
+      attackingTeam.passes++;
+      if (success) attackingTeam.passesCompleted++;
+    }
+    if (actionType === 'dribble' || actionType === 'carry') {
+      attackingTeam.dribbles++;
+      if (success) attackingTeam.dribblesSuccess++;
+    }
+    if (actionType === 'cross') {
+      attackingTeam.crosses++;
+      if (success) attackingTeam.crossesSuccess++;
+    }
 
     const space = success ? calculateSpaceCreated(pressure, attackingTeam) : 0;
     totalSpace += space;
@@ -104,7 +124,6 @@ export function createAttackSequence(
   const avgSpace = Math.round(totalSpace / Math.max(1, actionCount));
   const inAttackZone = currentZone.includes('Attack');
 
-  // Yeni formul: 0.5 + 0.4
   const chanceQuality = inAttackZone
     ? Math.round(avgSpace * 0.5 + (100 - finalPressure) * 0.4)
     : 0;
@@ -125,21 +144,25 @@ export function createAttackSequence(
   };
 }
 
+// ═══════════════════════════════════════════════
+// OYUNCU SEÇİMİ (17 pozisyon)
+// ═══════════════════════════════════════════════
+
 function pickPlayerForZone(xi: Player[], zone: string): Player | null {
   let positions: string[];
 
   if (zone.includes('Defense')) {
-    positions = ['DC', 'DL', 'DR', 'DM'];
+    positions = ['DC', 'DL', 'DR', 'DMC', 'WBL', 'WBR'];
   } else if (zone.includes('Midfield')) {
-    if (zone === 'centerMidfield') positions = ['DM', 'MC', 'AMC'];
-    else if (zone === 'leftMidfield') positions = ['DL', 'ML', 'AML', 'MC'];
-    else positions = ['DR', 'MR', 'AMR', 'MC'];
+    if (zone === 'centerMidfield') positions = ['DMC', 'MC', 'AMC'];
+    else if (zone === 'leftMidfield') positions = ['DL', 'ML', 'AML', 'MC', 'WBL', 'KFL'];
+    else positions = ['DR', 'MR', 'AMR', 'MC', 'WBR', 'KFR'];
   } else if (zone === 'centerAttack') {
-    positions = ['AMC', 'ST'];
+    positions = ['AMC', 'ST', 'GF'];
   } else if (zone === 'leftAttack') {
-    positions = ['ML', 'AML', 'ST', 'AMC'];
+    positions = ['ML', 'AML', 'ST', 'AMC', 'KFL'];
   } else {
-    positions = ['MR', 'AMR', 'ST', 'AMC'];
+    positions = ['MR', 'AMR', 'ST', 'AMC', 'KFR'];
   }
 
   const candidates = xi.filter(p => positions.includes(p.position));

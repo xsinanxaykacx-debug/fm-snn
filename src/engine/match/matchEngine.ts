@@ -450,7 +450,7 @@ export function simulateMatch(
     updateCareerStats(players, bestPlayerId, { motm: 1 });
   }
 
-  return {
+    return {
     id: `match_${week}_${home.id}_${away.id}`,
     week,
     homeId: home.id,
@@ -458,6 +458,7 @@ export function simulateMatch(
     homeScore: state.homeScore,
     awayScore: state.awayScore,
     events,
+    sequences: state.sequences,  // 🆕 SEQUENCE'LARI EKLE
     stats: {
       possession: { home: possession.home, away: possession.away },
       shots: { home: state.home.shots, away: state.away.shots },
@@ -476,7 +477,6 @@ export function simulateMatch(
     played: true,
   };
 }
-
 function processCardsInMatch(
   state: MatchState,
   players: Record<string, Player>,
