@@ -109,7 +109,7 @@ export function developPlayers(
     // Yaş ilerle
     p.age = p.age + 1;
 
-    // 🎯 36+ EMEKLİ — kayıttan tamamen çıkar (yerine genç üretilecek)
+    // 🎯 36+ EMEKLİ
     if (p.age > 35) {
       continue;
     }
@@ -118,9 +118,7 @@ export function developPlayers(
     const progression = getAgeProgression(p.age);
     const r = () => (Math.random() - 0.5) * 0.8;
 
-    // ─────────────────────────────────────────
     // FİZİKSEL
-    // ─────────────────────────────────────────
     a.pace = Math.max(1, Math.min(20, Math.round(a.pace + progression.physical + r())));
     a.acceleration = Math.max(1, Math.min(20, Math.round(a.acceleration + progression.physical + r())));
     a.stamina = Math.max(1, Math.min(20, Math.round(a.stamina + progression.physical * 0.5 + r())));
@@ -128,9 +126,7 @@ export function developPlayers(
     a.agility = Math.max(1, Math.min(20, Math.round(a.agility + progression.physical * 0.7 + r())));
     a.balance = Math.max(1, Math.min(20, Math.round(a.balance + progression.physical * 0.5 + r())));
 
-    // ─────────────────────────────────────────
     // TEKNİK
-    // ─────────────────────────────────────────
     a.passing = Math.max(1, Math.min(20, Math.round(a.passing + progression.technical + r())));
     a.firstTouch = Math.max(1, Math.min(20, Math.round(a.firstTouch + progression.technical + r())));
     a.dribbling = Math.max(1, Math.min(20, Math.round(a.dribbling + progression.technical + r())));
@@ -141,9 +137,7 @@ export function developPlayers(
     a.longShots = Math.max(1, Math.min(20, Math.round(a.longShots + progression.technical * 0.7 + progression.mental * 0.3 + r())));
     a.setPieces = Math.max(1, Math.min(20, Math.round(a.setPieces + progression.technical * 0.8 + r())));
 
-    // ─────────────────────────────────────────
     // ZİHİNSEL
-    // ─────────────────────────────────────────
     a.decisions = Math.max(1, Math.min(20, Math.round(a.decisions + progression.mental + r())));
     a.vision = Math.max(1, Math.min(20, Math.round(a.vision + progression.mental + r())));
     a.anticipation = Math.max(1, Math.min(20, Math.round(a.anticipation + progression.mental + r())));
@@ -156,18 +150,14 @@ export function developPlayers(
     a.bravery = Math.max(1, Math.min(20, Math.round(a.bravery + progression.mental * 0.5 + progression.physical * 0.3 + r())));
     a.aggression = Math.max(1, Math.min(20, Math.round(a.aggression + progression.physical * 0.4 + progression.mental * 0.3 + r())));
 
-    // ─────────────────────────────────────────
     // SAVUNMA
-    // ─────────────────────────────────────────
     a.marking = Math.max(1, Math.min(20, Math.round(a.marking + progression.technical * 0.7 + progression.mental * 0.3 + r())));
     a.tackling = Math.max(1, Math.min(20, Math.round(a.tackling + progression.technical * 0.7 + progression.mental * 0.3 + r())));
     a.defensivePositioning = Math.max(1, Math.min(20, Math.round(a.defensivePositioning + progression.mental + r())));
     a.heading = Math.max(1, Math.min(20, Math.round(a.heading + progression.physical * 0.4 + progression.technical * 0.3 + r())));
     a.ballWinning = Math.max(1, Math.min(20, Math.round(a.ballWinning + progression.mental * 0.7 + progression.physical * 0.3 + r())));
 
-    // ─────────────────────────────────────────
     // KALECİ
-    // ─────────────────────────────────────────
     a.goalkeeper = Math.max(1, Math.min(20, Math.round(a.goalkeeper + progression.technical * 0.5 + progression.mental * 0.5 + r())));
     a.reflexes = Math.max(1, Math.min(20, Math.round(a.reflexes + progression.physical * 0.6 + progression.technical * 0.4 + r())));
     a.gkPositioning = Math.max(1, Math.min(20, Math.round(a.gkPositioning + progression.mental + r())));

@@ -16,7 +16,7 @@ import type {
 
 export const MIN_AGE = 15;
 export const MAX_AGE = 35;
-export const RETIREMENT_AGE = 35;  // 35 yaşında son sezon, 36'da emekli
+export const RETIREMENT_AGE = 35;
 
 const FIRST_NAMES = [
   'Luis', 'Marco', 'Carlos', 'Diego', 'Juan', 'Pedro', 'Miguel', 'Sergio', 'Andres', 'Javier',
@@ -35,7 +35,7 @@ const LAST_NAMES = [
 const NATIONALITIES = ['TR', 'EN', 'DE', 'FR', 'ES', 'IT', 'BR', 'AR', 'NL', 'PT'];
 
 // ═══════════════════════════════════════════════
-// YARDIMCI FONKSİYONLAR
+// YARDIMCI
 // ═══════════════════════════════════════════════
 
 function randomBetween(min: number, max: number): number {
@@ -63,12 +63,12 @@ function randomNationality(): string {
 
 function generateAge(): number {
   const roll = Math.random();
-  if (roll < 0.10) return 15 + Math.floor(Math.random() * 3);   // 15-17
-  if (roll < 0.30) return 18 + Math.floor(Math.random() * 4);   // 18-21
-  if (roll < 0.55) return 22 + Math.floor(Math.random() * 4);   // 22-25
-  if (roll < 0.80) return 26 + Math.floor(Math.random() * 4);   // 26-29
-  if (roll < 0.95) return 30 + Math.floor(Math.random() * 3);   // 30-32
-  return 33 + Math.floor(Math.random() * 3);                     // 33-35
+  if (roll < 0.10) return 15 + Math.floor(Math.random() * 3);
+  if (roll < 0.30) return 18 + Math.floor(Math.random() * 4);
+  if (roll < 0.55) return 22 + Math.floor(Math.random() * 4);
+  if (roll < 0.80) return 26 + Math.floor(Math.random() * 4);
+  if (roll < 0.95) return 30 + Math.floor(Math.random() * 3);
+  return 33 + Math.floor(Math.random() * 3);
 }
 
 function ageAttributeBias(age: number): number {
@@ -287,7 +287,7 @@ function randomAttributes(position: Position, age: number): Attributes {
 }
 
 // ═══════════════════════════════════════════════
-// GENEL REYTİNG (1-20)
+// GENEL REYTİNG
 // ═══════════════════════════════════════════════
 
 function calculateOverall(a: Attributes, position: Position): number {
@@ -319,7 +319,7 @@ function calculateOverall(a: Attributes, position: Position): number {
 }
 
 // ═══════════════════════════════════════════════
-// DEĞER HESABI (1-20 reyting) — 15-35 YAŞ ARASI
+// DEĞER HESABI
 // ═══════════════════════════════════════════════
 
 export function calculateValue(overall: number, age: number): number {
@@ -415,17 +415,17 @@ export function generatePlayer(position: Position, clubId: string, index: number
     careerStats,
     recentRatings: [],
     overall,
+
+    // 🆕 SÖZLEŞME
+    contractYears: randomBetween(1, 5),
+    squadRole: overall >= 14 ? 'first' : overall >= 11 ? 'rotation' : 'backup',
   };
 }
 
 // ═══════════════════════════════════════════════
-// GENÇ OYUNCU ÜRETİMİ (RE-GEN)
+// GENÇ OYUNCU (RE-GEN)
 // ═══════════════════════════════════════════════
 
-/**
- * Emekli olan oyuncunun yerine genç yetenek üretir.
- * Yaş: 15-18 arası
- */
 export function generateYouthPlayer(
   position?: Position,
   nationality?: string,
@@ -465,14 +465,15 @@ export function generateYouthPlayer(
     careerStats: createEmptyCareerStats(),
     recentRatings: [],
     overall,
+
+    // 🆕 SÖZLEŞME
+    contractYears: randomBetween(2, 4),
+    squadRole: 'u21',
   };
 }
 
 /**
  * Emekli olan oyuncuların yerine genç üretir.
- * developPlayers'dan SONRA çağrılmalı (emekliler zaten silinmiş olur).
- *
- * Kadro hedefi 24. Eksik pozisyonları tespit edip genç üretir.
  */
 export function replaceRetiredPlayers(
   players: Record<string, Player>,
@@ -480,25 +481,21 @@ export function replaceRetiredPlayers(
 ): Record<string, Player> {
   const newPlayers = { ...players };
 
-  // Her kulüp için kadro sayısını kontrol et
   for (const clubId in clubs) {
     const clubPlayers = Object.values(newPlayers).filter(
       p => p.clubId === clubId
     );
     const squadSize = clubPlayers.length;
 
-    // 24 kişilik kadro hedefi
     const TARGET_SQUAD_SIZE = 24;
     const missing = TARGET_SQUAD_SIZE - squadSize;
 
     if (missing > 0) {
-      // Eksik pozisyonları belirle
       const positionCounts: Record<string, number> = {};
       clubPlayers.forEach(p => {
         positionCounts[p.position] = (positionCounts[p.position] || 0) + 1;
       });
 
-      // SQUAD_TEMPLATE'e göre eksik pozisyonları bul
       const needPositions: Position[] = [];
       for (const pos of SQUAD_TEMPLATE) {
         const have = positionCounts[pos] || 0;
@@ -508,7 +505,6 @@ export function replaceRetiredPlayers(
         }
       }
 
-      // Eksik sayı kadar genç üret
       for (let i = 0; i < missing; i++) {
         const pos = needPositions[i] ?? SQUAD_TEMPLATE[i % SQUAD_TEMPLATE.length];
         const youth = generateYouthPlayer(pos, undefined, clubId);
@@ -610,7 +606,7 @@ export function scorePlayer(p: Player): number {
 }
 
 // ═══════════════════════════════════════════════
-// İLK 11
+// İLK 11 (U21 oyuncuları hariç)
 // ═══════════════════════════════════════════════
 
 export function getStartingXI(
@@ -620,13 +616,23 @@ export function getStartingXI(
   userLineup?: string[]
 ): Player[] {
   const clubPlayers = Object.values(players).filter(
-    p => p.clubId === clubId && p.injuryWeeks === 0 && p.suspensionWeeks === 0
+    p =>
+      p.clubId === clubId &&
+      p.injuryWeeks === 0 &&
+      p.suspensionWeeks === 0 &&
+      p.squadRole !== 'u21'  // 🆕 U21 hariç
   );
 
   if (userLineup && userLineup.length === 11) {
     const lineupPlayers = userLineup
       .map(id => players[id])
-      .filter(p => p && p.clubId === clubId && p.injuryWeeks === 0 && p.suspensionWeeks === 0);
+      .filter(p =>
+        p &&
+        p.clubId === clubId &&
+        p.injuryWeeks === 0 &&
+        p.suspensionWeeks === 0 &&
+        p.squadRole !== 'u21'
+      );
     if (lineupPlayers.length === 11) return lineupPlayers;
   }
 

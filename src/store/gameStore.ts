@@ -2,15 +2,25 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { GameState, Player, Club, TrainingFocus, AssistantSettings } from '../engine/types';
+import type {
+  GameState,
+  Player,
+  Club,
+  TrainingFocus,
+  AssistantSettings,
+  AcademyState,
+  AcademyPlayer,
+} from '../engine/types';
 import { generateGameData, replaceRetiredPlayers } from '../engine/data/generateData';
 import { generateFixtures } from '../engine/league/fixtures';
 import { initTable, updateTable } from '../engine/league/table';
 import { simulateMatch } from '../engine/match/simulate';
 import { developPlayers } from '../engine/progression/training';
 import { applyTrainingToSquad } from '../engine/progression/trainingSystem';
+import { decrementContracts, evaluateContractOffer, applyContractRenewal } from '../engine/progression/contract';
 import { aiTransferWindow } from '../engine/transfer/aiTransfer';
 import { suggestTrainingFocus, analyzeMatch } from '../engine/assistant/assistantAI';
+import { generateAllIntakes } from '../engine/academy/academy';
 import { useInboxStore } from './useInboxStore';
 
 // ═══════════════════════════════════════════════
@@ -43,6 +53,11 @@ const DEFAULT_ASSISTANT: AssistantSettings = {
   matchAnalysis: false,
 };
 
+const DEFAULT_ACADEMY: AcademyState = {
+  players: {},
+  lastIntakeSeason: 0,
+};
+
 interface Store extends GameState {
   newGame: () => void;
   playWeek: () => void;
@@ -70,6 +85,22 @@ interface Store extends GameState {
     isHome: boolean;
   } | null;
   clearPendingPress: () => void;
+
+  // Akademi
+  promoteToFirstTeam: (playerId: string) => void;
+  promoteAllSelected: (playerIds: string[]) => void;
+  releaseFromAcademy: (playerId: string) => void;
+
+  // 🆕 Kadro Dışı (U21)
+  sendToReserves: (playerId: string) => void;
+  sendAllSelectedToReserves: (playerIds: string[]) => void;
+  promoteFromReserves: (playerId: string) => void;
+
+  // 🆕 Sözleşme
+  renewContract: (playerId: string, offeredWage: number, offeredYears: number) => {
+    accepted: boolean;
+    reason: string;
+  };
 }
 
 function createInitialState(): GameState {
@@ -94,11 +125,12 @@ function createInitialState(): GameState {
     training: { focus: 'balanced', intensity: 'normal' },
     userLineup: [],
     assistant: { ...DEFAULT_ASSISTANT },
+    academy: { ...DEFAULT_ACADEMY },
   };
 }
 
 // ═══════════════════════════════════════════════
-// INBOX MESAJ YARDIMCILARI
+// INBOX YARDIMCILARI
 // ═══════════════════════════════════════════════
 
 function hasActiveInjuryMessage(playerName: string): boolean {
@@ -153,7 +185,8 @@ function maybeAddTransferOffer(
     p =>
       p.clubId === userClubId &&
       p.injuryWeeks === 0 &&
-      p.suspensionWeeks === 0
+      p.suspensionWeeks === 0 &&
+      p.squadRole !== 'u21'
   );
 
   const candidates = userSquad.filter(p => p.value > 500_000);
@@ -297,9 +330,6 @@ export const useGameStore = create<Store>()(
 
       resetLineup: () => set({ userLineup: [] }),
 
-      // ═══════════════════════════════════════════════
-      // YARDIMCI MENAJER AYARLARI
-      // ═══════════════════════════════════════════════
       setAssistantSetting: (key, value) => {
         const state = get();
         const current = state.assistant ?? DEFAULT_ASSISTANT;
@@ -308,9 +338,6 @@ export const useGameStore = create<Store>()(
         });
       },
 
-      // ═══════════════════════════════════════════════
-      // BASIN TOPLANTISI ETKİSİ
-      // ═══════════════════════════════════════════════
       applyPressEffects: (moraleDelta, boardDelta) => {
         const state = get();
         const userClub = state.clubs[state.userClubId];
@@ -359,9 +386,6 @@ export const useGameStore = create<Store>()(
         });
       },
 
-      // ═══════════════════════════════════════════════
-      // YARDIMCI MENAJER BASIN TOPLANTISI
-      // ═══════════════════════════════════════════════
       simulateAssistantPress: () => {
         const state = get();
         const moraleDelta = Math.floor((Math.random() - 0.5) * 6);
@@ -512,7 +536,6 @@ export const useGameStore = create<Store>()(
           newPlayers[id] = p;
         }
 
-        // ANTRENMAN — Asistan veya manuel
         const currentAssistant = state.assistant ?? DEFAULT_ASSISTANT;
         let trainingToApply = state.training;
 
@@ -571,13 +594,17 @@ export const useGameStore = create<Store>()(
       advanceSeason: () => {
         const state = get();
 
-        // 1. Oyuncuları geliştir (yaş +1, attribute güncelle, 36+ emekli → silinir)
+        // 1. Oyuncuları geliştir
         let newPlayers = developPlayers(state.players);
 
-        // 2. Emekli olanların yerine genç üret (eksik kadroları doldur)
+        // 2. 🆕 Sözleşmeleri azalt
+        const contractResult = decrementContracts(newPlayers, state.userClubId);
+        newPlayers = contractResult.updatedPlayers;
+
+        // 3. Emeklilerin yerine genç üret
         newPlayers = replaceRetiredPlayers(newPlayers, state.clubs);
 
-        // 3. Sezon istatistiklerini sıfırla
+        // 4. Sezon istatistiklerini sıfırla
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           if (p.careerStats) {
@@ -596,7 +623,7 @@ export const useGameStore = create<Store>()(
           newPlayers[id] = p;
         }
 
-        // 4. AI TRANSFER
+        // 5. AI TRANSFER
         const transferResult = aiTransferWindow(
           state.clubs,
           newPlayers,
@@ -605,20 +632,78 @@ export const useGameStore = create<Store>()(
         newPlayers = transferResult.players;
         const newClubs = transferResult.clubs;
 
-        // 5. Yeni sezon fikstürü
+        // 6. AKADEMİ ALIMI
+        const newAcademyIntakes = generateAllIntakes(newClubs);
+        const newAcademy: AcademyState = {
+          players: {
+            ...state.academy.players,
+            ...newAcademyIntakes,
+          },
+          lastIntakeSeason: state.season + 1,
+        };
+
+        // 🆕 Akademi oyuncularının yaşını +1 yap, 20+ olanları serbest bırak
+        const academyToRelease: AcademyPlayer[] = [];
+        for (const id in newAcademy.players) {
+          const p = newAcademy.players[id];
+          const newAge = p.age + 1;
+
+          if (newAge >= 20) {
+            academyToRelease.push({ ...p, age: newAge });
+            delete newAcademy.players[id];
+          } else {
+            newAcademy.players[id] = { ...p, age: newAge };
+          }
+        }
+
+        const userAcademyReleased = academyToRelease.filter(
+          p => p.clubId === state.userClubId
+        );
+
+        // 7. Yeni sezon fikstürü
         const season = state.season + 1;
         const fixtures = generateFixtures(newClubs, season);
         const table = initTable(Object.keys(newClubs));
 
         const news = [`🏆 Sezon ${season} başladı!`, ...state.news];
 
+        // 🆕 Sözleşme haberleri
+        if (contractResult.released.length > 0) {
+          const userReleased = contractResult.released.filter(
+            p => p.clubId === null
+          );
+          if (userReleased.length > 0) {
+            news.unshift(
+              `📋 ${userReleased.length} oyuncunun sözleşmesi bitti ve serbest kaldı`
+            );
+          }
+        }
+
+        if (contractResult.expiring.length > 0) {
+          news.unshift(
+            `⚠️ ${contractResult.expiring.length} oyuncunun sözleşmesi bu sezon bitiyor!`
+          );
+        }
+
         if (transferResult.log.length > 0) {
           news.unshift(
             `📨 Transfer sezonu: ${transferResult.log.length} transfer gerçekleşti`
           );
-          transferResult.log.slice(0, 3).forEach(msg => {
-            news.push(`• ${msg}`);
-          });
+        }
+
+        // Akademi bilgisi
+        const userIntakeCount = Object.values(newAcademyIntakes).filter(
+          p => p.clubId === state.userClubId
+        ).length;
+
+        if (userIntakeCount > 0) {
+          news.unshift(`🎓 Akademiye ${userIntakeCount} yeni genç oyuncu katıldı`);
+        }
+
+        if (userAcademyReleased.length > 0) {
+          news.unshift(
+            `📤 ${userAcademyReleased.length} genç oyuncu akademiden yaş sınırı nedeniyle ayrıldı`
+          );
         }
 
         set({
@@ -630,8 +715,10 @@ export const useGameStore = create<Store>()(
           clubs: newClubs,
           seasonOver: false,
           news: news.slice(0, 30),
+          academy: newAcademy,
         });
 
+        // Inbox mesajları
         useInboxStore.getState().addMessage({
           season,
           week: 1,
@@ -640,6 +727,61 @@ export const useGameStore = create<Store>()(
           content: `Yeni sezon başladı. Başarılar dileriz!`,
           category: 'BOARD',
         });
+
+        // 🆕 Sözleşme bitenler
+        if (contractResult.released.length > 0) {
+          const releasedNames = contractResult.released
+            .map(p => p.name)
+            .slice(0, 5)
+            .join(', ');
+          useInboxStore.getState().addMessage({
+            season,
+            week: 1,
+            sender: '📋 Sözleşme Departmanı',
+            title: `Sözleşmesi biten oyuncular`,
+            content: `${contractResult.released.length} oyuncunun sözleşmesi bitti ve serbest kaldı: ${releasedNames}${contractResult.released.length > 5 ? '...' : ''}`,
+            category: 'FINANCE',
+          });
+        }
+
+        // 🆕 Sözleşmesi bitecekler (uyarı)
+        if (contractResult.expiring.length > 0) {
+          const expiringNames = contractResult.expiring
+            .map(p => p.name)
+            .slice(0, 5)
+            .join(', ');
+          useInboxStore.getState().addMessage({
+            season,
+            week: 1,
+            sender: '📋 Sözleşme Departmanı',
+            title: `⚠️ Sözleşmesi biten oyuncular`,
+            content: `Bu sezon sonunda sözleşmesi bitecek ${contractResult.expiring.length} oyuncu var: ${expiringNames}${contractResult.expiring.length > 5 ? '...' : ''}. Yenilemek için Squad sayfasına bakın.`,
+            category: 'FINANCE',
+          });
+        }
+
+        // 🆕 Akademi mesajları
+        if (userIntakeCount > 0) {
+          useInboxStore.getState().addMessage({
+            season,
+            week: 1,
+            sender: '🎓 Akademi Direktörü',
+            title: `Yeni genç yetenekler geldi!`,
+            content: `Akademiye ${userIntakeCount} yeni genç oyuncu katıldı. Yeteneklerini incelemek için Akademi sayfasına bakın.`,
+            category: 'BOARD',
+          });
+        }
+
+        if (userAcademyReleased.length > 0) {
+          useInboxStore.getState().addMessage({
+            season,
+            week: 1,
+            sender: '🎓 Akademi Direktörü',
+            title: `Genç oyuncular akademiden ayrıldı`,
+            content: `${userAcademyReleased.length} genç oyuncu 20 yaşına geldiği için akademiden ayrıldı: ${userAcademyReleased.map(p => p.name).join(', ')}`,
+            category: 'BOARD',
+          });
+        }
 
         if (transferResult.log.length > 0) {
           useInboxStore.getState().addMessage({
@@ -687,6 +829,8 @@ export const useGameStore = create<Store>()(
         const updatedPlayer: Player = {
           ...player,
           clubId: state.userClubId,
+          contractYears: 3,
+          squadRole: player.overall >= 14 ? 'first' : player.overall >= 11 ? 'rotation' : 'backup',
         };
         const updatedClub: Club = {
           ...userClub,
@@ -815,6 +959,214 @@ export const useGameStore = create<Store>()(
         const state = get();
         set({ training: { ...state.training, intensity } });
       },
+
+      // ═══════════════════════════════════════════════
+      // AKADEMİ
+      // ═══════════════════════════════════════════════
+
+      promoteToFirstTeam: (playerId) => {
+        const state = get();
+        const academyPlayer = state.academy.players[playerId];
+        if (!academyPlayer) return;
+
+        const promoted: Player = {
+          ...academyPlayer,
+          clubId: state.userClubId,
+          contractYears: 3,
+          squadRole: academyPlayer.age <= 20 ? 'u21' : 'backup',
+        };
+
+        const newAcademyPlayers = { ...state.academy.players };
+        delete newAcademyPlayers[playerId];
+
+        set({
+          players: { ...state.players, [promoted.id]: promoted },
+          academy: {
+            ...state.academy,
+            players: newAcademyPlayers,
+          },
+          news: [
+            `🌟 ${promoted.name} A takıma yükseltildi!`,
+            ...state.news,
+          ].slice(0, 30),
+        });
+
+        useInboxStore.getState().addMessage({
+          season: state.season,
+          week: state.currentWeek,
+          sender: '🎓 Akademi',
+          title: `${promoted.name} A takıma yükseltildi`,
+          content: `${promoted.name} (${promoted.age} yaş, ${promoted.position}) akademiden A takıma yükseltildi. Potansiyel: ${promoted.potentialStars}⭐`,
+          category: 'BOARD',
+        });
+      },
+
+      promoteAllSelected: (playerIds) => {
+        const state = get();
+        const newPlayers = { ...state.players };
+        const newAcademyPlayers = { ...state.academy.players };
+        const promoted: string[] = [];
+
+        for (const id of playerIds) {
+          const academyPlayer = newAcademyPlayers[id];
+          if (!academyPlayer) continue;
+
+          newPlayers[id] = {
+            ...academyPlayer,
+            clubId: state.userClubId,
+            contractYears: 3,
+            squadRole: academyPlayer.age <= 20 ? 'u21' : 'backup',
+          };
+          delete newAcademyPlayers[id];
+          promoted.push(academyPlayer.name);
+        }
+
+        if (promoted.length === 0) return;
+
+        set({
+          players: newPlayers,
+          academy: { ...state.academy, players: newAcademyPlayers },
+          news: [
+            `🌟 ${promoted.length} genç oyuncu A takıma yükseltildi`,
+            ...state.news,
+          ].slice(0, 30),
+        });
+
+        useInboxStore.getState().addMessage({
+          season: state.season,
+          week: state.currentWeek,
+          sender: '🎓 Akademi',
+          title: `${promoted.length} genç oyuncu A takıma alındı`,
+          content: promoted.join(', '),
+          category: 'BOARD',
+        });
+      },
+
+      releaseFromAcademy: (playerId) => {
+        const state = get();
+        const academyPlayer = state.academy.players[playerId];
+        if (!academyPlayer) return;
+
+        const newAcademyPlayers = { ...state.academy.players };
+        delete newAcademyPlayers[playerId];
+
+        set({
+          academy: { ...state.academy, players: newAcademyPlayers },
+          news: [
+            `❌ ${academyPlayer.name} akademiden serbest bırakıldı`,
+            ...state.news,
+          ].slice(0, 30),
+        });
+      },
+
+      // ═══════════════════════════════════════════════
+      // 🆕 KADRO DIŞI (U21)
+      // ═══════════════════════════════════════════════
+
+      sendToReserves: (playerId) => {
+        const state = get();
+        const player = state.players[playerId];
+        if (!player || player.clubId !== state.userClubId) return;
+
+        set({
+          players: {
+            ...state.players,
+            [playerId]: { ...player, squadRole: 'u21' },
+          },
+          news: [
+            `📤 ${player.name} U21 takıma gönderildi`,
+            ...state.news,
+          ].slice(0, 30),
+        });
+      },
+
+      sendAllSelectedToReserves: (playerIds) => {
+        const state = get();
+        const newPlayers = { ...state.players };
+        const sent: string[] = [];
+
+        for (const id of playerIds) {
+          const player = newPlayers[id];
+          if (!player || player.clubId !== state.userClubId) continue;
+
+          newPlayers[id] = { ...player, squadRole: 'u21' };
+          sent.push(player.name);
+        }
+
+        if (sent.length === 0) return;
+
+        set({
+          players: newPlayers,
+          news: [
+            `📤 ${sent.length} oyuncu U21 takıma gönderildi`,
+            ...state.news,
+          ].slice(0, 30),
+        });
+      },
+
+      promoteFromReserves: (playerId) => {
+        const state = get();
+        const player = state.players[playerId];
+        if (!player || player.clubId !== state.userClubId) return;
+
+        set({
+          players: {
+            ...state.players,
+            [playerId]: {
+              ...player,
+              squadRole: player.overall >= 14 ? 'first' : player.overall >= 11 ? 'rotation' : 'backup',
+            },
+          },
+          news: [
+            `📥 ${player.name} A takıma geri alındı`,
+            ...state.news,
+          ].slice(0, 30),
+        });
+      },
+
+      // ═══════════════════════════════════════════════
+      // 🆕 SÖZLEŞME YENİLEME
+      // ═══════════════════════════════════════════════
+
+      renewContract: (playerId, offeredWage, offeredYears) => {
+        const state = get();
+        const player = state.players[playerId];
+        if (!player) return { accepted: false, reason: 'Oyuncu bulunamadı' };
+
+        const evaluation = evaluateContractOffer(player, offeredWage, offeredYears);
+
+        if (evaluation.accepted) {
+          const updated = applyContractRenewal(player, offeredWage, offeredYears);
+
+          set({
+            players: { ...state.players, [playerId]: updated },
+            news: [
+              `✍️ ${player.name} sözleşmesini yeniledi (${offeredYears} yıl, £${(offeredWage / 1_000).toFixed(0)}K/hafta)`,
+              ...state.news,
+            ].slice(0, 30),
+          });
+
+          useInboxStore.getState().addMessage({
+            season: state.season,
+            week: state.currentWeek,
+            sender: '✍️ Sözleşme Departmanı',
+            title: `${player.name} sözleşmesini yeniledi`,
+            content: `${player.name} ${offeredYears} yıllık yeni sözleşmeye imza attı. Yeni maaş: £${(offeredWage / 1_000).toFixed(0)}K/hafta`,
+            category: 'FINANCE',
+          });
+        } else {
+          useInboxStore.getState().addMessage({
+            season: state.season,
+            week: state.currentWeek,
+            sender: '✍️ Sözleşme Departmanı',
+            title: `${player.name} teklifi reddetti`,
+            content: `${player.name} sözleşme yenileme teklifini reddetti. Sebep: ${evaluation.reason}`,
+            category: 'FINANCE',
+          });
+        }
+
+        return evaluation;
+      },
     }),
     {
       name: 'fm-clone-save',
@@ -831,6 +1183,22 @@ export const useGameStore = create<Store>()(
 
         if (!merged.training) {
           merged.training = { focus: 'balanced', intensity: 'normal' };
+        }
+
+        if (!merged.academy) {
+          merged.academy = { ...DEFAULT_ACADEMY };
+        }
+
+        // Eski kayıtlarda contractYears yoksa ekle
+        for (const id in merged.players) {
+          const p = merged.players[id];
+          if (p.contractYears === undefined) {
+            merged.players[id] = {
+              ...p,
+              contractYears: 1 + Math.floor(Math.random() * 4),
+              squadRole: p.overall >= 14 ? 'first' : p.overall >= 11 ? 'rotation' : 'backup',
+            };
+          }
         }
 
         return merged;

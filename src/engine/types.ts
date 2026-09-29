@@ -1,9 +1,16 @@
 // src/engine/types.ts
 
+// ═══════════════════════════════════════════════
+// MEVKİLER
+// ═══════════════════════════════════════════════
+
 export type Position = 'GK' | 'DC' | 'DL' | 'DR' | 'DM' | 'MC' | 'ML' | 'MR' | 'AMC' | 'AML' | 'AMR' | 'ST';
 
+// ═══════════════════════════════════════════════
+// ATTRIBUTE'LAR (1-20)
+// ═══════════════════════════════════════════════
+
 export interface Attributes {
-  // TEKNİK (1-20)
   passing: number;
   firstTouch: number;
   dribbling: number;
@@ -15,7 +22,6 @@ export interface Attributes {
   setPieces: number;
   longShots: number;
 
-  // ZİHİNSEL (1-20)
   decisions: number;
   vision: number;
   anticipation: number;
@@ -28,7 +34,6 @@ export interface Attributes {
   bravery: number;
   aggression: number;
 
-  // FİZİKSEL (1-20)
   pace: number;
   acceleration: number;
   agility: number;
@@ -36,13 +41,11 @@ export interface Attributes {
   strength: number;
   balance: number;
 
-  // DEFANS (1-20)
   marking: number;
   tackling: number;
   ballWinning: number;
   defensivePositioning: number;
 
-  // KALECİ (1-20)
   goalkeeper: number;
   reflexes: number;
   gkPositioning: number;
@@ -50,6 +53,10 @@ export interface Attributes {
   oneOnOne: number;
   aerialReach: number;
 }
+
+// ═══════════════════════════════════════════════
+// KARİYER İSTATİSTİKLERİ
+// ═══════════════════════════════════════════════
 
 export interface CareerStats {
   appearances: number;
@@ -70,6 +77,10 @@ export interface CareerStats {
   seasonMinutesPlayed: number;
   seasonMotm: number;
 }
+
+// ═══════════════════════════════════════════════
+// OYUNCU
+// ═══════════════════════════════════════════════
 
 export interface Player {
   id: string;
@@ -96,8 +107,31 @@ export interface Player {
 
   careerStats: CareerStats;
   recentRatings: number[];
-  overall: number;      // Genel reyting (1-20) — hesaplanmış, kaydedilir
+  overall: number;
+
+  // 🆕 SÖZLEŞME
+  contractYears: number;      // Kalan sözleşme yılı (1-5)
+  squadRole: 'first' | 'rotation' | 'backup' | 'u21';  // Kadro rolü
 }
+
+// ═══════════════════════════════════════════════
+// AKADEMİ OYUNCUSU
+// ═══════════════════════════════════════════════
+
+export interface AcademyPlayer extends Player {
+  potential: number;        // 1-200 arası FM tarzı potansiyel
+  potentialStars: number;   // 0.5-5 yıldız
+  scoutRating: string;      // "Yetenekli", "Yıldız Adayı" vs.
+}
+
+export interface AcademyState {
+  players: Record<string, AcademyPlayer>;
+  lastIntakeSeason: number;
+}
+
+// ═══════════════════════════════════════════════
+// TAKTİK
+// ═══════════════════════════════════════════════
 
 export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1';
 
@@ -110,6 +144,10 @@ export interface Tactic {
   directness: 'short' | 'mixed' | 'direct';
   defensiveLine: 'deep' | 'normal' | 'high';
 }
+
+// ═══════════════════════════════════════════════
+// KULÜP
+// ═══════════════════════════════════════════════
 
 export interface Club {
   id: string;
@@ -125,6 +163,10 @@ export interface Club {
   lineup?: string[];
 }
 
+// ═══════════════════════════════════════════════
+// MAÇ EVENT'LERİ
+// ═══════════════════════════════════════════════
+
 export interface MatchEvent {
   minute: number;
   type:
@@ -139,6 +181,10 @@ export interface MatchEvent {
   xG?: number;
   weeks?: number;
 }
+
+// ═══════════════════════════════════════════════
+// MAÇ İSTATİSTİKLERİ
+// ═══════════════════════════════════════════════
 
 export interface MatchStats {
   possession: { home: number; away: number };
@@ -159,6 +205,10 @@ export interface MatchStats {
   redCards?: { home: number; away: number };
 }
 
+// ═══════════════════════════════════════════════
+// MAÇ
+// ═══════════════════════════════════════════════
+
 export interface Match {
   id?: string;
   week?: number;
@@ -173,6 +223,10 @@ export interface Match {
   engine?: any;
 }
 
+// ═══════════════════════════════════════════════
+// PUAN TABLOSU
+// ═══════════════════════════════════════════════
+
 export interface TableRow {
   clubId: string;
   played: number;
@@ -184,12 +238,20 @@ export interface TableRow {
   points: number;
 }
 
+// ═══════════════════════════════════════════════
+// ANTRENMAN
+// ═══════════════════════════════════════════════
+
 export type TrainingFocus = 'attack' | 'defense' | 'physical' | 'tactical' | 'balanced';
 
 export interface TrainingState {
   focus: TrainingFocus;
   intensity: 'light' | 'normal' | 'intense';
 }
+
+// ═══════════════════════════════════════════════
+// OYUN STATE
+// ═══════════════════════════════════════════════
 
 export interface GameState {
   season: number;
@@ -205,7 +267,12 @@ export interface GameState {
   training: TrainingState;
   userLineup: string[];
   assistant: AssistantSettings;
+  academy: AcademyState;
 }
+
+// ═══════════════════════════════════════════════
+// TAKIM BİRİMLERİ
+// ═══════════════════════════════════════════════
 
 export interface TeamUnits {
   attack: number;
@@ -226,10 +293,61 @@ export interface UnitComparison {
   advantagePct: number;
 }
 
+// ═══════════════════════════════════════════════
+// YARDIMCI MENAJER
+// ═══════════════════════════════════════════════
+
 export interface AssistantSettings {
-  pressConference: boolean;      // Basın toplantısı
-  training: boolean;             // Antrenman
-  lineupSuggestion: boolean;     // Kadro önerisi
-  transferSuggestion: boolean;   // Transfer önerisi
-  matchAnalysis: boolean;        // Maç analizi
+  pressConference: boolean;
+  training: boolean;
+  lineupSuggestion: boolean;
+  transferSuggestion: boolean;
+  matchAnalysis: boolean;
+}
+
+// ═══════════════════════════════════════════════
+// MAÇ MOTORU — SALDIRI SEKANSI
+// ═══════════════════════════════════════════════
+
+export interface AttackSequenceAction {
+  minute: number;
+  action: 'pass' | 'dribble' | 'cross' | 'throughBall' | 'run' | 'recycle' | 'carry' | 'shot';
+  playerId: string;
+  playerName: string;
+  playerPosition: string;
+  fromZone: string;
+  toZone: string;
+  success: boolean;
+  defensePressure: number;
+  spaceCreated: number;
+  description: string;
+}
+
+export interface AttackSequence {
+  attackingClubId: string;
+  defendingClubId: string;
+  startedZone: string;
+  finalZone: string;
+  actions: AttackSequenceAction[];
+  totalActions: number;
+  finalPressure: number;
+  spaceCreated: number;
+  chanceQuality: number;
+  resultedInShot: boolean;
+  resultedInGoal: boolean;
+  xG: number;
+}
+
+// ═══════════════════════════════════════════════
+// 🆕 SÖZLEŞME PAZARLIĞI
+// ═══════════════════════════════════════════════
+
+export interface ContractOffer {
+  playerId: string;
+  playerName: string;
+  currentWage: number;
+  offeredWage: number;
+  currentYears: number;
+  offeredYears: number;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
 }

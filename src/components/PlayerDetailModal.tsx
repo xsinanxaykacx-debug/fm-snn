@@ -1,11 +1,14 @@
 // src/components/PlayerDetailModal.tsx
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useGameStore } from '../store/gameStore';
 import type { Player } from '../engine/types';
 import { scorePlayer } from '../engine/data/generateData';
+import { getContractStatus } from '../engine/progression/contract';
 import { getTeamColor } from '../utils/teamColors';
 import { getAttrColor, getOverallColor } from '../utils/attributeColor';
 import { PlayerStatusCard } from './PlayerStatusCard';
+import { ContractModal } from './ContractModal';
 
 declare global {
   interface Window {
@@ -27,6 +30,16 @@ function getPosColor(position: string): { bg: string; text: string; border: stri
   if (['AMC', 'AML', 'AMR'].includes(position)) return { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/40' };
   if (position === 'ST') return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/40' };
   return { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/40' };
+}
+
+function getSquadRoleLabel(role: string): { icon: string; label: string; color: string } {
+  switch (role) {
+    case 'first':    return { icon: '⭐', label: 'İlk 11',     color: 'bg-green-500/20 text-green-400 border-green-500/40' };
+    case 'rotation': return { icon: '🔄', label: 'Rotasyon',   color: 'bg-blue-500/20 text-blue-400 border-blue-500/40' };
+    case 'backup':   return { icon: '🪑', label: 'Yedek',      color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' };
+    case 'u21':      return { icon: '📤', label: 'U21 Takım',  color: 'bg-slate-500/20 text-slate-400 border-slate-500/40' };
+    default:         return { icon: '•',  label: '-',          color: 'bg-slate-500/20 text-slate-400 border-slate-500/40' };
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -184,6 +197,13 @@ function CareerStat({ label, value, color }: { label: string; value: number | st
 // ═══════════════════════════════════════════════
 
 export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) {
+  const state = useGameStore();
+  const sendToReserves = useGameStore(s => s.sendToReserves);
+  const promoteFromReserves = useGameStore(s => s.promoteFromReserves);
+  const transferSell = useGameStore(s => s.transferSell);
+
+  const [showContract, setShowContract] = useState(false);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -194,246 +214,309 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
 
   if (!player) return null;
 
-  const rating = scorePlayer(player);
-  const posColor = getPosColor(player.position);
-  const clubColor = getTeamColor(clubId);
-  const a = player.attributes;
-  const initials = player.name.split(' ').map(n => n[0]).join('').slice(0, 2);
+  // Store'dan güncel oyuncuyu çek (sözleşme güncellenmiş olabilir)
+  const currentPlayer = state.players[player.id] ?? player;
 
-  const stats = player.careerStats ?? {
-    appearances: 0,
-    goals: 0,
-    assists: 0,
-    yellowCards: 0,
-    redCards: 0,
-    avgRating: 0,
-    minutesPlayed: 0,
-    motm: 0,
-    seasonAppearances: 0,
-    seasonGoals: 0,
-    seasonAssists: 0,
-    seasonYellowCards: 0,
-    seasonRedCards: 0,
-    seasonAvgRating: 0,
-    seasonMinutesPlayed: 0,
-    seasonMotm: 0,
+  const rating = scorePlayer(currentPlayer);
+  const posColor = getPosColor(currentPlayer.position);
+  const clubColor = getTeamColor(clubId);
+  const a = currentPlayer.attributes;
+  const initials = currentPlayer.name.split(' ').map(n => n[0]).join('').slice(0, 2);
+  const contract = getContractStatus(currentPlayer);
+  const role = getSquadRoleLabel(currentPlayer.squadRole);
+
+  const isUserPlayer = currentPlayer.clubId === state.userClubId;
+
+  const stats = currentPlayer.careerStats ?? {
+    appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0,
+    avgRating: 0, minutesPlayed: 0, motm: 0,
+    seasonAppearances: 0, seasonGoals: 0, seasonAssists: 0,
+    seasonYellowCards: 0, seasonRedCards: 0, seasonAvgRating: 0,
+    seasonMinutesPlayed: 0, seasonMotm: 0,
   };
 
   const hasCareer = stats.appearances > 0;
   const hasSeason = stats.seasonAppearances > 0;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-backdrop-in"
-      onClick={onClose}
-    >
+    <>
       <div
-        className="glass-modal w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-modal-in"
-        onClick={e => e.stopPropagation()}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-backdrop-in"
+        onClick={onClose}
       >
-        {/* HEADER */}
         <div
-          className="px-6 py-4 border-b border-pitch-700/50 flex items-center justify-between"
-          style={{ background: `linear-gradient(135deg, ${clubColor.bg}20 0%, transparent 100%)` }}
+          className="glass-modal w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-modal-in"
+          onClick={e => e.stopPropagation()}
         >
-          <div className="flex items-center gap-4">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl shadow-lg"
-              style={{
-                backgroundColor: clubColor.bg,
-                color: clubColor.fg,
-                boxShadow: `0 0 20px ${clubColor.bg}60`,
-              }}
-            >
-              {initials}
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-white">{player.name}</h2>
-              <p className="text-xs text-slate-300 mt-1 flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded font-bold ${posColor.bg} ${posColor.text} border ${posColor.border}`}>
-                  {player.position}
-                </span>
-                <span>{player.age} yaş</span>
-                <span>•</span>
-                <span>{player.nationality}</span>
-                <span>•</span>
-                <span className="font-bold">{clubName}</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-[10px] text-slate-400 uppercase">Genel Reyting</p>
-              <p className={`text-4xl font-black tabular-nums ${getOverallColor(rating)}`}>{rating}</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-pitch-700 hover:bg-pitch-600 flex items-center justify-center text-slate-300 hover:text-white transition text-lg"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        {/* İÇERİK */}
-        <div className="overflow-y-auto p-6 space-y-5">
-
-          {/* Temel bilgiler */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <InfoBox label="Piyasa Değeri" value={`£${(player.value / 1_000_000).toFixed(2)}M`} highlight />
-            <InfoBox label="Haftalık Maaş" value={`£${(player.wage / 1_000).toFixed(0)}K`} />
-            <InfoBox label="Kondisyon" value={`${player.condition}%`} valueColor={player.condition >= 80 ? 'text-green-400' : player.condition >= 60 ? 'text-yellow-400' : 'text-red-400'} />
-            <InfoBox label="Form" value={`${player.form}%`} valueColor={player.form >= 70 ? 'text-green-400' : player.form >= 50 ? 'text-yellow-400' : 'text-red-400'} />
-          </div>
-
-          {/* PlayerStatusCard */}
-          <PlayerStatusCard
-            player={player}
-            selectedTacticalPosition={player.position}
-          />
-
-          {/* KARİYER + SEZON */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="glass-card p-4 rounded-xl">
-              <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">🏆 Kariyer</h4>
-              {!hasCareer ? (
-                <div className="text-center py-4">
-                  <p className="text-xs text-slate-500">Henüz profesyonel maç oynamadı</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-3 gap-2">
-                    <CareerStat label="Maç" value={stats.appearances} />
-                    <CareerStat label="Gol" value={stats.goals} color={stats.goals > 0 ? 'text-green-400' : undefined} />
-                    <CareerStat label="Asist" value={stats.assists} color={stats.assists > 0 ? 'text-blue-400' : undefined} />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    <CareerStat label="Sarı" value={stats.yellowCards} color={stats.yellowCards > 0 ? 'text-yellow-400' : undefined} />
-                    <CareerStat label="Kırmızı" value={stats.redCards} color={stats.redCards > 0 ? 'text-red-400' : undefined} />
-                    <CareerStat label="MVP" value={stats.motm} color={stats.motm > 0 ? 'text-purple-400' : undefined} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <CareerStat
-                      label="Ort. Reyting"
-                      value={stats.avgRating > 0 ? stats.avgRating.toFixed(2) : '---'}
-                      color={stats.avgRating > 0 ? 'text-accent' : 'text-slate-500'}
-                    />
-                    <CareerStat label="Dakika" value={stats.minutesPlayed.toLocaleString()} />
-                  </div>
-                </>
-              )}
+          {/* HEADER */}
+          <div
+            className="px-6 py-4 border-b border-pitch-700/50 flex items-center justify-between"
+            style={{ background: `linear-gradient(135deg, ${clubColor.bg}20 0%, transparent 100%)` }}
+          >
+            <div className="flex items-center gap-4">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center font-black text-2xl shadow-lg"
+                style={{
+                  backgroundColor: clubColor.bg,
+                  color: clubColor.fg,
+                  boxShadow: `0 0 20px ${clubColor.bg}60`,
+                }}
+              >
+                {initials}
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-white">{currentPlayer.name}</h2>
+                <p className="text-xs text-slate-300 mt-1 flex items-center gap-2 flex-wrap">
+                  <span className={`px-2 py-0.5 rounded font-bold ${posColor.bg} ${posColor.text} border ${posColor.border}`}>
+                    {currentPlayer.position}
+                  </span>
+                  <span>{currentPlayer.age} yaş</span>
+                  <span>•</span>
+                  <span>{currentPlayer.nationality}</span>
+                  <span>•</span>
+                  <span className="font-bold">{clubName}</span>
+                  <span className={`px-2 py-0.5 rounded font-bold border ${role.color}`}>
+                    {role.icon} {role.label}
+                  </span>
+                </p>
+              </div>
             </div>
 
-            <div className="glass-card p-4 rounded-xl">
-              <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">📅 Bu Sezon</h4>
-              {!hasSeason ? (
-                <div className="text-center py-4">
-                  <p className="text-xs text-slate-500">Bu sezon henüz maç oynamadı</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-3 gap-2">
-                    <CareerStat label="Maç" value={stats.seasonAppearances} />
-                    <CareerStat label="Gol" value={stats.seasonGoals} color={stats.seasonGoals > 0 ? 'text-green-400' : undefined} />
-                    <CareerStat label="Asist" value={stats.seasonAssists} color={stats.seasonAssists > 0 ? 'text-blue-400' : undefined} />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    <CareerStat label="Sarı" value={stats.seasonYellowCards} color={stats.seasonYellowCards > 0 ? 'text-yellow-400' : undefined} />
-                    <CareerStat label="Kırmızı" value={stats.seasonRedCards} color={stats.seasonRedCards > 0 ? 'text-red-400' : undefined} />
-                    <CareerStat label="MVP" value={stats.seasonMotm} color={stats.seasonMotm > 0 ? 'text-purple-400' : undefined} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <CareerStat
-                      label="Ort. Reyting"
-                      value={stats.seasonAvgRating > 0 ? stats.seasonAvgRating.toFixed(2) : '---'}
-                      color={stats.seasonAvgRating > 0 ? 'text-accent' : 'text-slate-500'}
-                    />
-                    <CareerStat label="Dakika" value={stats.seasonMinutesPlayed.toLocaleString()} />
-                  </div>
-                </>
-              )}
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 uppercase">Genel Reyting</p>
+                <p className={`text-4xl font-black tabular-nums ${getOverallColor(rating)}`}>{rating}</p>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-pitch-700 hover:bg-pitch-600 flex items-center justify-center text-slate-300 hover:text-white transition text-lg"
+              >
+                ✕
+              </button>
             </div>
           </div>
 
-          {/* Radar + Attribute tablosu */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="glass-card p-4 rounded-xl">
-              <h4 className="text-xs font-bold text-slate-300 uppercase mb-3 text-center">
-                📊 Özellik Poligonu
-              </h4>
-              <PlayerRadar player={player} />
+          {/* İÇERİK */}
+          <div className="overflow-y-auto p-6 space-y-5">
+
+            {/* Temel bilgiler */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <InfoBox label="Piyasa Değeri" value={`£${(currentPlayer.value / 1_000_000).toFixed(2)}M`} highlight />
+              <InfoBox label="Haftalık Maaş" value={`£${(currentPlayer.wage / 1_000).toFixed(0)}K`} />
+              <InfoBox
+                label="Sözleşme"
+                value={contract.label}
+                valueColor={contract.color}
+              />
+              <InfoBox
+                label="Kondisyon"
+                value={`${currentPlayer.condition}%`}
+                valueColor={currentPlayer.condition >= 80 ? 'text-green-400' : currentPlayer.condition >= 60 ? 'text-yellow-400' : 'text-red-400'}
+              />
             </div>
 
-            <div className="glass-card p-4 rounded-xl">
-              <div className="grid grid-cols-3 gap-3 text-xs">
-                <div>
-                  <h5 className="font-bold text-cyan-400 border-b border-pitch-700 pb-1 mb-2 text-[10px] uppercase">
-                    Teknik
-                  </h5>
-                  <ul className="space-y-1.5 text-[11px]">
-                    <AttrRow label="Pas" value={a.passing} />
-                    <AttrRow label="İlk Dokunuş" value={a.firstTouch} />
-                    <AttrRow label="Dripling" value={a.dribbling} />
-                    <AttrRow label="Orta" value={a.crossing} />
-                    <AttrRow label="Şut" value={a.shooting} />
-                    <AttrRow label="Bitiricilik" value={a.finishing} />
-                    <AttrRow label="Teknik" value={a.technique} />
-                    <AttrRow label="Kafa" value={a.heading} />
-                  </ul>
-                </div>
+            {/* AKSİYON BUTONLARI */}
+            {isUserPlayer && (
+              <div className="glass-card p-3 rounded-xl flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowContract(true)}
+                  className="flex-1 min-w-[140px] bg-accent hover:bg-accent-hover text-white text-sm font-bold py-2.5 rounded-lg transition-colors"
+                >
+                  ✍️ Sözleşme Yenile
+                </button>
 
-                <div>
-                  <h5 className="font-bold text-green-400 border-b border-pitch-700 pb-1 mb-2 text-[10px] uppercase">
-                    Zihinsel
-                  </h5>
-                  <ul className="space-y-1.5 text-[11px]">
-                    <AttrRow label="Karar" value={a.decisions} />
-                    <AttrRow label="Vizyon" value={a.vision} />
-                    <AttrRow label="Öngörü" value={a.anticipation} />
-                    <AttrRow label="Pozisyon" value={a.positioning} />
-                    <AttrRow label="Soğukkan." value={a.composure} />
-                    <AttrRow label="Konsantras." value={a.concentration} />
-                    <AttrRow label="Çalışkanlık" value={a.workRate} />
-                    <AttrRow label="Liderlik" value={a.bravery} />
-                  </ul>
-                </div>
+                {currentPlayer.squadRole === 'u21' ? (
+                  <button
+                    onClick={() => {
+                      promoteFromReserves(currentPlayer.id);
+                      onClose();
+                    }}
+                    className="flex-1 min-w-[140px] bg-green-600 hover:bg-green-500 text-white text-sm font-bold py-2.5 rounded-lg transition-colors"
+                  >
+                    📥 A Takıma Al
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      sendToReserves(currentPlayer.id);
+                      onClose();
+                    }}
+                    className="flex-1 min-w-[140px] bg-pitch-700 hover:bg-pitch-600 text-slate-200 text-sm font-bold py-2.5 rounded-lg transition-colors"
+                  >
+                    📤 U21'e Gönder
+                  </button>
+                )}
 
-                <div>
-                  <h5 className="font-bold text-amber-400 border-b border-pitch-700 pb-1 mb-2 text-[10px] uppercase">
-                    Fiziksel
-                  </h5>
-                  <ul className="space-y-1.5 text-[11px]">
-                    <AttrRow label="Hız" value={a.pace} />
-                    <AttrRow label="Hızlanma" value={a.acceleration} />
-                    <AttrRow label="Çeviklik" value={a.agility} />
-                    <AttrRow label="Dayanıkl." value={a.stamina} />
-                    <AttrRow label="Güç" value={a.strength} />
-                    <AttrRow label="Denge" value={a.balance} />
-                    {player.position === 'GK' && (
-                      <>
-                        <AttrRow label="Refleks" value={a.reflexes} />
-                        <AttrRow label="Top Tutma" value={a.handling} />
-                      </>
-                    )}
-                  </ul>
+                <button
+                  onClick={() => {
+                    if (confirm(`${currentPlayer.name}'ı satmak istediğine emin misin?`)) {
+                      transferSell(currentPlayer.id);
+                      onClose();
+                    }
+                  }}
+                  className="bg-pitch-700 hover:bg-red-900/50 text-red-300 text-sm font-bold py-2.5 px-4 rounded-lg transition-colors"
+                >
+                  💸 Sat
+                </button>
+              </div>
+            )}
+
+            {/* PlayerStatusCard */}
+            <PlayerStatusCard
+              player={currentPlayer}
+              selectedTacticalPosition={currentPlayer.position}
+            />
+
+            {/* KARİYER + SEZON */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="glass-card p-4 rounded-xl">
+                <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">🏆 Kariyer</h4>
+                {!hasCareer ? (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-slate-500">Henüz profesyonel maç oynamadı</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      <CareerStat label="Maç" value={stats.appearances} />
+                      <CareerStat label="Gol" value={stats.goals} color={stats.goals > 0 ? 'text-green-400' : undefined} />
+                      <CareerStat label="Asist" value={stats.assists} color={stats.assists > 0 ? 'text-blue-400' : undefined} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      <CareerStat label="Sarı" value={stats.yellowCards} color={stats.yellowCards > 0 ? 'text-yellow-400' : undefined} />
+                      <CareerStat label="Kırmızı" value={stats.redCards} color={stats.redCards > 0 ? 'text-red-400' : undefined} />
+                      <CareerStat label="MVP" value={stats.motm} color={stats.motm > 0 ? 'text-purple-400' : undefined} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <CareerStat
+                        label="Ort. Reyting"
+                        value={stats.avgRating > 0 ? stats.avgRating.toFixed(2) : '---'}
+                        color={stats.avgRating > 0 ? 'text-accent' : 'text-slate-500'}
+                      />
+                      <CareerStat label="Dakika" value={stats.minutesPlayed.toLocaleString()} />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="glass-card p-4 rounded-xl">
+                <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">📅 Bu Sezon</h4>
+                {!hasSeason ? (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-slate-500">Bu sezon henüz maç oynamadı</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      <CareerStat label="Maç" value={stats.seasonAppearances} />
+                      <CareerStat label="Gol" value={stats.seasonGoals} color={stats.seasonGoals > 0 ? 'text-green-400' : undefined} />
+                      <CareerStat label="Asist" value={stats.seasonAssists} color={stats.seasonAssists > 0 ? 'text-blue-400' : undefined} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      <CareerStat label="Sarı" value={stats.seasonYellowCards} color={stats.seasonYellowCards > 0 ? 'text-yellow-400' : undefined} />
+                      <CareerStat label="Kırmızı" value={stats.seasonRedCards} color={stats.seasonRedCards > 0 ? 'text-red-400' : undefined} />
+                      <CareerStat label="MVP" value={stats.seasonMotm} color={stats.seasonMotm > 0 ? 'text-purple-400' : undefined} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <CareerStat
+                        label="Ort. Reyting"
+                        value={stats.seasonAvgRating > 0 ? stats.seasonAvgRating.toFixed(2) : '---'}
+                        color={stats.seasonAvgRating > 0 ? 'text-accent' : 'text-slate-500'}
+                      />
+                      <CareerStat label="Dakika" value={stats.seasonMinutesPlayed.toLocaleString()} />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Radar + Attribute tablosu */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="glass-card p-4 rounded-xl">
+                <h4 className="text-xs font-bold text-slate-300 uppercase mb-3 text-center">
+                  📊 Özellik Poligonu
+                </h4>
+                <PlayerRadar player={currentPlayer} />
+              </div>
+
+              <div className="glass-card p-4 rounded-xl">
+                <div className="grid grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <h5 className="font-bold text-cyan-400 border-b border-pitch-700 pb-1 mb-2 text-[10px] uppercase">
+                      Teknik
+                    </h5>
+                    <ul className="space-y-1.5 text-[11px]">
+                      <AttrRow label="Pas" value={a.passing} />
+                      <AttrRow label="İlk Dokunuş" value={a.firstTouch} />
+                      <AttrRow label="Dripling" value={a.dribbling} />
+                      <AttrRow label="Orta" value={a.crossing} />
+                      <AttrRow label="Şut" value={a.shooting} />
+                      <AttrRow label="Bitiricilik" value={a.finishing} />
+                      <AttrRow label="Teknik" value={a.technique} />
+                      <AttrRow label="Kafa" value={a.heading} />
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h5 className="font-bold text-green-400 border-b border-pitch-700 pb-1 mb-2 text-[10px] uppercase">
+                      Zihinsel
+                    </h5>
+                    <ul className="space-y-1.5 text-[11px]">
+                      <AttrRow label="Karar" value={a.decisions} />
+                      <AttrRow label="Vizyon" value={a.vision} />
+                      <AttrRow label="Öngörü" value={a.anticipation} />
+                      <AttrRow label="Pozisyon" value={a.positioning} />
+                      <AttrRow label="Soğukkan." value={a.composure} />
+                      <AttrRow label="Konsantras." value={a.concentration} />
+                      <AttrRow label="Çalışkanlık" value={a.workRate} />
+                      <AttrRow label="Liderlik" value={a.bravery} />
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h5 className="font-bold text-amber-400 border-b border-pitch-700 pb-1 mb-2 text-[10px] uppercase">
+                      Fiziksel
+                    </h5>
+                    <ul className="space-y-1.5 text-[11px]">
+                      <AttrRow label="Hız" value={a.pace} />
+                      <AttrRow label="Hızlanma" value={a.acceleration} />
+                      <AttrRow label="Çeviklik" value={a.agility} />
+                      <AttrRow label="Dayanıkl." value={a.stamina} />
+                      <AttrRow label="Güç" value={a.strength} />
+                      <AttrRow label="Denge" value={a.balance} />
+                      {currentPlayer.position === 'GK' && (
+                        <>
+                          <AttrRow label="Refleks" value={a.reflexes} />
+                          <AttrRow label="Top Tutma" value={a.handling} />
+                        </>
+                      )}
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Form/Moral/Kondisyon barları */}
-          <div className="glass-card p-4 rounded-xl">
-            <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">📈 Durum</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Bar label="Kondisyon" value={player.condition} color={getBarColor(player.condition)} />
-              <Bar label="Form" value={player.form} color={getBarColor(player.form)} />
-              <Bar label="Moral" value={player.morale} color={getBarColor(player.morale)} />
+            {/* Form/Moral/Kondisyon barları */}
+            <div className="glass-card p-4 rounded-xl">
+              <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">📈 Durum</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Bar label="Kondisyon" value={currentPlayer.condition} color={getBarColor(currentPlayer.condition)} />
+                <Bar label="Form" value={currentPlayer.form} color={getBarColor(currentPlayer.form)} />
+                <Bar label="Moral" value={currentPlayer.morale} color={getBarColor(currentPlayer.morale)} />
+              </div>
             </div>
-          </div>
 
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* SÖZLEŞME MODAL */}
+      {showContract && (
+        <ContractModal
+          player={currentPlayer}
+          onClose={() => setShowContract(false)}
+        />
+      )}
+    </>
   );
 }

@@ -10,13 +10,25 @@ import { Table } from './components/Table';
 import { MatchDay } from './components/MatchDay';
 import { Transfers } from './components/Transfers';
 import { Training } from './components/Training';
+import { Academy } from './components/Academy';
 import { Stats } from './components/Stats';
 import { Settings } from './components/Settings';
 import { SeasonEndModal } from './components/SeasonEndModal';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { InboxView } from './components/InboxView';
 
-type Tab = 'dashboard' | 'squad' | 'tactics' | 'table' | 'match' | 'transfer' | 'training' | 'stats' | 'inbox' | 'settings';
+type Tab =
+  | 'dashboard'
+  | 'squad'
+  | 'tactics'
+  | 'table'
+  | 'match'
+  | 'transfer'
+  | 'training'
+  | 'academy'
+  | 'stats'
+  | 'inbox'
+  | 'settings';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -41,10 +53,8 @@ export default function App() {
   useEffect(() => {
     if (pendingPressMatch && !showPress) {
       if (assistant?.pressConference) {
-        // Asistan otomatik gider
         simulateAssistantPress();
       } else {
-        // Manuel basın toplantısı
         setShowPress(true);
       }
     }
@@ -56,6 +66,7 @@ export default function App() {
     { key: 'squad', label: '👥 Kadro' },
     { key: 'tactics', label: '🎯 Taktik' },
     { key: 'training', label: '🏃 Antrenman' },
+    { key: 'academy', label: '🎓 Akademi' },
     { key: 'table', label: '📊 Puan Durumu' },
     { key: 'stats', label: '🏆 İstatistikler' },
     { key: 'inbox', label: '📬 Gelen Kutusu', badge: unreadCount },
@@ -122,6 +133,7 @@ export default function App() {
         {tab === 'squad' && <Squad />}
         {tab === 'tactics' && <Tactics />}
         {tab === 'training' && <Training />}
+        {tab === 'academy' && <Academy />}
         {tab === 'table' && <Table />}
         {tab === 'stats' && <Stats />}
         {tab === 'inbox' && <InboxView />}
