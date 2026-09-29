@@ -58,7 +58,7 @@ function randomNationality(): string {
 }
 
 // ═══════════════════════════════════════════════
-// YAŞ DAĞILIMI (15-35)
+// YAŞ DAĞILIMI
 // ═══════════════════════════════════════════════
 
 function generateAge(): number {
@@ -94,22 +94,27 @@ export function createEmptyCareerStats(): CareerStats {
 }
 
 // ═══════════════════════════════════════════════
-// İKİNCİL MEVKİ
+// İKİNCİL MEVKİ (17 pozisyon)
 // ═══════════════════════════════════════════════
 
 const SECONDARY_POSITION_MAP: Record<Position, Position[]> = {
   'GK': [],
-  'DC': ['DM'],
-  'DL': ['ML', 'DC'],
-  'DR': ['MR', 'DC'],
-  'DM': ['MC', 'DC'],
-  'MC': ['DM', 'AMC'],
-  'ML': ['AML', 'DL'],
-  'MR': ['AMR', 'DR'],
-  'AMC': ['MC', 'ST'],
-  'AML': ['ML', 'ST'],
-  'AMR': ['MR', 'ST'],
-  'ST': ['AMC', 'AML', 'AMR'],
+  'DC': ['DMC'],
+  'DL': ['WBL', 'ML'],
+  'DR': ['WBR', 'MR'],
+  'WBL': ['DL', 'ML'],
+  'WBR': ['DR', 'MR'],
+  'DMC': ['MC', 'DC'],
+  'ML': ['AML', 'WBL', 'KFL'],
+  'MC': ['DMC', 'AMC'],
+  'MR': ['AMR', 'WBR', 'KFR'],
+  'AML': ['ML', 'KFL'],
+  'AMC': ['MC', 'GF'],
+  'AMR': ['MR', 'KFR'],
+  'KFL': ['AML', 'ML', 'ST'],
+  'GF': ['AMC', 'ST'],
+  'KFR': ['AMR', 'MR', 'ST'],
+  'ST': ['GF', 'KFL', 'KFR'],
 };
 
 function generateSecondaryPositions(position: Position): Position[] {
@@ -121,7 +126,7 @@ function generateSecondaryPositions(position: Position): Position[] {
 }
 
 // ═══════════════════════════════════════════════
-// ATTRIBUTE ÜRETİMİ
+// ATTRIBUTE ÜRETİMİ (17 pozisyon)
 // ═══════════════════════════════════════════════
 
 function randomAttributes(position: Position, age: number): Attributes {
@@ -192,7 +197,23 @@ function randomAttributes(position: Position, age: number): Attributes {
     a.heading = fmRandom(9, 3);
     a.longShots = fmRandom(5, 2);
     a.strength = fmRandom(10, 3);
-  } else if (position === 'DM') {
+  } else if (position === 'WBL' || position === 'WBR') {
+    // Kanat bek — hücum odaklı
+    a.marking = fmRandom(Math.max(3, 12 + bias), 3);
+    a.tackling = fmRandom(Math.max(3, 12 + bias), 3);
+    a.defensivePositioning = fmRandom(Math.max(3, 11 + bias), 3);
+    a.pace = fmRandom(Math.max(3, 15 + bias), 3);
+    a.acceleration = fmRandom(Math.max(3, 15 + bias), 3);
+    a.stamina = fmRandom(Math.max(3, 15 + bias), 3);
+    a.crossing = fmRandom(Math.max(3, 14 + bias), 3);
+    a.dribbling = fmRandom(Math.max(3, 13 + bias), 3);
+    a.workRate = fmRandom(Math.max(3, 14 + bias), 3);
+    a.finishing = fmRandom(6, 2);
+    a.shooting = fmRandom(7, 3);
+    a.heading = fmRandom(8, 3);
+    a.longShots = fmRandom(5, 2);
+    a.strength = fmRandom(9, 3);
+  } else if (position === 'DMC') {
     a.passing = fmRandom(Math.max(3, 14 + bias), 3);
     a.tackling = fmRandom(Math.max(3, 14 + bias), 3);
     a.ballWinning = fmRandom(Math.max(3, 14 + bias), 3);
@@ -246,6 +267,21 @@ function randomAttributes(position: Position, age: number): Attributes {
     a.heading = fmRandom(7, 3);
     a.defensivePositioning = fmRandom(5, 2);
     a.strength = fmRandom(8, 3);
+  } else if (position === 'KFL' || position === 'KFR') {
+    // Kanat forvet — AML/AMR ile aynı
+    a.pace = fmRandom(Math.max(3, 16 + bias), 3);
+    a.acceleration = fmRandom(Math.max(3, 16 + bias), 3);
+    a.dribbling = fmRandom(Math.max(3, 16 + bias), 3);
+    a.technique = fmRandom(Math.max(3, 14 + bias), 3);
+    a.finishing = fmRandom(Math.max(3, 15 + bias), 3);
+    a.offTheBall = fmRandom(Math.max(3, 15 + bias), 3);
+    a.agility = fmRandom(Math.max(3, 14 + bias), 3);
+    a.crossing = fmRandom(Math.max(3, 12 + bias), 3);
+    a.marking = fmRandom(5, 2);
+    a.tackling = fmRandom(5, 2);
+    a.heading = fmRandom(7, 3);
+    a.defensivePositioning = fmRandom(5, 2);
+    a.strength = fmRandom(8, 3);
   } else if (position === 'AMC') {
     a.passing = fmRandom(Math.max(3, 16 + bias), 3);
     a.vision = fmRandom(Math.max(3, 16 + bias), 3);
@@ -261,6 +297,22 @@ function randomAttributes(position: Position, age: number): Attributes {
     a.defensivePositioning = fmRandom(5, 2);
     a.strength = fmRandom(8, 3);
     a.ballWinning = fmRandom(5, 2);
+  } else if (position === 'GF') {
+    // Gizli forvet — ST ile benzer ama dribbling+offTheBall daha yüksek
+    a.finishing = fmRandom(Math.max(3, 16 + bias), 3);
+    a.shooting = fmRandom(Math.max(3, 14 + bias), 3);
+    a.offTheBall = fmRandom(Math.max(3, 16 + bias), 3);
+    a.composure = fmRandom(Math.max(3, 14 + bias), 3);
+    a.technique = fmRandom(Math.max(3, 14 + bias), 3);
+    a.heading = fmRandom(Math.max(3, 12 + bias), 3);
+    a.firstTouch = fmRandom(Math.max(3, 14 + bias), 3);
+    a.anticipation = fmRandom(Math.max(3, 14 + bias), 3);
+    a.dribbling = fmRandom(Math.max(3, 14 + bias), 3);
+    a.marking = fmRandom(4, 2);
+    a.tackling = fmRandom(4, 2);
+    a.defensivePositioning = fmRandom(4, 2);
+    a.ballWinning = fmRandom(4, 2);
+    a.crossing = fmRandom(7, 3);
   } else if (position === 'ST') {
     a.finishing = fmRandom(Math.max(3, 16 + bias), 3);
     a.shooting = fmRandom(Math.max(3, 15 + bias), 3);
@@ -287,7 +339,7 @@ function randomAttributes(position: Position, age: number): Attributes {
 }
 
 // ═══════════════════════════════════════════════
-// GENEL REYTİNG
+// GENEL REYTİNG (17 pozisyon)
 // ═══════════════════════════════════════════════
 
 function calculateOverall(a: Attributes, position: Position): number {
@@ -299,7 +351,10 @@ function calculateOverall(a: Attributes, position: Position): number {
     score = a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1;
   } else if (position === 'DL' || position === 'DR') {
     score = a.marking * 0.2 + a.tackling * 0.2 + a.defensivePositioning * 0.15 + a.pace * 0.15 + a.acceleration * 0.1 + a.stamina * 0.1 + a.crossing * 0.1;
-  } else if (position === 'DM') {
+  } else if (position === 'WBL' || position === 'WBR') {
+    // Kanat bek — hücum ağırlıklı
+    score = a.marking * 0.15 + a.tackling * 0.15 + a.pace * 0.2 + a.acceleration * 0.15 + a.stamina * 0.1 + a.crossing * 0.15 + a.workRate * 0.1;
+  } else if (position === 'DMC') {
     score = a.passing * 0.2 + a.tackling * 0.2 + a.ballWinning * 0.15 + a.positioning * 0.15 + a.decisions * 0.15 + a.workRate * 0.15;
   } else if (position === 'MC') {
     score = a.passing * 0.25 + a.vision * 0.2 + a.decisions * 0.2 + a.technique * 0.15 + a.workRate * 0.1 + a.stamina * 0.1;
@@ -307,8 +362,14 @@ function calculateOverall(a: Attributes, position: Position): number {
     score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.2 + a.acceleration * 0.15 + a.technique * 0.15;
   } else if (position === 'AML' || position === 'AMR') {
     score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
+  } else if (position === 'KFL' || position === 'KFR') {
+    // Kanat forvet — AML/AMR ile aynı
+    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
   } else if (position === 'AMC') {
     score = a.passing * 0.2 + a.vision * 0.2 + a.technique * 0.2 + a.decisions * 0.15 + a.finishing * 0.15 + a.dribbling * 0.1;
+  } else if (position === 'GF') {
+    // Gizli forvet — ST benzeri
+    score = a.finishing * 0.3 + a.offTheBall * 0.2 + a.technique * 0.15 + a.composure * 0.15 + a.dribbling * 0.1 + a.shooting * 0.1;
   } else if (position === 'ST') {
     score = a.finishing * 0.3 + a.shooting * 0.2 + a.offTheBall * 0.2 + a.composure * 0.15 + a.technique * 0.15;
   } else {
@@ -359,14 +420,14 @@ export function calculateValue(overall: number, age: number): number {
 
 const SQUAD_TEMPLATE: Position[] = [
   'GK', 'GK',
-  'DC', 'DC', 'DC', 'DC',
-  'DL', 'DL',
-  'DR', 'DR',
-  'DM', 'DM',
+  'DL', 'DL', 'DC', 'DC', 'DC', 'DR', 'DR',
+  'WBL', 'WBR',
+  'DMC', 'DMC',
   'MC', 'MC', 'MC',
   'ML', 'MR',
   'AMC',
   'AML', 'AMR',
+  'KFL', 'KFR',
   'ST', 'ST', 'ST',
 ];
 
@@ -415,8 +476,6 @@ export function generatePlayer(position: Position, clubId: string, index: number
     careerStats,
     recentRatings: [],
     overall,
-
-    // 🆕 SÖZLEŞME
     contractYears: randomBetween(1, 5),
     squadRole: overall >= 14 ? 'first' : overall >= 11 ? 'rotation' : 'backup',
   };
@@ -431,7 +490,11 @@ export function generateYouthPlayer(
   nationality?: string,
   clubId: string | null = null
 ): Player {
-  const positions: Position[] = ['GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST'];
+  const positions: Position[] = [
+    'GK', 'DL', 'DC', 'DR', 'WBL', 'WBR', 'DMC',
+    'ML', 'MC', 'MR', 'AML', 'AMC', 'AMR',
+    'KFL', 'GF', 'KFR', 'ST',
+  ];
   const pos = position ?? positions[Math.floor(Math.random() * positions.length)];
   const nat = nationality ?? randomNationality();
   const age = randomBetween(15, 18);
@@ -465,16 +528,15 @@ export function generateYouthPlayer(
     careerStats: createEmptyCareerStats(),
     recentRatings: [],
     overall,
-
-    // 🆕 SÖZLEŞME
     contractYears: randomBetween(2, 4),
     squadRole: 'u21',
   };
 }
 
-/**
- * Emekli olan oyuncuların yerine genç üretir.
- */
+// ═══════════════════════════════════════════════
+// EMEKLİ OYUNCU DEĞİŞİMİ
+// ═══════════════════════════════════════════════
+
 export function replaceRetiredPlayers(
   players: Record<string, Player>,
   clubs: Record<string, Club>
@@ -487,7 +549,7 @@ export function replaceRetiredPlayers(
     );
     const squadSize = clubPlayers.length;
 
-    const TARGET_SQUAD_SIZE = 24;
+    const TARGET_SQUAD_SIZE = 26;
     const missing = TARGET_SQUAD_SIZE - squadSize;
 
     if (missing > 0) {
@@ -606,21 +668,36 @@ export function scorePlayer(p: Player): number {
 }
 
 // ═══════════════════════════════════════════════
-// İLK 11 (U21 oyuncuları hariç)
+// İLK 11 (Custom + Sabit formasyon)
 // ═══════════════════════════════════════════════
 
 export function getStartingXI(
   clubId: string,
   players: Record<string, Player>,
   formation: Formation,
-  userLineup?: string[]
+  userLineup?: string[],
+  customFormation?: any
 ): Player[] {
+  // 🆕 Custom formasyon varsa oradan al
+  if (customFormation && customFormation.slots && customFormation.slots.length === 11) {
+    const customXI: Player[] = [];
+    for (const slot of customFormation.slots) {
+      if (slot.playerId) {
+        const p = players[slot.playerId];
+        if (p && p.clubId === clubId && p.injuryWeeks === 0 && p.suspensionWeeks === 0) {
+          customXI.push(p);
+        }
+      }
+    }
+    if (customXI.length === 11) return customXI;
+  }
+
   const clubPlayers = Object.values(players).filter(
     p =>
       p.clubId === clubId &&
       p.injuryWeeks === 0 &&
       p.suspensionWeeks === 0 &&
-      p.squadRole !== 'u21'  // 🆕 U21 hariç
+      p.squadRole !== 'u21'
   );
 
   if (userLineup && userLineup.length === 11) {
@@ -636,14 +713,14 @@ export function getStartingXI(
     if (lineupPlayers.length === 11) return lineupPlayers;
   }
 
-  const needs: Record<Formation, Partial<Record<Position, number>>> = {
+  const needs: Record<string, Partial<Record<Position, number>>> = {
     '4-4-2':    { GK: 1, DC: 2, DL: 1, DR: 1, ML: 1, MR: 1, MC: 2, ST: 2 },
     '4-3-3':    { GK: 1, DC: 2, DL: 1, DR: 1, MC: 3, AML: 1, AMR: 1, ST: 1 },
-    '3-5-2':    { GK: 1, DC: 3, DL: 1, DR: 1, MC: 3, ST: 2 },
-    '4-2-3-1':  { GK: 1, DC: 2, DL: 1, DR: 1, DM: 2, AMC: 1, AML: 1, AMR: 1, ST: 1 },
+    '3-5-2':    { GK: 1, DC: 3, WBL: 1, WBR: 1, MC: 3, ST: 2 },
+    '4-2-3-1':  { GK: 1, DC: 2, DL: 1, DR: 1, DMC: 2, AMC: 1, AML: 1, AMR: 1, ST: 1 },
   };
 
-  const need = needs[formation];
+  const need = needs[formation] ?? needs['4-4-2'];
   const result: Player[] = [];
   const used = new Set<string>();
 

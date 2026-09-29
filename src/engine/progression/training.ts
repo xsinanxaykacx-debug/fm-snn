@@ -3,7 +3,7 @@
 import type { Player } from '../types';
 
 // ═══════════════════════════════════════════════
-// OVERALL HESABI (1-20)
+// OVERALL HESABI (17 Pozisyon)
 // ═══════════════════════════════════════════════
 
 function computeOverall(a: Player['attributes'], position: string): number {
@@ -15,7 +15,9 @@ function computeOverall(a: Player['attributes'], position: string): number {
     score = a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1;
   } else if (position === 'DL' || position === 'DR') {
     score = a.marking * 0.2 + a.tackling * 0.2 + a.defensivePositioning * 0.15 + a.pace * 0.15 + a.acceleration * 0.1 + a.stamina * 0.1 + a.crossing * 0.1;
-  } else if (position === 'DM') {
+  } else if (position === 'WBL' || position === 'WBR') {
+    score = a.marking * 0.15 + a.tackling * 0.15 + a.pace * 0.2 + a.acceleration * 0.15 + a.stamina * 0.1 + a.crossing * 0.15 + a.workRate * 0.1;
+  } else if (position === 'DMC') {
     score = a.passing * 0.2 + a.tackling * 0.2 + a.ballWinning * 0.15 + a.positioning * 0.15 + a.decisions * 0.15 + a.workRate * 0.15;
   } else if (position === 'MC') {
     score = a.passing * 0.25 + a.vision * 0.2 + a.decisions * 0.2 + a.technique * 0.15 + a.workRate * 0.1 + a.stamina * 0.1;
@@ -23,8 +25,12 @@ function computeOverall(a: Player['attributes'], position: string): number {
     score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.2 + a.acceleration * 0.15 + a.technique * 0.15;
   } else if (position === 'AML' || position === 'AMR') {
     score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
+  } else if (position === 'KFL' || position === 'KFR') {
+    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
   } else if (position === 'AMC') {
     score = a.passing * 0.2 + a.vision * 0.2 + a.technique * 0.2 + a.decisions * 0.15 + a.finishing * 0.15 + a.dribbling * 0.1;
+  } else if (position === 'GF') {
+    score = a.finishing * 0.3 + a.offTheBall * 0.2 + a.technique * 0.15 + a.composure * 0.15 + a.dribbling * 0.1 + a.shooting * 0.1;
   } else if (position === 'ST') {
     score = a.finishing * 0.3 + a.shooting * 0.2 + a.offTheBall * 0.2 + a.composure * 0.15 + a.technique * 0.15;
   } else {
@@ -35,7 +41,7 @@ function computeOverall(a: Player['attributes'], position: string): number {
 }
 
 // ═══════════════════════════════════════════════
-// DEĞER HESABI (1-20 reyting) — 15-35 YAŞ ARASI
+// DEĞER HESABI
 // ═══════════════════════════════════════════════
 
 export function calculateValue(overall: number, age: number): number {
@@ -70,7 +76,7 @@ export function calculateValue(overall: number, age: number): number {
 }
 
 // ═══════════════════════════════════════════════
-// YAŞ BAZLI GELİŞİM (15-35 ARASI)
+// YAŞ BAZLI GELİŞİM
 // ═══════════════════════════════════════════════
 
 interface AgeProgression {
@@ -106,15 +112,13 @@ export function developPlayers(
     const p = { ...players[id] };
     const a = { ...p.attributes };
 
-    // Yaş ilerle
     p.age = p.age + 1;
 
-    // 🎯 36+ EMEKLİ
+    // 36+ EMEKLİ
     if (p.age > 35) {
       continue;
     }
 
-    // Yaşa göre gelişim
     const progression = getAgeProgression(p.age);
     const r = () => (Math.random() - 0.5) * 0.8;
 
@@ -167,11 +171,9 @@ export function developPlayers(
 
     p.attributes = a;
 
-    // Overall güncelle
     const newOverall = computeOverall(a, p.position);
     p.overall = newOverall;
 
-    // Value ve wage
     p.value = calculateValue(newOverall, p.age);
     p.wage = Math.round(p.value / 500);
 

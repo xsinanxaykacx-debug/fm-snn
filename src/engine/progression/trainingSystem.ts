@@ -91,9 +91,6 @@ function getFocusKeys(focus: TrainingFocus): (keyof Player['attributes'])[] {
   }
 }
 
-/**
- * Bir oyuncuya antrenman uygular.
- */
 function applyTrainingToPlayer(
   player: Player,
   training: TrainingState
@@ -101,7 +98,6 @@ function applyTrainingToPlayer(
   const focusKeys = getFocusKeys(training.focus);
   const intensityMultiplier = getIntensityMultiplier(training.intensity);
 
-  // Genç oyuncular daha hızlı gelişir
   const ageMultiplier =
     player.age <= 21 ? 1.5 :
     player.age <= 24 ? 1.2 :
@@ -113,7 +109,6 @@ function applyTrainingToPlayer(
   let anyChange = false;
 
   for (const key of focusKeys) {
-    // Gelişim olasılığı (düşük)
     const developChance = 0.05 * intensityMultiplier * ageMultiplier;
 
     if (Math.random() < developChance) {
@@ -127,7 +122,6 @@ function applyTrainingToPlayer(
 
   if (!anyChange) return player;
 
-  // 🔧 Overall ve value YENİ formülle
   const overall = computeOverallFromAttrs(newAttrs, player.position);
   const newValue = calculateValue(overall, player.age);
 
@@ -140,9 +134,10 @@ function applyTrainingToPlayer(
   };
 }
 
-/**
- * Attribute'lardan overall hesapla (1-20)
- */
+// ═══════════════════════════════════════════════
+// OVERALL (17 Pozisyon)
+// ═══════════════════════════════════════════════
+
 function computeOverallFromAttrs(
   a: Player['attributes'],
   position: string
@@ -155,7 +150,9 @@ function computeOverallFromAttrs(
     score = a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1;
   } else if (position === 'DL' || position === 'DR') {
     score = a.marking * 0.2 + a.tackling * 0.2 + a.defensivePositioning * 0.15 + a.pace * 0.15 + a.acceleration * 0.1 + a.stamina * 0.1 + a.crossing * 0.1;
-  } else if (position === 'DM') {
+  } else if (position === 'WBL' || position === 'WBR') {
+    score = a.marking * 0.15 + a.tackling * 0.15 + a.pace * 0.2 + a.acceleration * 0.15 + a.stamina * 0.1 + a.crossing * 0.15 + a.workRate * 0.1;
+  } else if (position === 'DMC') {
     score = a.passing * 0.2 + a.tackling * 0.2 + a.ballWinning * 0.15 + a.positioning * 0.15 + a.decisions * 0.15 + a.workRate * 0.15;
   } else if (position === 'MC') {
     score = a.passing * 0.25 + a.vision * 0.2 + a.decisions * 0.2 + a.technique * 0.15 + a.workRate * 0.1 + a.stamina * 0.1;
@@ -163,8 +160,12 @@ function computeOverallFromAttrs(
     score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.2 + a.acceleration * 0.15 + a.technique * 0.15;
   } else if (position === 'AML' || position === 'AMR') {
     score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
+  } else if (position === 'KFL' || position === 'KFR') {
+    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
   } else if (position === 'AMC') {
     score = a.passing * 0.2 + a.vision * 0.2 + a.technique * 0.2 + a.decisions * 0.15 + a.finishing * 0.15 + a.dribbling * 0.1;
+  } else if (position === 'GF') {
+    score = a.finishing * 0.3 + a.offTheBall * 0.2 + a.technique * 0.15 + a.composure * 0.15 + a.dribbling * 0.1 + a.shooting * 0.1;
   } else if (position === 'ST') {
     score = a.finishing * 0.3 + a.shooting * 0.2 + a.offTheBall * 0.2 + a.composure * 0.15 + a.technique * 0.15;
   } else {

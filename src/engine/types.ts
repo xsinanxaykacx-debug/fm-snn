@@ -1,10 +1,21 @@
 // src/engine/types.ts
 
 // ═══════════════════════════════════════════════
-// MEVKİLER
+// MEVKİLER (17 Pozisyon)
 // ═══════════════════════════════════════════════
 
-export type Position = 'GK' | 'DC' | 'DL' | 'DR' | 'DM' | 'MC' | 'ML' | 'MR' | 'AMC' | 'AML' | 'AMR' | 'ST';
+export type Position =
+  | 'GK'
+  | 'DL' | 'DC' | 'DR'
+  | 'WBL' | 'WBR'
+  | 'DMC'
+  | 'ML' | 'MC' | 'MR'
+  | 'AML' | 'AMC' | 'AMR'
+  | 'KFL' | 'GF' | 'KFR'
+  | 'ST';
+
+// Slot pozisyonu (aynı 17 pozisyon)
+export type SlotPosition = Position;
 
 // ═══════════════════════════════════════════════
 // ATTRIBUTE'LAR (1-20)
@@ -109,19 +120,18 @@ export interface Player {
   recentRatings: number[];
   overall: number;
 
-  // 🆕 SÖZLEŞME
-  contractYears: number;      // Kalan sözleşme yılı (1-5)
-  squadRole: 'first' | 'rotation' | 'backup' | 'u21';  // Kadro rolü
+  contractYears: number;
+  squadRole: 'first' | 'rotation' | 'backup' | 'u21';
 }
 
 // ═══════════════════════════════════════════════
-// AKADEMİ OYUNCUSU
+// AKADEMİ
 // ═══════════════════════════════════════════════
 
 export interface AcademyPlayer extends Player {
-  potential: number;        // 1-200 arası FM tarzı potansiyel
-  potentialStars: number;   // 0.5-5 yıldız
-  scoutRating: string;      // "Yetenekli", "Yıldız Adayı" vs.
+  potential: number;
+  potentialStars: number;
+  scoutRating: string;
 }
 
 export interface AcademyState {
@@ -133,7 +143,7 @@ export interface AcademyState {
 // TAKTİK
 // ═══════════════════════════════════════════════
 
-export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1';
+export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1' | 'CUSTOM';
 
 export interface Tactic {
   formation: Formation;
@@ -143,6 +153,24 @@ export interface Tactic {
   width: 'narrow' | 'normal' | 'wide';
   directness: 'short' | 'mixed' | 'direct';
   defensiveLine: 'deep' | 'normal' | 'high';
+}
+
+// ═══════════════════════════════════════════════
+// 🆕 SERBEST FORMASYON
+// ═══════════════════════════════════════════════
+
+export interface CustomSlot {
+  id: string;
+  label: SlotPosition;
+  x: number;   // Saha X (%)
+  y: number;   // Saha Y (%)
+  playerId: string | null;
+}
+
+export interface CustomFormation {
+  id: string;
+  name: string;
+  slots: CustomSlot[];
 }
 
 // ═══════════════════════════════════════════════
@@ -161,6 +189,7 @@ export interface Club {
   tactic: Tactic;
   isUser: boolean;
   lineup?: string[];
+  customFormation?: CustomFormation;
 }
 
 // ═══════════════════════════════════════════════
@@ -339,7 +368,7 @@ export interface AttackSequence {
 }
 
 // ═══════════════════════════════════════════════
-// 🆕 SÖZLEŞME PAZARLIĞI
+// SÖZLEŞME
 // ═══════════════════════════════════════════════
 
 export interface ContractOffer {
