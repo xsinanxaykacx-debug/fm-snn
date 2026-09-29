@@ -17,34 +17,31 @@ export type Position =
 export type SlotPosition = Position;
 
 // ═══════════════════════════════════════════════
-// 🆕 SAHA BÖLGELERİ (3 Sütun × 6 Satır = 16 Bölge)
+// SAHA BÖLGELERİ
 // ═══════════════════════════════════════════════
-
-// Satır: 0=GK, 1=DEFANS, 2=DEFANSİFORTA, 3=ORTA, 4=ATAKORTA, 5=FORVET
-// Sütun: 0=SOL, 1=ORTA, 2=SAĞ
 
 export type PitchRow = 'ST' | 'FORVET' | 'ATAKORTA' | 'ORTA' | 'DEFANSIFORTA' | 'DEFANS' | 'GK';
 export type PitchCol = 'SOL' | 'SOLORTA' | 'ORTA' | 'SAGORTA' | 'SAG';
 
 export interface PitchZone {
-  id: string;          // "r1_c0" gibi
-  row: number;         // 0-5
-  col: number;         // 0-2
+  id: string;
+  row: number;
+  col: number;
   rowName: PitchRow;
   colName: PitchCol;
-  suggestedPosition: SlotPosition;  // Öneri (KFL, ST vs.)
-  playerId: string | null;          // Atanan oyuncu
-  customLabel?: SlotPosition;       // Kullanıcı etiketi değiştirdiyse
+  suggestedPosition: SlotPosition;
+  playerId: string | null;
+  customLabel?: SlotPosition;
 }
 
 export interface CustomFormation {
   id: string;
   name: string;
-  zones: PitchZone[];  // 16 bölge
+  zones: PitchZone[];
 }
 
 // ═══════════════════════════════════════════════
-// ATTRIBUTE'LAR (1-20)
+// ATTRIBUTE'LAR
 // ═══════════════════════════════════════════════
 
 export interface Attributes {
@@ -113,6 +110,11 @@ export interface CareerStats {
   seasonAvgRating: number;
   seasonMinutesPlayed: number;
   seasonMotm: number;
+
+  // 🆕 KUPA İSTATİSTİKLERİ
+  cupAppearances: number;
+  cupGoals: number;
+  cupAssists: number;
 }
 
 // ═══════════════════════════════════════════════
@@ -210,7 +212,8 @@ export interface MatchEvent {
     | 'kickoff' | 'halftime' | 'fulltime'
     | 'pass' | 'dribble' | 'cross' | 'counter' | 'shot'
     | 'goal' | 'save' | 'miss' | 'blocked_shot'
-    | 'yellow' | 'red' | 'injury' | 'substitution';
+    | 'yellow' | 'red' | 'injury' | 'substitution'
+    | 'penalty_shootout';
   playerId?: string;
   clubId?: string;
   team?: 'home' | 'away';
@@ -258,6 +261,43 @@ export interface Match {
   played?: boolean;
   possession?: { home: number; away: number };
   engine?: any;
+
+  // 🆕 KUPA MAÇI
+  isCup?: boolean;
+  cupRound?: CupRound;
+  penalties?: {
+    home: number;
+    away: number;
+  };
+  winnerId?: string;
+}
+
+// ═══════════════════════════════════════════════
+// 🆕 KUPA TİPLERİ
+// ═══════════════════════════════════════════════
+
+export type CupRound = 'round1' | 'quarter' | 'semi' | 'final';
+
+export interface CupMatch {
+  id: string;
+  round: CupRound;
+  homeId: string;
+  awayId: string;
+  match: Match | null;
+  winnerId: string | null;
+}
+
+export interface CupState {
+  season: number;
+  matches: Record<string, CupMatch>;
+  currentRound: CupRound | null;
+  champion: string | null;
+  rounds: {
+    round1: string[];
+    quarter: string[];
+    semi: string[];
+    final: string[];
+  };
 }
 
 // ═══════════════════════════════════════════════
@@ -305,6 +345,9 @@ export interface GameState {
   userLineup: string[];
   assistant: AssistantSettings;
   academy: AcademyState;
+
+  // 🆕 KUPA
+  cup: CupState;
 }
 
 // ═══════════════════════════════════════════════
@@ -343,7 +386,7 @@ export interface AssistantSettings {
 }
 
 // ═══════════════════════════════════════════════
-// MAÇ MOTORU — SALDIRI SEKANSI
+// MAÇ MOTORU
 // ═══════════════════════════════════════════════
 
 export interface AttackSequenceAction {

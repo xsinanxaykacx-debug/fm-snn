@@ -1,0 +1,15 @@
+(() => {
+  const s = JSON.parse(localStorage.getItem('fm-clone-save')).state;
+  const user = s.userClubId;
+  const played = s.fixtures.filter(f => f.played && (f.homeId === user || f.awayId === user));
+  const last10 = played.slice(-10);
+  let totalGoals = 0, totalShots = 0, totalXG = 0;
+  last10.forEach(m => {
+    totalGoals += m.homeScore + m.awayScore;
+    totalShots += m.stats.shots.home + m.stats.shots.away;
+    totalXG += (m.stats.xG?.home || 0) + (m.stats.xG?.away || 0);
+  });
+  console.log(`Gol/maç: ${(totalGoals/last10.length).toFixed(2)}`);
+  console.log(`Şut/maç: ${(totalShots/last10.length).toFixed(2)}`);
+  console.log(`xG/maç: ${(totalXG/last10.length).toFixed(2)}`);
+})();

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { sortedTable } from '../engine/league/table';
+import { CUP_WEEKS, CUP_ROUND_NAMES, getCupSummary } from '../engine/cup/cupEngine';
 import { TeamBadge } from './TeamBadge';
 import { FormBadge } from './FormBadge';
 import { getTeamColor } from '../utils/teamColors';
@@ -77,24 +78,6 @@ function FormChart({ clubId }: { clubId: string }) {
             borderWidth: 2,
             pointRadius: 3,
           },
-          {
-            label: 'Gol (Biz)',
-            data: goalsFor,
-            borderColor: '#06b6d4',
-            borderDash: [5, 5],
-            tension: 0.4,
-            borderWidth: 2,
-            pointRadius: 2,
-          },
-          {
-            label: 'Gol (Rakip)',
-            data: goalsAgainst,
-            borderColor: '#f59e0b',
-            borderDash: [5, 5],
-            tension: 0.4,
-            borderWidth: 2,
-            pointRadius: 2,
-          },
         ]
       },
       options: {
@@ -162,6 +145,10 @@ export function Dashboard({ onNavigate }: Props) {
     : null;
   const isHome = nextMatch?.homeId === state.userClubId;
 
+  // 🆕 KUPA BİLGİSİ
+  const isCupWeek = Object.values(CUP_WEEKS).includes(state.currentWeek);
+  const cupSummary = getCupSummary(state.cup, state.userClubId);
+
   const last5 = [...state.fixtures]
     .filter(m => m.played && (m.homeId === state.userClubId || m.awayId === state.userClubId))
     .sort((a, b) => (b.week ?? 0) - (a.week ?? 0))
@@ -220,6 +207,33 @@ export function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
+      {/* 🆕 KUPA HAFTASI UYARISI */}
+      {isCupWeek && cupSummary.userNextMatch && (
+        <div
+          className="glass-panel rounded-xl p-4 flex items-center justify-between"
+          style={{
+            background: 'linear-gradient(135deg, rgba(250,204,21,0.15) 0%, transparent 100%)',
+            borderColor: 'rgba(250,204,21,0.4)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🏆</span>
+            <div>
+              <p className="text-sm font-bold text-yellow-400">KUPA HAFTASI!</p>
+              <p className="text-xs text-slate-300">
+                Bu hafta lig maçı yok. Kupa maçın var.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate('cup')}
+            className="bg-yellow-500 hover:bg-yellow-400 text-slate-900 text-xs font-bold px-3 py-2 rounded"
+          >
+            🏆 Kupaya Git
+          </button>
+        </div>
+      )}
+
       {/* GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {opponent && nextMatch ? (
@@ -266,7 +280,7 @@ export function Dashboard({ onNavigate }: Props) {
           </div>
         ) : (
           <div className="glass-panel rounded-xl p-5 flex items-center justify-center text-slate-500 py-12">
-            Bu hafta maçın yok.
+            {isCupWeek ? '🏆 Bu hafta kupa maçı var!' : 'Bu hafta maçın yok.'}
           </div>
         )}
 
@@ -304,17 +318,34 @@ export function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* FORM GRAFİĞİ */}
-      <div className="glass-panel rounded-xl p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-bold text-white">📈 Form Grafiği (Son 8 Maç)</h3>
-          <div className="text-[10px] text-slate-500 flex gap-3">
-            <span>🟢 xG (Biz)</span>
-            <span>🔴 xG (Rakip)</span>
-            <span>🔵 Gol (Biz)</span>
-            <span>🟠 Gol (Rakip)</span>
+      {/* 🆕 KUPA DURUMU */}
+      {cupSummary.currentRound && !cupSummary.champion && (
+        <div className="glass-panel rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🏆</span>
+              <div>
+                <p className="text-sm font-bold text-white">
+                  Kupa: {CUP_ROUND_NAMES[cupSummary.currentRound]}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {cupSummary.userAlive ? '✅ Hâlâ kupadasın' : '😞 Elendin'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => onNavigate('cup')}
+              className="text-xs bg-pitch-700 hover:bg-pitch-600 text-slate-200 px-3 py-1.5 rounded font-medium"
+            >
+              🏆 Kupaya Git
+            </button>
           </div>
         </div>
+      )}
+
+      {/* FORM GRAFİĞİ */}
+      <div className="glass-panel rounded-xl p-5">
+        <h3 className="text-lg font-bold mb-3 text-white">📈 Form Grafiği (Son 8 Maç)</h3>
         <FormChart clubId={state.userClubId} />
       </div>
 
@@ -337,9 +368,6 @@ export function Dashboard({ onNavigate }: Props) {
                 <span className="flex-1 text-sm truncate text-slate-200">{opp?.name}</span>
                 <span className="font-bold text-sm text-white">
                   {ourScore} - {theirScore}
-                </span>
-                <span className="text-xs text-slate-500 w-20 text-right">
-                  xG: {(match.stats as any)?.xG?.home?.toFixed(1) ?? '?'} - {(match.stats as any)?.xG?.away?.toFixed(1) ?? '?'}
                 </span>
               </div>
             ))}

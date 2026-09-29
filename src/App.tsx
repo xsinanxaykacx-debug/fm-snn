@@ -8,6 +8,7 @@ import { Squad } from './components/Squad';
 import { Tactics } from './components/Tactics';
 import { Table } from './components/Table';
 import { Fixtures } from './components/Fixtures';
+import { Cup } from './components/Cup';
 import { Transfers } from './components/Transfers';
 import { Training } from './components/Training';
 import { Academy } from './components/Academy';
@@ -23,6 +24,7 @@ type Tab =
   | 'tactics'
   | 'table'
   | 'fixtures'
+  | 'cup'
   | 'transfer'
   | 'training'
   | 'academy'
@@ -63,6 +65,7 @@ export default function App() {
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'dashboard', label: '📋 Ana Sayfa' },
     { key: 'fixtures', label: '📅 Fikstür' },
+    { key: 'cup', label: '🏆 Kupa' },
     { key: 'squad', label: '👥 Kadro' },
     { key: 'tactics', label: '🎯 Taktik' },
     { key: 'training', label: '🏃 Antrenman' },
@@ -130,6 +133,7 @@ export default function App() {
       <main className="p-6 max-w-7xl mx-auto">
         {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
         {tab === 'fixtures' && <Fixtures />}
+        {tab === 'cup' && <Cup />}
         {tab === 'squad' && <Squad />}
         {tab === 'tactics' && <Tactics />}
         {tab === 'training' && <Training />}

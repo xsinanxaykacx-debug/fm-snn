@@ -13,6 +13,10 @@ import type {
   CustomFormation,
   PitchZone,
   SlotPosition,
+  CupState,
+  CupRound,
+  Match,
+  Formation,
 } from '../engine/types';
 import { generateGameData, replaceRetiredPlayers } from '../engine/data/generateData';
 import { generateFixtures } from '../engine/league/fixtures';
@@ -25,17 +29,20 @@ import { aiTransferWindow } from '../engine/transfer/aiTransfer';
 import { suggestTrainingFocus, analyzeMatch } from '../engine/assistant/assistantAI';
 import { generateAllIntakes } from '../engine/academy/academy';
 import { createEmptyZones, getFormationZoneMapping, findZoneByPosition } from '../engine/formation/zones';
+import {
+  createCup,
+  saveCupMatchResult,
+  advanceCupRound,
+  simulatePenalties,
+  CUP_WEEKS,
+} from '../engine/cup/cupEngine';
 import { useInboxStore } from './useInboxStore';
 
 // ═══════════════════════════════════════════════
-// SABİT: MAX SAHA OYUNCUSU
+// SABİT
 // ═══════════════════════════════════════════════
 
 const MAX_PITCH_PLAYERS = 11;
-
-// ═══════════════════════════════════════════════
-// TRANSFER PENCERESİ
-// ═══════════════════════════════════════════════
 
 const SUMMER_WINDOW_START = 1;
 const SUMMER_WINDOW_END = 4;
@@ -73,6 +80,16 @@ function createEmptyCustomFormation(): CustomFormation {
     id: `custom_${Date.now()}`,
     name: 'Serbest Diziliş',
     zones: createEmptyZones(),
+  };
+}
+
+function createEmptyCup(): CupState {
+  return {
+    season: 0,
+    matches: {},
+    currentRound: null,
+    champion: null,
+    rounds: { round1: [], quarter: [], semi: [], final: [] },
   };
 }
 
@@ -121,7 +138,6 @@ interface Store extends GameState {
     reason: string;
   };
 
-  // ZONE-BASED
   setZonePlayer: (zoneId: string, playerId: string | null) => void;
   swapZones: (zoneIdA: string, zoneIdB: string) => void;
   clearZone: (zoneId: string) => void;
@@ -129,6 +145,9 @@ interface Store extends GameState {
   resetZoneFormation: () => void;
   autoFillZones: (formation: Formation) => void;
   setFormationMode: (mode: 'fixed' | 'custom') => void;
+
+  playCupRound: () => void;
+  simulateCupMatch: (matchId: string) => Match | null;
 }
 
 // ═══════════════════════════════════════════════
@@ -142,6 +161,7 @@ function createInitialState(): GameState {
 
   const fixtures = generateFixtures(clubs, 1);
   const table = initTable(Object.keys(clubs));
+  const cup = createCup(1, clubs);
 
   return {
     season: 1,
@@ -152,12 +172,13 @@ function createInitialState(): GameState {
     fixtures,
     table,
     transferList: [],
-    news: ['Yeni sezon başladı! Başarılar dileriz.'],
+    news: ['Yeni sezon başladı! Başarılar dileriz.', '🏆 Kupa başladı!'],
     seasonOver: false,
     training: { focus: 'balanced', intensity: 'normal' },
     userLineup: [],
     assistant: { ...DEFAULT_ASSISTANT },
     academy: { ...DEFAULT_ACADEMY },
+    cup,
   };
 }
 
@@ -440,21 +461,26 @@ export const useGameStore = create<Store>()(
       clearPendingPress: () => set({ pendingPressMatch: null }),
 
       // ═══════════════════════════════════════════════
-      // HAFTA OYNA
+      // HAFTA OYNA (Lig + Kupa birlikte)
       // ═══════════════════════════════════════════════
       playWeek: () => {
         const state = get();
         if (state.seasonOver) return;
 
-        const weekMatches = state.fixtures.filter(
-          m => m.week === state.currentWeek && !m.played
-        );
+        const isCupWeek = Object.values(CUP_WEEKS).includes(state.currentWeek);
+
         const newFixtures = [...state.fixtures];
         const newTable = { ...state.table };
         let newPlayers = { ...state.players };
         const news = [...state.news];
+        let newCup = { ...state.cup };
 
         let userMatch: any = null;
+
+        // ═══ LİG MAÇLARI (HER HAFTA oynanır) ═══
+        const weekMatches = state.fixtures.filter(
+          m => m.week === state.currentWeek && !m.played
+        );
 
         for (const m of weekMatches) {
           const home = state.clubs[m.homeId!];
@@ -534,6 +560,94 @@ export const useGameStore = create<Store>()(
           }
         }
 
+        // ═══ KUPA MAÇLARI (sadece kupa haftalarında, lig maçlarıyla BİRLİKTE) ═══
+        if (isCupWeek && newCup.currentRound) {
+          const round = newCup.currentRound;
+          const roundMatchIds = newCup.rounds[round];
+          const roundMatches = roundMatchIds
+            .map(id => newCup.matches[id])
+            .filter(Boolean)
+            .filter(m => m.winnerId === null);
+
+          for (const cupMatch of roundMatches) {
+            const home = state.clubs[cupMatch.homeId];
+            const away = state.clubs[cupMatch.awayId];
+
+            const isUserMatch =
+              cupMatch.homeId === state.userClubId ||
+              cupMatch.awayId === state.userClubId;
+
+            const lineup = isUserMatch ? state.userLineup : undefined;
+
+            const result = simulateMatch(
+              home,
+              away,
+              newPlayers,
+              state.currentWeek,
+              lineup
+            );
+
+            // Beraberlik → penaltılar
+            if (result.homeScore === result.awayScore) {
+              const homeUnits = home.reputation;
+              const awayUnits = away.reputation;
+              const penalties = simulatePenalties(homeUnits, awayUnits);
+              result.penalties = penalties;
+
+              const winnerId = penalties.home > penalties.away
+                ? cupMatch.homeId
+                : cupMatch.awayId;
+
+              news.unshift(
+                `🏆 Kupa: ${home.shortName} ${result.homeScore}-${result.awayScore} ${away.shortName} (Pen: ${penalties.home}-${penalties.away}) → ${state.clubs[winnerId]?.shortName} tur atladı`
+              );
+
+              if (isUserMatch) {
+                if (winnerId === state.userClubId) {
+                  news.unshift(`🎉 Kupa'da tur atladın!`);
+                } else {
+                  news.unshift(`😞 Kupa'dan elendin.`);
+                }
+              }
+            } else {
+              const winnerId = result.homeScore > result.awayScore
+                ? cupMatch.homeId
+                : cupMatch.awayId;
+
+              news.unshift(
+                `🏆 Kupa: ${home.shortName} ${result.homeScore}-${result.awayScore} ${away.shortName} → ${state.clubs[winnerId]?.shortName} tur atladı`
+              );
+
+              if (isUserMatch) {
+                if (winnerId === state.userClubId) {
+                  news.unshift(`🎉 Kupa'da tur atladın!`);
+                } else {
+                  news.unshift(`😞 Kupa'dan elendin.`);
+                }
+              }
+            }
+
+            newCup = saveCupMatchResult(newCup, cupMatch.id, result);
+          }
+
+          newCup = advanceCupRound(newCup);
+
+          if (newCup.champion) {
+            const champion = state.clubs[newCup.champion];
+            news.unshift(`🏆 ${champion?.name} KUPA ŞAMPİYONU!`);
+
+            useInboxStore.getState().addMessage({
+              season: state.season,
+              week: state.currentWeek,
+              sender: '🏆 Kupa Organizasyonu',
+              title: `${champion?.name} Kupa Şampiyonu!`,
+              content: `${champion?.name} bu sezonun kupa şampiyonu oldu! Tebrikler!`,
+              category: 'AWARD',
+            });
+          }
+        }
+
+        // ═══ OYUNCU DURUMU ═══
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           p.condition = Math.max(
@@ -597,6 +711,7 @@ export const useGameStore = create<Store>()(
           news: news.slice(0, 30),
           seasonOver,
           pendingPressMatch: userMatch,
+          cup: newCup,
         });
 
         addInjuryMessages(
@@ -644,6 +759,9 @@ export const useGameStore = create<Store>()(
               seasonAvgRating: 0,
               seasonMinutesPlayed: 0,
               seasonMotm: 0,
+              cupAppearances: 0,
+              cupGoals: 0,
+              cupAssists: 0,
             };
           }
           newPlayers[id] = p;
@@ -686,6 +804,7 @@ export const useGameStore = create<Store>()(
         const season = state.season + 1;
         const fixtures = generateFixtures(newClubs, season);
         const table = initTable(Object.keys(newClubs));
+        const cup = createCup(season, newClubs);
 
         const news = [`🏆 Sezon ${season} başladı!`, ...state.news];
 
@@ -720,12 +839,6 @@ export const useGameStore = create<Store>()(
           news.unshift(`🎓 Akademiye ${userIntakeCount} yeni genç oyuncu katıldı`);
         }
 
-        if (userAcademyReleased.length > 0) {
-          news.unshift(
-            `📤 ${userAcademyReleased.length} genç oyuncu akademiden yaş sınırı nedeniyle ayrıldı`
-          );
-        }
-
         set({
           season,
           currentWeek: 1,
@@ -736,6 +849,7 @@ export const useGameStore = create<Store>()(
           seasonOver: false,
           news: news.slice(0, 30),
           academy: newAcademy,
+          cup,
         });
 
         useInboxStore.getState().addMessage({
@@ -746,71 +860,6 @@ export const useGameStore = create<Store>()(
           content: `Yeni sezon başladı. Başarılar dileriz!`,
           category: 'BOARD',
         });
-
-        if (contractResult.released.length > 0) {
-          const releasedNames = contractResult.released
-            .map(p => p.name)
-            .slice(0, 5)
-            .join(', ');
-          useInboxStore.getState().addMessage({
-            season,
-            week: 1,
-            sender: '📋 Sözleşme Departmanı',
-            title: `Sözleşmesi biten oyuncular`,
-            content: `${contractResult.released.length} oyuncunun sözleşmesi bitti ve serbest kaldı: ${releasedNames}${contractResult.released.length > 5 ? '...' : ''}`,
-            category: 'FINANCE',
-          });
-        }
-
-        if (contractResult.expiring.length > 0) {
-          const expiringNames = contractResult.expiring
-            .map(p => p.name)
-            .slice(0, 5)
-            .join(', ');
-          useInboxStore.getState().addMessage({
-            season,
-            week: 1,
-            sender: '📋 Sözleşme Departmanı',
-            title: `⚠️ Sözleşmesi biten oyuncular`,
-            content: `Bu sezon sonunda sözleşmesi bitecek ${contractResult.expiring.length} oyuncu var: ${expiringNames}${contractResult.expiring.length > 5 ? '...' : ''}. Yenilemek için Squad sayfasına bakın.`,
-            category: 'FINANCE',
-          });
-        }
-
-        if (userIntakeCount > 0) {
-          useInboxStore.getState().addMessage({
-            season,
-            week: 1,
-            sender: '🎓 Akademi Direktörü',
-            title: `Yeni genç yetenekler geldi!`,
-            content: `Akademiye ${userIntakeCount} yeni genç oyuncu katıldı. Yeteneklerini incelemek için Akademi sayfasına bakın.`,
-            category: 'BOARD',
-          });
-        }
-
-        if (userAcademyReleased.length > 0) {
-          useInboxStore.getState().addMessage({
-            season,
-            week: 1,
-            sender: '🎓 Akademi Direktörü',
-            title: `Genç oyuncular akademiden ayrıldı`,
-            content: `${userAcademyReleased.length} genç oyuncu 20 yaşına geldiği için akademiden ayrıldı: ${userAcademyReleased.map(p => p.name).join(', ')}`,
-            category: 'BOARD',
-          });
-        }
-
-        if (transferResult.log.length > 0) {
-          useInboxStore.getState().addMessage({
-            season,
-            week: 1,
-            sender: '📨 AI Transfer Ofisi',
-            title: `AI Transfer Window tamamlandı`,
-            content: `Yapay zeka takımları bu sezon ${transferResult.log.length} transfer gerçekleştirdi.\n\n${transferResult.log
-              .slice(0, 5)
-              .join('\n')}`,
-            category: 'TRANSFER',
-          });
-        }
       },
 
       // ═══════════════════════════════════════════════
@@ -1141,7 +1190,7 @@ export const useGameStore = create<Store>()(
       },
 
       // ═══════════════════════════════════════════════
-      // SÖZLEŞME YENİLEME
+      // SÖZLEŞME
       // ═══════════════════════════════════════════════
 
       renewContract: (playerId, offeredWage, offeredYears) => {
@@ -1185,7 +1234,7 @@ export const useGameStore = create<Store>()(
       },
 
       // ═══════════════════════════════════════════════
-      // ZONE-BASED FORMASYON
+      // ZONE-BASED
       // ═══════════════════════════════════════════════
 
       setZonePlayer: (zoneId, playerId) => {
@@ -1195,20 +1244,17 @@ export const useGameStore = create<Store>()(
 
         const custom = userClub.customFormation ?? createEmptyCustomFormation();
 
-        // ═══ MAX 11 KONTROLÜ ═══
         if (playerId !== null) {
           const targetZone = custom.zones.find(z => z.id === zoneId);
           const isTargetEmpty = targetZone?.playerId === null;
           const filledCount = custom.zones.filter(z => z.playerId !== null).length;
 
-          // Hedef bölge boşsa VE toplam zaten 11 ise → ENGEL
           if (isTargetEmpty && filledCount >= MAX_PITCH_PLAYERS) {
             console.warn(`❌ Sahaya en fazla ${MAX_PITCH_PLAYERS} oyuncu koyabilirsin!`);
             return;
           }
         }
 
-        // Aynı oyuncu başka bölgede varsa, oradan çıkar
         let updatedZones = custom.zones.map(z => {
           if (playerId && z.playerId === playerId) {
             return { ...z, playerId: null };
@@ -1216,7 +1262,6 @@ export const useGameStore = create<Store>()(
           return z;
         });
 
-        // Yeni bölgeye ata
         updatedZones = updatedZones.map(z =>
           z.id === zoneId ? { ...z, playerId } : z
         );
@@ -1338,10 +1383,8 @@ export const useGameStore = create<Store>()(
 
         const custom = userClub.customFormation ?? createEmptyCustomFormation();
 
-        // ✅ ÖNCE TÜM BÖLGELERİ BOŞALT (garanti)
         let zones = custom.zones.map(z => ({ ...z, playerId: null }));
 
-        // Kadrodaki oyuncuları al
         const squad = Object.values(state.players).filter(
           p =>
             p.clubId === state.userClubId &&
@@ -1350,12 +1393,10 @@ export const useGameStore = create<Store>()(
             p.suspensionWeeks === 0
         );
 
-        // Formasyona göre bölge haritası
         const mapping = getFormationZoneMapping(formation);
         const usedIds = new Set<string>();
         const usedZoneIds = new Set<string>();
 
-        // Her bölge için en iyi oyuncuyu bul (max 11)
         for (let i = 0; i < mapping.length && i < MAX_PITCH_PLAYERS; i++) {
           const { row, col } = mapping[i];
           const zone = findZoneByPosition(zones, row, col, usedZoneIds);
@@ -1363,13 +1404,11 @@ export const useGameStore = create<Store>()(
 
           const zonePos = zone.suggestedPosition;
 
-          // Önce doğal pozisyon
           let candidate = squad
             .filter(p => !usedIds.has(p.id))
             .filter(p => p.position === zonePos)
             .sort((a, b) => b.overall - a.overall)[0];
 
-          // Yoksa ikincil pozisyon
           if (!candidate) {
             candidate = squad
               .filter(p => !usedIds.has(p.id))
@@ -1377,7 +1416,6 @@ export const useGameStore = create<Store>()(
               .sort((a, b) => b.overall - a.overall)[0];
           }
 
-          // Hâlâ yoksa en iyi uygun oyuncu
           if (!candidate) {
             candidate = squad
               .filter(p => !usedIds.has(p.id))
@@ -1445,6 +1483,48 @@ export const useGameStore = create<Store>()(
           });
         }
       },
+
+      // ═══════════════════════════════════════════════
+      // KUPA
+      // ═══════════════════════════════════════════════
+
+      playCupRound: () => {
+        const state = get();
+        const isCupWeek = Object.values(CUP_WEEKS).includes(state.currentWeek);
+        if (!isCupWeek) {
+          console.warn('Bu hafta kupa maçı yok!');
+          return;
+        }
+        get().playWeek();
+      },
+
+      simulateCupMatch: (matchId) => {
+        const state = get();
+        const cupMatch = state.cup.matches[matchId];
+        if (!cupMatch || cupMatch.winnerId !== null) return null;
+
+        const home = state.clubs[cupMatch.homeId];
+        const away = state.clubs[cupMatch.awayId];
+        if (!home || !away) return null;
+
+        const playersCopy = { ...state.players };
+        const result = simulateMatch(home, away, playersCopy, state.currentWeek);
+
+        if (result.homeScore === result.awayScore) {
+          const homeUnits = home.reputation;
+          const awayUnits = away.reputation;
+          result.penalties = simulatePenalties(homeUnits, awayUnits);
+        }
+
+        const newCup = saveCupMatchResult(state.cup, matchId, result);
+
+        set({
+          players: playersCopy,
+          cup: newCup,
+        });
+
+        return result;
+      },
     }),
     {
       name: 'fm-clone-save',
@@ -1467,6 +1547,10 @@ export const useGameStore = create<Store>()(
           merged.academy = { ...DEFAULT_ACADEMY };
         }
 
+        if (!merged.cup) {
+          merged.cup = createEmptyCup();
+        }
+
         for (const id in merged.players) {
           const p = merged.players[id];
           if (p.contractYears === undefined) {
@@ -1474,6 +1558,17 @@ export const useGameStore = create<Store>()(
               ...p,
               contractYears: 1 + Math.floor(Math.random() * 4),
               squadRole: p.overall >= 14 ? 'first' : p.overall >= 11 ? 'rotation' : 'backup',
+            };
+          }
+          if (p.careerStats && p.careerStats.cupAppearances === undefined) {
+            merged.players[id] = {
+              ...merged.players[id],
+              careerStats: {
+                ...p.careerStats,
+                cupAppearances: 0,
+                cupGoals: 0,
+                cupAssists: 0,
+              },
             };
           }
         }

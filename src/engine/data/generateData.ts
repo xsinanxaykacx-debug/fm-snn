@@ -90,6 +90,7 @@ export function createEmptyCareerStats(): CareerStats {
     seasonAppearances: 0, seasonGoals: 0, seasonAssists: 0,
     seasonYellowCards: 0, seasonRedCards: 0, seasonAvgRating: 0,
     seasonMinutesPlayed: 0, seasonMotm: 0,
+    cupAppearances: 0, cupGoals: 0, cupAssists: 0,
   };
 }
 
@@ -444,12 +445,13 @@ export function generatePlayer(position: Position, clubId: string, index: number
   const initialAvgRating = ageFactor > 0 ? Math.round((5.8 + Math.random() * 1.2) * 100) / 100 : 0;
 
   const careerStats: CareerStats = {
-    appearances: initialApps, goals: 0, assists: 0, yellowCards: 0, redCards: 0,
-    avgRating: initialAvgRating, minutesPlayed: ageFactor * randomBetween(800, 2000), motm: 0,
-    seasonAppearances: 0, seasonGoals: 0, seasonAssists: 0,
-    seasonYellowCards: 0, seasonRedCards: 0, seasonAvgRating: 0,
-    seasonMinutesPlayed: 0, seasonMotm: 0,
-  };
+  appearances: initialApps, goals: 0, assists: 0, yellowCards: 0, redCards: 0,
+  avgRating: initialAvgRating, minutesPlayed: ageFactor * randomBetween(800, 2000), motm: 0,
+  seasonAppearances: 0, seasonGoals: 0, seasonAssists: 0,
+  seasonYellowCards: 0, seasonRedCards: 0, seasonAvgRating: 0,
+  seasonMinutesPlayed: 0, seasonMotm: 0,
+  cupAppearances: 0, cupGoals: 0, cupAssists: 0,
+};
 
   return {
     id: `player_${clubId}_${index}`,
