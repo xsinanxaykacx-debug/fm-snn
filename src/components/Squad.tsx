@@ -1,6 +1,6 @@
 // src/components/Squad.tsx
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { scorePlayer } from '../engine/data/generateData';
 import { getContractStatus } from '../engine/progression/contract';
@@ -21,13 +21,6 @@ function getPositionColor(position: string): { bg: string; text: string; border:
   return { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/40' };
 }
 
-function getConditionColor(value: number): string {
-  if (value >= 80) return 'bg-green-500';
-  if (value >= 60) return 'bg-yellow-500';
-  if (value >= 40) return 'bg-orange-500';
-  return 'bg-red-500';
-}
-
 function getSquadRoleLabel(role: string): { icon: string; label: string; color: string } {
   switch (role) {
     case 'first':    return { icon: '⭐', label: 'İlk 11',     color: 'bg-green-500/20 text-green-400 border-green-500/40' };
@@ -38,80 +31,61 @@ function getSquadRoleLabel(role: string): { icon: string; label: string; color: 
   }
 }
 
-function Bar({ value, color, label }: { value: number; color: string; label: string }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-[10px] text-slate-500">
-        <span>{label}</span>
-        <span className="tabular-nums">{value}</span>
-      </div>
-      <div className="w-full h-1 bg-pitch-700 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${color} transition-all duration-500`}
-          style={{ width: `${Math.min(100, value)}%` }}
-        />
-      </div>
-    </div>
-  );
+// ═══════════════════════════════════════════════
+// SIRALAMA TİPLERİ
+// ═══════════════════════════════════════════════
+
+type SortKey =
+  | 'name'
+  | 'position'
+  | 'age'
+  | 'overall'
+  | 'role'
+  | 'contract'
+  | 'form'
+  | 'condition'
+  | 'morale'
+  | 'pace'
+  | 'shooting'
+  | 'passing'
+  | 'dribbling'
+  | 'marking'
+  | 'strength'
+  | 'value'
+  | 'wage';
+
+type SortDir = 'asc' | 'desc';
+
+interface SortConfig {
+  key: SortKey;
+  dir: SortDir;
 }
 
-function PlayerCard({ player, onClick }: { player: Player; onClick: () => void }) {
-  const overall = scorePlayer(player);
-  const posColor = getPositionColor(player.position);
-  const contract = getContractStatus(player);
-  const role = getSquadRoleLabel(player.squadRole);
+const POSITION_ORDER = ['GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST'];
+const ROLE_ORDER = ['first', 'rotation', 'backup', 'u21'];
 
-  return (
-    <div
-      onClick={onClick}
-      className={`card cursor-pointer hover:scale-[1.02] transition-all border ${posColor.border} ${posColor.bg} relative`}
-    >
-      {player.injuryWeeks > 0 && (
-        <div className="absolute top-2 right-2 text-xs px-1.5 py-0.5 rounded bg-red-900/80 text-red-200">
-          🚑 {player.injuryWeeks}h
-        </div>
-      )}
-      {player.suspensionWeeks > 0 && (
-        <div className="absolute top-2 right-2 text-xs px-1.5 py-0.5 rounded bg-yellow-900/80 text-yellow-200">
-          🟨 {player.suspensionWeeks}h
-        </div>
-      )}
-
-      <div className="flex items-center justify-between mb-3">
-        <div className={`text-xs font-bold px-2 py-1 rounded ${posColor.bg} ${posColor.text} border ${posColor.border}`}>
-          {player.position}
-        </div>
-        <div className={`text-3xl font-bold tabular-nums ${getOverallColor(overall)}`}>
-          {overall}
-        </div>
-      </div>
-
-      <div className="mb-3">
-        <p className="text-sm font-bold truncate">{player.name}</p>
-        <p className="text-xs text-slate-400">{player.age} yaş • {player.nationality}</p>
-      </div>
-
-      <div className="flex items-center gap-1 mb-3 flex-wrap">
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${role.color}`}>
-          {role.icon} {role.label}
-        </span>
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border bg-pitch-700/50 ${contract.color}`}>
-          📋 {contract.label}
-        </span>
-      </div>
-
-      <div className="space-y-2 mb-3">
-        <Bar value={player.condition} color={getConditionColor(player.condition)} label="Kondisyon" />
-        <Bar value={player.form} color={getConditionColor(player.form)} label="Form" />
-        <Bar value={player.morale} color={getConditionColor(player.morale)} label="Moral" />
-      </div>
-
-      <div className="flex items-center justify-between text-xs pt-2 border-t border-pitch-700/50">
-        <span className="text-slate-400">Değer</span>
-        <span className="font-bold text-accent">£{(player.value / 1_000_000).toFixed(2)}M</span>
-      </div>
-    </div>
-  );
+function getSortValue(p: Player, key: SortKey): number | string {
+  const overall = scorePlayer(p);
+  switch (key) {
+    case 'name':        return p.name;
+    case 'position':    return POSITION_ORDER.indexOf(p.position);
+    case 'age':         return p.age;
+    case 'overall':     return overall;
+    case 'role':        return ROLE_ORDER.indexOf(p.squadRole);
+    case 'contract':    return p.contractYears ?? 0;
+    case 'form':        return p.form;
+    case 'condition':   return p.condition;
+    case 'morale':      return p.morale;
+    case 'pace':        return p.attributes.pace;
+    case 'shooting':    return p.attributes.shooting;
+    case 'passing':     return p.attributes.passing;
+    case 'dribbling':   return p.attributes.dribbling;
+    case 'marking':     return p.attributes.marking;
+    case 'strength':    return p.attributes.strength;
+    case 'value':       return p.value;
+    case 'wage':        return p.wage;
+    default:            return 0;
+  }
 }
 
 const POSITION_FILTERS: { key: Position | 'ALL'; label: string }[] = [
@@ -140,6 +114,54 @@ const SQUAD_VIEWS: { key: SquadView; label: string; icon: string }[] = [
   { key: 'u21',      label: 'U21 Takım',  icon: '📤' },
 ];
 
+// ═══════════════════════════════════════════════
+// SORTABLE HEADER
+// ═══════════════════════════════════════════════
+
+function SortHeader({
+  label,
+  sortKey,
+  currentSort,
+  onSort,
+  className = '',
+  align = 'left',
+}: {
+  label: string;
+  sortKey: SortKey;
+  currentSort: SortConfig;
+  onSort: (key: SortKey) => void;
+  className?: string;
+  align?: 'left' | 'center' | 'right';
+}) {
+  const isActive = currentSort.key === sortKey;
+
+  const alignClass =
+    align === 'center' ? 'text-center' :
+    align === 'right' ? 'text-right' :
+    'text-left';
+
+  return (
+    <th
+      onClick={() => onSort(sortKey)}
+      className={`py-2 px-2 cursor-pointer select-none hover:text-accent transition-colors ${alignClass} ${className}`}
+      title={`${label} sırala`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {isActive && (
+          <span className="text-accent">
+            {currentSort.dir === 'desc' ? '▼' : '▲'}
+          </span>
+        )}
+      </span>
+    </th>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// ANA COMPONENT
+// ═══════════════════════════════════════════════
+
 export function Squad() {
   const state = useGameStore();
   const sellPlayer = useGameStore(s => s.transferSell);
@@ -147,25 +169,37 @@ export function Squad() {
   const sendAllSelectedToReserves = useGameStore(s => s.sendAllSelectedToReserves);
   const promoteFromReserves = useGameStore(s => s.promoteFromReserves);
 
-  const [view, setView] = useState<'cards' | 'table'>('cards');
   const [squadView, setSquadView] = useState<SquadView>('all');
   const [posFilter, setPosFilter] = useState<Position | 'ALL'>('ALL');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [checkedPlayers, setCheckedPlayers] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<SortConfig>({ key: 'overall', dir: 'desc' });
 
   const allSquad = Object.values(state.players)
     .filter(p => p.clubId === state.userClubId);
 
-  const squad = allSquad
-    .filter(p => squadView === 'all' || p.squadRole === squadView)
-    .filter(p => posFilter === 'ALL' || p.position === posFilter)
-    .sort((a, b) => {
-      const posOrder = ['GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST'];
-      const pa = posOrder.indexOf(a.position);
-      const pb = posOrder.indexOf(b.position);
-      if (pa !== pb) return pa - pb;
-      return scorePlayer(b) - scorePlayer(a);
+  const squad = useMemo(() => {
+    const filtered = allSquad
+      .filter(p => squadView === 'all' || p.squadRole === squadView)
+      .filter(p => posFilter === 'ALL' || p.position === posFilter);
+
+    // Sırala
+    const sorted = [...filtered].sort((a, b) => {
+      const aVal = getSortValue(a, sort.key);
+      const bVal = getSortValue(b, sort.key);
+
+      let cmp = 0;
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        cmp = aVal.localeCompare(bVal);
+      } else {
+        cmp = (aVal as number) - (bVal as number);
+      }
+
+      return sort.dir === 'asc' ? cmp : -cmp;
     });
+
+    return sorted;
+  }, [allSquad, squadView, posFilter, sort]);
 
   // İstatistikler
   const firstTeam = allSquad.filter(p => p.squadRole !== 'u21');
@@ -178,11 +212,28 @@ export function Squad() {
     ? allSquad.reduce((s, p) => s + scorePlayer(p), 0) / allSquad.length
     : 0;
 
+  const handleSort = (key: SortKey) => {
+    setSort(prev => {
+      if (prev.key === key) {
+        return { key, dir: prev.dir === 'desc' ? 'asc' : 'desc' };
+      }
+      return { key, dir: 'desc' };
+    });
+  };
+
   const toggleCheck = (id: string) => {
     const newSet = new Set(checkedPlayers);
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setCheckedPlayers(newSet);
+  };
+
+  const toggleAll = () => {
+    if (checkedPlayers.size === squad.length && squad.length > 0) {
+      setCheckedPlayers(new Set());
+    } else {
+      setCheckedPlayers(new Set(squad.map(p => p.id)));
+    }
   };
 
   const handleSendSelectedToReserves = () => {
@@ -273,28 +324,9 @@ export function Squad() {
         )}
       </div>
 
-      {/* FİLTRE + GÖRÜNÜM */}
+      {/* FİLTRE */}
       <div className="card">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setView('cards')}
-              className={`px-3 py-1.5 rounded text-xs font-medium ${
-                view === 'cards' ? 'bg-accent text-white' : 'bg-pitch-700 hover:bg-pitch-600'
-              }`}
-            >
-              📇 Kart Görünümü
-            </button>
-            <button
-              onClick={() => setView('table')}
-              className={`px-3 py-1.5 rounded text-xs font-medium ${
-                view === 'table' ? 'bg-accent text-white' : 'bg-pitch-700 hover:bg-pitch-600'
-              }`}
-            >
-              📊 Tablo Görünümü
-            </button>
-          </div>
-
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1">
             {POSITION_FILTERS.map(pf => (
               <button
@@ -310,147 +342,186 @@ export function Squad() {
               </button>
             ))}
           </div>
-        </div>
 
-        <p className="text-xs text-slate-500">
-          {squad.length} oyuncu gösteriliyor
-        </p>
+          <div className="text-xs text-slate-500">
+            {squad.length} oyuncu • Sıralama: <span className="text-accent font-bold">{sort.key}</span> {sort.dir === 'desc' ? '▼' : '▲'}
+          </div>
+        </div>
       </div>
 
-      {/* KART GÖRÜNÜMÜ */}
-      {view === 'cards' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {squad.map(player => (
-            <PlayerCard
-              key={player.id}
-              player={player}
-              onClick={() => setSelectedPlayer(player)}
-            />
-          ))}
-        </div>
-      )}
+      {/* TABLO */}
+      <div className="card overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-left text-slate-400 border-b border-pitch-700">
+              <th className="py-2 px-2 w-8">
+                <input
+                  type="checkbox"
+                  checked={checkedPlayers.size === squad.length && squad.length > 0}
+                  onChange={toggleAll}
+                  className="w-4 h-4 cursor-pointer accent-green-500"
+                />
+              </th>
+              <SortHeader label="İsim" sortKey="name" currentSort={sort} onSort={handleSort} />
+              <SortHeader label="Poz" sortKey="position" currentSort={sort} onSort={handleSort} className="text-center" align="center" />
+              <SortHeader label="Yaş" sortKey="age" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Gen" sortKey="overall" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Rol" sortKey="role" currentSort={sort} onSort={handleSort} />
+              <SortHeader label="Sözleşme" sortKey="contract" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Form" sortKey="form" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Kond" sortKey="condition" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Moral" sortKey="morale" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Hız" sortKey="pace" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Şut" sortKey="shooting" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Pas" sortKey="passing" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Dri" sortKey="dribbling" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Def" sortKey="marking" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Fiz" sortKey="strength" currentSort={sort} onSort={handleSort} align="center" />
+              <SortHeader label="Değer" sortKey="value" currentSort={sort} onSort={handleSort} align="right" />
+              <SortHeader label="Maaş" sortKey="wage" currentSort={sort} onSort={handleSort} align="right" />
+              <th className="py-2 px-2 text-right">İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {squad.map((p: Player) => {
+              const overall = scorePlayer(p);
+              const posColor = getPositionColor(p.position);
+              const contract = getContractStatus(p);
+              const role = getSquadRoleLabel(p.squadRole);
+              const isChecked = checkedPlayers.has(p.id);
+              const a = p.attributes;
 
-      {/* TABLO GÖRÜNÜMÜ */}
-      {view === 'table' && (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-left text-slate-400 border-b border-pitch-700">
-                <th className="py-2 w-8"></th>
-                <th>İsim</th>
-                <th>Poz</th>
-                <th>Yaş</th>
-                <th title="Genel">Gen</th>
-                <th>Rol</th>
-                <th>Sözleşme</th>
-                <th>Form</th>
-                <th>Kond</th>
-                <th>Değer</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {squad.map((p: Player) => {
-                const overall = scorePlayer(p);
-                const posColor = getPositionColor(p.position);
-                const contract = getContractStatus(p);
-                const role = getSquadRoleLabel(p.squadRole);
-                const isChecked = checkedPlayers.has(p.id);
-
-                return (
-                  <tr
-                    key={p.id}
-                    className={`border-b border-pitch-700/50 hover:bg-pitch-700/30 cursor-pointer ${
-                      p.injuryWeeks > 0 ? 'bg-red-900/20' :
-                      p.suspensionWeeks > 0 ? 'bg-yellow-900/20' :
-                      p.squadRole === 'u21' ? 'bg-slate-700/20' : ''
-                    } ${isChecked ? 'bg-accent/10' : ''}`}
+              return (
+                <tr
+                  key={p.id}
+                  className={`border-b border-pitch-700/50 hover:bg-pitch-700/30 cursor-pointer ${
+                    p.injuryWeeks > 0 ? 'bg-red-900/20' :
+                    p.suspensionWeeks > 0 ? 'bg-yellow-900/20' :
+                    p.squadRole === 'u21' ? 'bg-slate-700/20' : ''
+                  } ${isChecked ? 'bg-accent/10' : ''}`}
+                >
+                  <td className="py-1.5 px-2">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleCheck(p.id);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 cursor-pointer accent-green-500"
+                    />
+                  </td>
+                  <td
+                    className="py-1.5 px-2 font-medium whitespace-nowrap"
+                    onClick={() => setSelectedPlayer(p)}
                   >
-                    <td className="py-1.5 px-2">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          toggleCheck(p.id);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-4 h-4 cursor-pointer accent-green-500"
-                      />
-                    </td>
-                    <td className="py-1.5 font-medium whitespace-nowrap" onClick={() => setSelectedPlayer(p)}>
-                      {p.name}
-                      {p.injuryWeeks > 0 && (
-                        <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-red-900/60 text-red-300">
-                          🚑 {p.injuryWeeks}h
-                        </span>
-                      )}
-                    </td>
-                    <td onClick={() => setSelectedPlayer(p)}>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${posColor.bg} ${posColor.text}`}>
-                        {p.position}
+                    {p.name}
+                    {p.injuryWeeks > 0 && (
+                      <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-red-900/60 text-red-300">
+                        🚑 {p.injuryWeeks}h
                       </span>
-                    </td>
-                    <td onClick={() => setSelectedPlayer(p)}>{p.age}</td>
-                    <td onClick={() => setSelectedPlayer(p)} className={`font-bold tabular-nums ${getOverallColor(overall)}`}>{overall}</td>
-                    <td onClick={() => setSelectedPlayer(p)}>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${role.color}`}>
-                        {role.icon} {role.label}
+                    )}
+                    {p.suspensionWeeks > 0 && (
+                      <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-yellow-900/60 text-yellow-300">
+                        🟨 {p.suspensionWeeks}h
                       </span>
-                    </td>
-                    <td onClick={() => setSelectedPlayer(p)}>
-                      <span className={`text-[10px] font-bold ${contract.color}`}>
-                        📋 {contract.label}
-                      </span>
-                    </td>
-                    <td onClick={() => setSelectedPlayer(p)}>{p.form}</td>
-                    <td onClick={() => setSelectedPlayer(p)}>{p.condition}</td>
-                    <td onClick={() => setSelectedPlayer(p)} className="whitespace-nowrap text-accent">£{(p.value / 1_000_000).toFixed(2)}M</td>
-                    <td className="pr-2">
-                      <div className="flex gap-1">
-                        {p.squadRole === 'u21' ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              promoteFromReserves(p.id);
-                            }}
-                            className="text-[10px] bg-green-600 hover:bg-green-500 text-white px-2 py-0.5 rounded"
-                            title="A takıma al"
-                          >
-                            📥 Al
-                          </button>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              sendToReserves(p.id);
-                            }}
-                            className="text-[10px] bg-pitch-600 hover:bg-pitch-500 text-slate-200 px-2 py-0.5 rounded"
-                            title="U21'e gönder"
-                          >
-                            📤
-                          </button>
-                        )}
+                    )}
+                  </td>
+                  <td className="px-2 text-center" onClick={() => setSelectedPlayer(p)}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${posColor.bg} ${posColor.text}`}>
+                      {p.position}
+                    </span>
+                  </td>
+                  <td className="px-2 text-center" onClick={() => setSelectedPlayer(p)}>{p.age}</td>
+                  <td className={`px-2 text-center font-bold tabular-nums ${getOverallColor(overall)}`} onClick={() => setSelectedPlayer(p)}>
+                    {overall}
+                  </td>
+                  <td className="px-2" onClick={() => setSelectedPlayer(p)}>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${role.color}`}>
+                      {role.icon} {role.label}
+                    </span>
+                  </td>
+                  <td className="px-2 text-center" onClick={() => setSelectedPlayer(p)}>
+                    <span className={`text-[10px] font-bold whitespace-nowrap ${contract.color}`}>
+                      📋 {contract.label}
+                    </span>
+                  </td>
+                  <td className="px-2 text-center" onClick={() => setSelectedPlayer(p)}>{p.form}</td>
+                  <td className="px-2 text-center" onClick={() => setSelectedPlayer(p)}>{p.condition}</td>
+                  <td className="px-2 text-center" onClick={() => setSelectedPlayer(p)}>{p.morale}</td>
+                  <td className={`px-2 text-center tabular-nums ${getAttrColor(a.pace)}`} onClick={() => setSelectedPlayer(p)}>{a.pace}</td>
+                  <td className={`px-2 text-center tabular-nums ${getAttrColor(a.shooting)}`} onClick={() => setSelectedPlayer(p)}>{a.shooting}</td>
+                  <td className={`px-2 text-center tabular-nums ${getAttrColor(a.passing)}`} onClick={() => setSelectedPlayer(p)}>{a.passing}</td>
+                  <td className={`px-2 text-center tabular-nums ${getAttrColor(a.dribbling)}`} onClick={() => setSelectedPlayer(p)}>{a.dribbling}</td>
+                  <td className={`px-2 text-center tabular-nums ${getAttrColor(a.marking)}`} onClick={() => setSelectedPlayer(p)}>{a.marking}</td>
+                  <td className={`px-2 text-center tabular-nums ${getAttrColor(a.strength)}`} onClick={() => setSelectedPlayer(p)}>{a.strength}</td>
+                  <td className="px-2 text-right whitespace-nowrap text-accent font-bold" onClick={() => setSelectedPlayer(p)}>
+                    £{(p.value / 1_000_000).toFixed(2)}M
+                  </td>
+                  <td className="px-2 text-right whitespace-nowrap text-slate-400" onClick={() => setSelectedPlayer(p)}>
+                    £{(p.wage / 1_000).toFixed(0)}K
+                  </td>
+                  <td className="pr-2">
+                    <div className="flex gap-1 justify-end">
+                      {p.squadRole === 'u21' ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`${p.name}'ı satmak istediğine emin misin?`)) {
-                              sellPlayer(p.id);
-                            }
+                            promoteFromReserves(p.id);
                           }}
-                          className="text-[10px] text-red-400 hover:text-red-300"
+                          className="text-[10px] bg-green-600 hover:bg-green-500 text-white px-2 py-0.5 rounded"
+                          title="A takıma al"
                         >
-                          Sat
+                          📥 Al
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            sendToReserves(p.id);
+                          }}
+                          className="text-[10px] bg-pitch-600 hover:bg-pitch-500 text-slate-200 px-2 py-0.5 rounded"
+                          title="U21'e gönder"
+                        >
+                          📤
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`${p.name}'ı satmak istediğine emin misin?`)) {
+                            sellPlayer(p.id);
+                          }
+                        }}
+                        className="text-[10px] text-red-400 hover:text-red-300 px-1"
+                        title="Sat"
+                      >
+                        💸
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {squad.length === 0 && (
+          <div className="text-center py-12 text-slate-500">
+            <p className="text-3xl mb-2">📭</p>
+            <p className="text-sm">Bu filtreye uygun oyuncu yok</p>
+          </div>
+        )}
+      </div>
+
+      {/* BİLGİ */}
+      <div className="glass-panel rounded-xl p-3">
+        <p className="text-[10px] text-slate-500">
+          💡 <strong className="text-slate-400">İpucu:</strong> Kolon başlıklarına tıklayarak sıralayabilirsin.
+          Detay için oyuncuya tıkla. Toplu göndermek için checkbox kullan.
+        </p>
+      </div>
 
       {selectedPlayer && (
         <PlayerDetailModal
