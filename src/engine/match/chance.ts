@@ -46,17 +46,17 @@ export function calculateChanceFromSequence(
   const composure = eff(shooter, 'composure');
   const technique = eff(shooter, 'technique');
 
+  // 🔧 KALİBRASYON: distanceFactor eşikleri yumuşatıldı
   let distanceFactor: number;
-  if (distance <= 6) distanceFactor = 2.0;
-  else if (distance <= 12) distanceFactor = 1.3;
-  else if (distance <= 18) distanceFactor = 0.75;
-  else if (distance <= 25) distanceFactor = 0.35;
-  else distanceFactor = 0.15;
+  if (distance <= 6) distanceFactor = 1.6;
+  else if (distance <= 12) distanceFactor = 1.15;
+  else if (distance <= 18) distanceFactor = 0.8;
+  else if (distance <= 25) distanceFactor = 0.5;
+  else distanceFactor = 0.25;
 
   let xg = 0.20 * distanceFactor;
 
-  // 🔧 KALİBRASYON F: Kalite çarpanları yumuşatıldı.
-  // Kalite farkı +37.2% → +17.7% (hedef %15-25)
+  // F formülü — dokunulmadı
   xg *= 0.85 + (finishing / 100) * 0.30;
   xg *= 0.90 + (composure / 100) * 0.20;
   xg *= 0.95 + (technique / 100) * 0.10;

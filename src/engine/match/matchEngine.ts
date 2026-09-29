@@ -253,9 +253,9 @@ export function simulateMatch(
     state.sequences.push(sequence);
 
     const shotProbability = Math.max(
-      0.05,
-      Math.min(0.90, sequence.chanceQuality / 82)
-    );
+  0.05,
+  Math.min(0.90, 0.30 + sequence.chanceQuality / 200)
+);
 
     if (!sequence.resultedInShot || Math.random() > shotProbability) {
       if (sequence.actions.length > 0) {
