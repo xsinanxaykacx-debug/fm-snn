@@ -22,8 +22,20 @@ const LAST_NAMES = [
 
 const NATIONALITIES = ['TR', 'EN', 'DE', 'FR', 'ES', 'IT', 'BR', 'AR', 'NL', 'PT'];
 
+// ═══════════════════════════════════════════════
+// 1-20 ARASI YARDIMCILAR
+// ═══════════════════════════════════════════════
+
 function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * 1-20 arası rastgele (ağırlıklı — ortalamaya yakın)
+ */
+function fmRandom(avg = 10, spread = 3): number {
+  const base = avg + (Math.random() - 0.5) * spread * 2;
+  return Math.max(1, Math.min(20, Math.round(base)));
 }
 
 function randomName(): string {
@@ -80,18 +92,18 @@ function generateSecondaryPositions(position: Position): Position[] {
   const candidates = SECONDARY_POSITION_MAP[position] ?? [];
   if (candidates.length === 0) return [];
 
-  // %60 ihtimalle 1, %30 ihtimalle 2 ikincil mevki
   const count = Math.random() < 0.6 ? 1 : Math.random() < 0.3 ? 2 : 0;
   const shuffled = [...candidates].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
 
 // ═══════════════════════════════════════════════
-// ATTRIBUTE ÜRETİMİ
+// 1-20 ATTRIBUTE ÜRETİMİ
 // ═══════════════════════════════════════════════
 
 function randomAttributes(position: Position): Attributes {
-  const base = () => randomBetween(30, 80);
+  // Taban: 1-20 arası ortalama 9-11
+  const base = (avg = 10) => fmRandom(avg, 4);
 
   const a: Attributes = {
     passing: base(),
@@ -129,77 +141,265 @@ function randomAttributes(position: Position): Attributes {
     ballWinning: base(),
     defensivePositioning: base(),
 
-    goalkeeper: randomBetween(10, 30),
-    reflexes: randomBetween(10, 30),
-    gkPositioning: randomBetween(10, 30),
-    handling: randomBetween(10, 30),
-    oneOnOne: randomBetween(10, 30),
-    aerialReach: randomBetween(10, 30),
+    goalkeeper: fmRandom(3, 2),
+    reflexes: fmRandom(3, 2),
+    gkPositioning: fmRandom(3, 2),
+    handling: fmRandom(3, 2),
+    oneOnOne: fmRandom(3, 2),
+    aerialReach: fmRandom(3, 2),
   };
 
+  // ═══ MEVKİ BAZLI BOOST + ZAYIF YÖNLER ═══
+
   if (position === 'GK') {
-    a.goalkeeper = randomBetween(60, 90);
-    a.reflexes = randomBetween(60, 90);
-    a.gkPositioning = randomBetween(60, 90);
-    a.handling = randomBetween(60, 90);
-    a.oneOnOne = randomBetween(60, 90);
-    a.aerialReach = randomBetween(60, 90);
-  } else if (['DC', 'DL', 'DR'].includes(position)) {
-    a.marking = randomBetween(55, 85);
-    a.tackling = randomBetween(55, 85);
-    a.defensivePositioning = randomBetween(55, 85);
-    a.strength = randomBetween(55, 85);
-    a.heading = randomBetween(55, 85);
-  } else if (['DM', 'MC'].includes(position)) {
-    a.passing = randomBetween(60, 88);
-    a.vision = randomBetween(55, 85);
-    a.decisions = randomBetween(55, 85);
-    a.workRate = randomBetween(55, 85);
-  } else if (['ML', 'MR', 'AML', 'AMR'].includes(position)) {
-    a.pace = randomBetween(65, 92);
-    a.acceleration = randomBetween(65, 92);
-    a.dribbling = randomBetween(60, 88);
-    a.crossing = randomBetween(60, 88);
-  } else if (['AMC', 'ST'].includes(position)) {
-    a.finishing = randomBetween(60, 90);
-    a.shooting = randomBetween(60, 90);
-    a.offTheBall = randomBetween(60, 88);
-    a.composure = randomBetween(60, 88);
-    a.technique = randomBetween(60, 88);
+    // Güçlü
+    a.goalkeeper = fmRandom(15, 3);
+    a.reflexes = fmRandom(15, 3);
+    a.gkPositioning = fmRandom(15, 3);
+    a.handling = fmRandom(14, 3);
+    a.oneOnOne = fmRandom(14, 3);
+    a.aerialReach = fmRandom(14, 3);
+    a.concentration = fmRandom(13, 3);
+    a.decisions = fmRandom(12, 3);
+
+    // Zayıf
+    a.finishing = fmRandom(3, 1);
+    a.shooting = fmRandom(4, 2);
+    a.dribbling = fmRandom(4, 2);
+    a.crossing = fmRandom(4, 2);
+    a.marking = fmRandom(3, 1);
+    a.tackling = fmRandom(3, 1);
+    a.pace = fmRandom(7, 3);
+    a.offTheBall = fmRandom(4, 2);
+
+  } else if (['DC'].includes(position)) {
+    // Güçlü — Stoper
+    a.marking = fmRandom(15, 3);
+    a.tackling = fmRandom(15, 3);
+    a.defensivePositioning = fmRandom(14, 3);
+    a.heading = fmRandom(14, 3);
+    a.strength = fmRandom(14, 3);
+    a.anticipation = fmRandom(13, 3);
+    a.concentration = fmRandom(13, 3);
+    a.bravery = fmRandom(13, 3);
+
+    // Zayıf
+    a.finishing = fmRandom(4, 2);
+    a.shooting = fmRandom(5, 2);
+    a.dribbling = fmRandom(6, 3);
+    a.crossing = fmRandom(6, 3);
+    a.longShots = fmRandom(4, 2);
+    a.pace = fmRandom(10, 3);
+
+  } else if (['DL', 'DR'].includes(position)) {
+    // Güçlü — Bek
+    a.marking = fmRandom(13, 3);
+    a.tackling = fmRandom(13, 3);
+    a.defensivePositioning = fmRandom(12, 3);
+    a.pace = fmRandom(14, 3);
+    a.acceleration = fmRandom(14, 3);
+    a.stamina = fmRandom(14, 3);
+    a.crossing = fmRandom(12, 3);
+    a.workRate = fmRandom(13, 3);
+
+    // Zayıf
+    a.finishing = fmRandom(5, 2);
+    a.shooting = fmRandom(6, 2);
+    a.heading = fmRandom(9, 3);
+    a.longShots = fmRandom(5, 2);
+    a.strength = fmRandom(10, 3);
+
+  } else if (position === 'DM') {
+    // Güçlü — Defansif Orta Saha
+    a.passing = fmRandom(14, 3);
+    a.tackling = fmRandom(14, 3);
+    a.ballWinning = fmRandom(14, 3);
+    a.positioning = fmRandom(14, 3);
+    a.decisions = fmRandom(13, 3);
+    a.workRate = fmRandom(14, 3);
+    a.stamina = fmRandom(14, 3);
+    a.teamwork = fmRandom(13, 3);
+
+    // Zayıf
+    a.finishing = fmRandom(6, 2);
+    a.shooting = fmRandom(7, 3);
+    a.dribbling = fmRandom(9, 3);
+    a.crossing = fmRandom(8, 3);
+    a.pace = fmRandom(10, 3);
+
+  } else if (position === 'MC') {
+    // Güçlü — Merkez Orta Saha
+    a.passing = fmRandom(15, 3);
+    a.vision = fmRandom(13, 3);
+    a.decisions = fmRandom(14, 3);
+    a.technique = fmRandom(13, 3);
+    a.firstTouch = fmRandom(13, 3);
+    a.workRate = fmRandom(13, 3);
+    a.stamina = fmRandom(13, 3);
+    a.teamwork = fmRandom(13, 3);
+
+    // Zayıf
+    a.finishing = fmRandom(8, 3);
+    a.heading = fmRandom(9, 3);
+    a.marking = fmRandom(10, 3);
+    a.tackling = fmRandom(10, 3);
+
+  } else if (position === 'ML') {
+    // Güçlü — Sol Orta
+    a.pace = fmRandom(14, 3);
+    a.acceleration = fmRandom(14, 3);
+    a.dribbling = fmRandom(14, 3);
+    a.crossing = fmRandom(14, 3);
+    a.stamina = fmRandom(14, 3);
+    a.agility = fmRandom(13, 3);
+    a.workRate = fmRandom(13, 3);
+
+    // Zayıf
+    a.marking = fmRandom(8, 3);
+    a.tackling = fmRandom(8, 3);
+    a.heading = fmRandom(7, 3);
+    a.defensivePositioning = fmRandom(8, 3);
+    a.strength = fmRandom(9, 3);
+
+  } else if (position === 'MR') {
+    // Güçlü — Sağ Orta
+    a.pace = fmRandom(14, 3);
+    a.acceleration = fmRandom(14, 3);
+    a.dribbling = fmRandom(14, 3);
+    a.crossing = fmRandom(14, 3);
+    a.stamina = fmRandom(14, 3);
+    a.agility = fmRandom(13, 3);
+    a.workRate = fmRandom(13, 3);
+
+    // Zayıf
+    a.marking = fmRandom(8, 3);
+    a.tackling = fmRandom(8, 3);
+    a.heading = fmRandom(7, 3);
+    a.defensivePositioning = fmRandom(8, 3);
+    a.strength = fmRandom(9, 3);
+
+  } else if (position === 'AML') {
+    // Güçlü — Sol Kanat Forvet
+    a.pace = fmRandom(16, 3);
+    a.acceleration = fmRandom(16, 3);
+    a.dribbling = fmRandom(16, 3);
+    a.technique = fmRandom(14, 3);
+    a.finishing = fmRandom(13, 3);
+    a.offTheBall = fmRandom(14, 3);
+    a.agility = fmRandom(14, 3);
+    a.crossing = fmRandom(12, 3);
+
+    // Zayıf
+    a.marking = fmRandom(5, 2);
+    a.tackling = fmRandom(5, 2);
+    a.heading = fmRandom(7, 3);
+    a.defensivePositioning = fmRandom(5, 2);
+    a.strength = fmRandom(8, 3);
+
+  } else if (position === 'AMR') {
+    // Güçlü — Sağ Kanat Forvet
+    a.pace = fmRandom(16, 3);
+    a.acceleration = fmRandom(16, 3);
+    a.dribbling = fmRandom(16, 3);
+    a.technique = fmRandom(14, 3);
+    a.finishing = fmRandom(13, 3);
+    a.offTheBall = fmRandom(14, 3);
+    a.agility = fmRandom(14, 3);
+    a.crossing = fmRandom(12, 3);
+
+    // Zayıf
+    a.marking = fmRandom(5, 2);
+    a.tackling = fmRandom(5, 2);
+    a.heading = fmRandom(7, 3);
+    a.defensivePositioning = fmRandom(5, 2);
+    a.strength = fmRandom(8, 3);
+
+  } else if (position === 'AMC') {
+    // Güçlü — Ofansif Orta Saha
+    a.passing = fmRandom(16, 3);
+    a.vision = fmRandom(16, 3);
+    a.technique = fmRandom(15, 3);
+    a.decisions = fmRandom(14, 3);
+    a.firstTouch = fmRandom(15, 3);
+    a.dribbling = fmRandom(14, 3);
+    a.finishing = fmRandom(13, 3);
+    a.composure = fmRandom(13, 3);
+
+    // Zayıf
+    a.marking = fmRandom(5, 2);
+    a.tackling = fmRandom(5, 2);
+    a.heading = fmRandom(7, 3);
+    a.defensivePositioning = fmRandom(5, 2);
+    a.strength = fmRandom(8, 3);
+    a.ballWinning = fmRandom(5, 2);
+
+  } else if (position === 'ST') {
+    // Güçlü — Santrafor
+    a.finishing = fmRandom(16, 3);
+    a.shooting = fmRandom(15, 3);
+    a.offTheBall = fmRandom(15, 3);
+    a.composure = fmRandom(14, 3);
+    a.technique = fmRandom(13, 3);
+    a.heading = fmRandom(13, 3);
+    a.firstTouch = fmRandom(13, 3);
+    a.anticipation = fmRandom(13, 3);
+
+    // Zayıf
+    a.marking = fmRandom(4, 2);
+    a.tackling = fmRandom(4, 2);
+    a.defensivePositioning = fmRandom(4, 2);
+    a.ballWinning = fmRandom(4, 2);
+    a.crossing = fmRandom(7, 3);
   }
 
+  // Tüm değerleri 1-20 arasına sıkıştır
   for (const key in a) {
     const k = key as keyof Attributes;
     const val = a[k];
     if (typeof val === 'number' && !isNaN(val)) {
-      a[k] = Math.max(20, Math.min(95, val));
+      a[k] = Math.max(1, Math.min(20, Math.round(val)));
     } else {
-      a[k] = 50;
+      a[k] = 10;
     }
   }
 
   return a;
 }
 
-function scoreAttributes(a: Attributes, position: Position): number {
+/**
+ * Mevkiye göre genel reyting (1-20)
+ */
+function calculateOverall(a: Attributes, position: Position): number {
+  let score: number;
+
   if (position === 'GK') {
-    const gk = (typeof a.goalkeeper === 'number' && !isNaN(a.goalkeeper)) ? a.goalkeeper : (a.reflexes ?? 50);
-    return (gk * 0.3 + a.reflexes * 0.25 + a.handling * 0.2 + a.oneOnOne * 0.15 + a.gkPositioning * 0.1);
+    score = a.goalkeeper * 0.3 + a.reflexes * 0.25 + a.handling * 0.2 + a.oneOnOne * 0.15 + a.gkPositioning * 0.1;
+  } else if (['DC'].includes(position)) {
+    score = a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1;
+  } else if (['DL', 'DR'].includes(position)) {
+    score = a.marking * 0.2 + a.tackling * 0.2 + a.defensivePositioning * 0.15 + a.pace * 0.15 + a.acceleration * 0.1 + a.stamina * 0.1 + a.crossing * 0.1;
+  } else if (position === 'DM') {
+    score = a.passing * 0.2 + a.tackling * 0.2 + a.ballWinning * 0.15 + a.positioning * 0.15 + a.decisions * 0.15 + a.workRate * 0.15;
+  } else if (position === 'MC') {
+    score = a.passing * 0.25 + a.vision * 0.2 + a.decisions * 0.2 + a.technique * 0.15 + a.workRate * 0.1 + a.stamina * 0.1;
+  } else if (['ML', 'MR'].includes(position)) {
+    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.2 + a.acceleration * 0.15 + a.technique * 0.15;
+  } else if (['AML', 'AMR'].includes(position)) {
+    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
+  } else if (position === 'AMC') {
+    score = a.passing * 0.2 + a.vision * 0.2 + a.technique * 0.2 + a.decisions * 0.15 + a.finishing * 0.15 + a.dribbling * 0.1;
+  } else if (position === 'ST') {
+    score = a.finishing * 0.3 + a.shooting * 0.2 + a.offTheBall * 0.2 + a.composure * 0.15 + a.technique * 0.15;
+  } else {
+    score = 10;
   }
-  if (['DC', 'DL', 'DR'].includes(position)) {
-    return (a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1);
-  }
-  if (['DM', 'MC'].includes(position)) {
-    return (a.passing * 0.25 + a.vision * 0.2 + a.decisions * 0.2 + a.workRate * 0.15 + a.technique * 0.1 + a.stamina * 0.1);
-  }
-  if (['ML', 'MR', 'AML', 'AMR'].includes(position)) {
-    return (a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.2 + a.acceleration * 0.15 + a.technique * 0.15);
-  }
-  if (['AMC', 'ST'].includes(position)) {
-    return (a.finishing * 0.3 + a.shooting * 0.2 + a.offTheBall * 0.2 + a.composure * 0.15 + a.technique * 0.15);
-  }
-  return 50;
+
+  return Math.max(1, Math.min(20, Math.round(score)));
 }
+
+// ═══════════════════════════════════════════════
+// OYUNCU ÜRETİMİ
+// ═══════════════════════════════════════════════
 
 const SQUAD_TEMPLATE: Position[] = [
   'GK', 'GK',
@@ -217,11 +417,12 @@ const SQUAD_TEMPLATE: Position[] = [
 export function generatePlayer(position: Position, clubId: string, index: number): Player {
   const age = randomBetween(18, 34);
   const attributes = randomAttributes(position);
-  const score = scoreAttributes(attributes, position);
+  const overall = calculateOverall(attributes, position);
 
-  const ratingFactor = Math.max(0, (score - 40) / 60);
+  // Değer hesabı — 1-20 reytinge göre
+  const ratingFactor = Math.max(0, (overall - 5) / 15); // 5-20 → 0-1
   const value = Math.round(
-    Math.pow(ratingFactor, 3) * 60_000_000 +
+    Math.pow(ratingFactor, 3) * 80_000_000 +
     age * 50_000
   );
   const wage = Math.round(value / 500);
@@ -273,6 +474,7 @@ export function generatePlayer(position: Position, clubId: string, index: number
     redCard: false,
     careerStats,
     recentRatings: [],
+    overall,
   };
 }
 
@@ -346,37 +548,23 @@ export function generateGameData(): {
   return { clubs, players };
 }
 
+/**
+ * Oyuncu genel reytingi (1-20)
+ */
 export function scorePlayer(p: Player): number {
-  const a = p.attributes;
-  const pos = p.position;
+  // Kaydedilmiş overall varsa onu kullan
+  if (typeof p.overall === 'number' && p.overall >= 1 && p.overall <= 20) {
+    // Kondisyon, moral, form etkisi
+    const condFactor = 0.5 + (p.condition / 100) * 0.5;
+    const moraleFactor = 0.9 + (p.morale / 100) * 0.1;
+    const formFactor = 0.9 + (p.form / 100) * 0.1;
 
-  let score: number;
-
-  if (pos === 'GK') {
-    const gk = (typeof a.goalkeeper === 'number' && !isNaN(a.goalkeeper)) ? a.goalkeeper : (a.reflexes ?? 50);
-    score = gk * 0.3 + a.reflexes * 0.25 + a.handling * 0.2 + a.oneOnOne * 0.15 + a.gkPositioning * 0.1;
-  } else if (['DC', 'DL', 'DR'].includes(pos)) {
-    score = a.marking * 0.25 + a.tackling * 0.2 + a.defensivePositioning * 0.2 + a.anticipation * 0.15 + a.strength * 0.1 + a.heading * 0.1;
-  } else if (['DM', 'MC'].includes(pos)) {
-    score = a.passing * 0.25 + a.vision * 0.2 + a.decisions * 0.2 + a.workRate * 0.15 + a.technique * 0.1 + a.stamina * 0.1;
-  } else if (['ML', 'MR'].includes(pos)) {
-    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.2 + a.acceleration * 0.15 + a.technique * 0.15;
-  } else if (['AML', 'AMR'].includes(pos)) {
-    score = a.pace * 0.25 + a.dribbling * 0.25 + a.crossing * 0.15 + a.finishing * 0.2 + a.offTheBall * 0.15;
-  } else if (pos === 'AMC') {
-    score = a.passing * 0.2 + a.vision * 0.2 + a.technique * 0.2 + a.decisions * 0.15 + a.finishing * 0.15 + a.dribbling * 0.1;
-  } else if (pos === 'ST') {
-    score = a.finishing * 0.3 + a.shooting * 0.2 + a.offTheBall * 0.2 + a.composure * 0.15 + a.technique * 0.15;
-  } else {
-    score = 50;
+    const result = p.overall * condFactor * moraleFactor * formFactor;
+    return Math.max(1, Math.min(20, Math.round(result)));
   }
 
-  const condFactor = 0.5 + (p.condition / 100) * 0.5;
-  const moraleFactor = 0.9 + (p.morale / 100) * 0.1;
-  const formFactor = 0.85 + (p.form / 100) * 0.15;
-
-  const result = score * condFactor * moraleFactor * formFactor;
-  return Number.isFinite(result) ? Math.round(result) : 50;
+  // Fallback — attribute'lardan hesapla
+  return calculateOverall(p.attributes, p.position);
 }
 
 export function getStartingXI(

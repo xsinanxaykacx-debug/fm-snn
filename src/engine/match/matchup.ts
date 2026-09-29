@@ -5,12 +5,21 @@ import { getStartingXI } from '../data/generateData';
 // YARDIMCILAR
 // ═══════════════════════════════════════════════
 
+function scaleToEngine(value: number): number {
+  const clamped = Math.max(1, Math.min(20, value));
+  return 30 + ((clamped - 1) / 19) * 50;
+}
+
 export function eff(player: Player, key: keyof Attributes): number {
   const base = player.attributes[key];
   const cond = 0.5 + (player.condition / 100) * 0.5;
   const form = 0.85 + (player.form / 100) * 0.15;
   const morale = 0.90 + (player.morale / 100) * 0.10;
-  return base * cond * form * morale;
+
+  // 🔧 1-20 → 20-95
+  const scaled = scaleToEngine(base);
+
+  return scaled * cond * form * morale;
 }
 
 export function avgEff(players: Player[], key: keyof Attributes): number {

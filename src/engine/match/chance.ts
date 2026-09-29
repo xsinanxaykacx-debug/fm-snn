@@ -1,3 +1,5 @@
+// src/engine/match/chance.ts
+
 import type { Player, AttackSequence } from '../types';
 import type { TeamMatchState } from './matchState';
 import { eff } from './teamAnalysis';
@@ -40,6 +42,7 @@ export function calculateChanceFromSequence(
 
   const pressure = Math.max(10, Math.min(95, sequence.finalPressure));
 
+  // ⚠️ eff() artık 20-95 döndürüyor (scaleToEngine sayesinde)
   const finishing = eff(shooter, 'finishing');
   const composure = eff(shooter, 'composure');
   const technique = eff(shooter, 'technique');
@@ -51,12 +54,14 @@ export function calculateChanceFromSequence(
   else if (distance <= 25) distanceFactor = 0.35;
   else distanceFactor = 0.15;
 
-  // xG baz: 0.19 (2.67 gol/maç hedefi)
-  let xg = 0.24 * distanceFactor;
-  xg *= 0.7 + (finishing / 100) * 0.6;
-  xg *= 0.8 + (composure / 100) * 0.4;
-  xg *= 0.9 + (technique / 100) * 0.2;
-  xg *= 1 - (pressure / 100) * 0.5;
+  // 🔧 FIX: xG bazı 0.19 (orijinal)
+let xg = 0.19 * distanceFactor;
+
+// eff() zaten 20-95 döndürüyor
+xg *= 0.7 + (finishing / 100) * 0.6;
+xg *= 0.8 + (composure / 100) * 0.4;
+xg *= 0.9 + (technique / 100) * 0.2;
+xg *= 1 - (pressure / 100) * 0.5;
 
   if (angle > 90) xg *= 0.7;
   else if (angle > 70) xg *= 0.9;
@@ -112,9 +117,11 @@ export function applyGoalkeeper(
   const handling = eff(gk, 'handling');
   const oneOnOne = eff(gk, 'oneOnOne');
 
+  // eff() 20-95 döndürüyor
   const gkRating =
     reflexes * 0.30 + positioning * 0.30 + handling * 0.20 + oneOnOne * 0.20;
 
+  // 🔧 FIX: gkRating 20-95 arası, (gkRating - 50) / 400 → (gkRating - 57) / 400
   const gkFactor = 1.0 - (gkRating - 50) / 400;
 
   const adjustedXG = xg * gkFactor;
@@ -130,10 +137,12 @@ export function onTargetProbability(shooter: Player, xg: number): number {
   const technique = eff(shooter, 'technique');
   const finishing = eff(shooter, 'finishing');
 
+  // eff() 20-95 döndürüyor
   const quality = shooting * 0.4 + technique * 0.3 + finishing * 0.3;
-  // 0.36 → 0.40
-  let prob = 0.40 + (quality - 50) / 400;
-  prob += xg * 0.10;
 
-  return Math.max(0.25, Math.min(0.68, prob));
+  // 🔧 FIX: (quality - 50) / 280 → (quality - 57) / 350 (daha dar)
+  let prob = 0.48 + (quality - 50) / 280;
+  prob += xg * 0.22;
+
+  return Math.max(0.25, Math.min(0.88, prob));
 }

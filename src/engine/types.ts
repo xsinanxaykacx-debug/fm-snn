@@ -1,6 +1,7 @@
 export type Position = 'GK' | 'DC' | 'DL' | 'DR' | 'DM' | 'MC' | 'ML' | 'MR' | 'AMC' | 'AML' | 'AMR' | 'ST';
 
 export interface Attributes {
+  // TEKNİK (1-20)
   passing: number;
   firstTouch: number;
   dribbling: number;
@@ -12,6 +13,7 @@ export interface Attributes {
   setPieces: number;
   longShots: number;
 
+  // ZİHİNSEL (1-20)
   decisions: number;
   vision: number;
   anticipation: number;
@@ -24,6 +26,7 @@ export interface Attributes {
   bravery: number;
   aggression: number;
 
+  // FİZİKSEL (1-20)
   pace: number;
   acceleration: number;
   agility: number;
@@ -31,11 +34,13 @@ export interface Attributes {
   strength: number;
   balance: number;
 
+  // DEFANS (1-20)
   marking: number;
   tackling: number;
   ballWinning: number;
   defensivePositioning: number;
 
+  // KALECİ (1-20)
   goalkeeper: number;
   reflexes: number;
   gkPositioning: number;
@@ -70,7 +75,7 @@ export interface Player {
   age: number;
   nationality: string;
   position: Position;
-  secondaryPositions: Position[];     // ← YENİ
+  secondaryPositions: Position[];
   attributes: Attributes;
   condition: number;
   morale: number;
@@ -88,7 +93,8 @@ export interface Player {
   redCard: boolean;
 
   careerStats: CareerStats;
-  recentRatings: number[];            // ← YENİ (son 5 maç)
+  recentRatings: number[];
+  overall: number;      // Genel reyting (1-20) — hesaplanmış, kaydedilir
 }
 
 export type Formation = '4-4-2' | '4-3-3' | '3-5-2' | '4-2-3-1';

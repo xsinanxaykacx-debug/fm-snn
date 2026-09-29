@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import type { Player } from '../engine/types';
 import { scorePlayer } from '../engine/data/generateData';
 import { getTeamColor } from '../utils/teamColors';
+import { getAttrColor, getOverallColor } from '../utils/attributeColor';
 import { PlayerStatusCard } from './PlayerStatusCard';
 
 declare global {
@@ -28,20 +29,9 @@ function getPosColor(position: string): { bg: string; text: string; border: stri
   return { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/40' };
 }
 
-function getRatingColor(rating: number): string {
-  if (rating >= 80) return 'text-green-400';
-  if (rating >= 70) return 'text-emerald-400';
-  if (rating >= 60) return 'text-yellow-400';
-  if (rating >= 50) return 'text-orange-400';
-  return 'text-red-400';
-}
-
-function attrColor(v: number): string {
-  if (v >= 80) return 'text-green-400';
-  if (v >= 65) return 'text-yellow-400';
-  if (v >= 50) return 'text-orange-400';
-  return 'text-red-400';
-}
+// ═══════════════════════════════════════════════
+// RADAR GRAFİĞİ
+// ═══════════════════════════════════════════════
 
 function PlayerRadar({ player }: { player: Player }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -106,7 +96,7 @@ function PlayerRadar({ player }: { player: Player }) {
             },
             ticks: { display: false, backdropColor: 'transparent' },
             suggestedMin: 0,
-            suggestedMax: 100,
+            suggestedMax: 20,
           }
         },
         plugins: {
@@ -130,6 +120,10 @@ function PlayerRadar({ player }: { player: Player }) {
   );
 }
 
+// ═══════════════════════════════════════════════
+// YARDIMCI COMPONENT'LER
+// ═══════════════════════════════════════════════
+
 function InfoBox({ label, value, valueColor, highlight }: { label: string; value: string; valueColor?: string; highlight?: boolean }) {
   return (
     <div className={`glass-card p-3 rounded-xl border ${highlight ? 'border-accent/40' : 'border-pitch-700/50'}`}>
@@ -143,9 +137,11 @@ function InfoBox({ label, value, valueColor, highlight }: { label: string; value
 
 function AttrRow({ label, value }: { label: string; value: number }) {
   return (
-    <li className="flex justify-between">
+    <li className="flex justify-between items-center">
       <span className="text-slate-400 truncate">{label}</span>
-      <span className={`font-bold ml-2 ${attrColor(value)}`}>{value}</span>
+      <span className={`font-bold ml-2 tabular-nums ${getAttrColor(value)}`}>
+        {value}
+      </span>
     </li>
   );
 }
@@ -182,6 +178,10 @@ function CareerStat({ label, value, color }: { label: string; value: number | st
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════
+// ANA COMPONENT
+// ═══════════════════════════════════════════════
 
 export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) {
   useEffect(() => {
@@ -265,7 +265,7 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-[10px] text-slate-400 uppercase">Genel Reyting</p>
-              <p className={`text-4xl font-black ${getRatingColor(rating)}`}>{rating}</p>
+              <p className={`text-4xl font-black tabular-nums ${getOverallColor(rating)}`}>{rating}</p>
             </div>
             <button
               onClick={onClose}
@@ -279,7 +279,7 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
         {/* İÇERİK */}
         <div className="overflow-y-auto p-6 space-y-5">
 
-          {/* 1. Temel bilgiler */}
+          {/* Temel bilgiler */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <InfoBox label="Piyasa Değeri" value={`£${(player.value / 1_000_000).toFixed(2)}M`} highlight />
             <InfoBox label="Haftalık Maaş" value={`£${(player.wage / 1_000).toFixed(0)}K`} />
@@ -287,15 +287,14 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
             <InfoBox label="Form" value={`${player.form}%`} valueColor={player.form >= 70 ? 'text-green-400' : player.form >= 50 ? 'text-yellow-400' : 'text-red-400'} />
           </div>
 
-          {/* 2. PLAYER STATUS CARD — Mevki Uyumu + Sakatlık Riski + Son 5 Maç */}
+          {/* PlayerStatusCard */}
           <PlayerStatusCard
             player={player}
             selectedTacticalPosition={player.position}
           />
 
-          {/* 3. KARİYER + SEZON İSTATİSTİKLERİ */}
+          {/* KARİYER + SEZON */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* KARİYER */}
             <div className="glass-card p-4 rounded-xl">
               <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">🏆 Kariyer</h4>
               {!hasCareer ? (
@@ -326,7 +325,6 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
               )}
             </div>
 
-            {/* BU SEZON */}
             <div className="glass-card p-4 rounded-xl">
               <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">📅 Bu Sezon</h4>
               {!hasSeason ? (
@@ -358,7 +356,7 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
             </div>
           </div>
 
-          {/* 4. Radar + Attribute tablosu */}
+          {/* Radar + Attribute tablosu */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="glass-card p-4 rounded-xl">
               <h4 className="text-xs font-bold text-slate-300 uppercase mb-3 text-center">
@@ -424,7 +422,7 @@ export function PlayerDetailModal({ player, clubId, clubName, onClose }: Props) 
             </div>
           </div>
 
-          {/* 5. Form/Moral/Kondisyon barları */}
+          {/* Form/Moral/Kondisyon barları */}
           <div className="glass-card p-4 rounded-xl">
             <h4 className="text-xs font-bold text-slate-300 uppercase mb-3">📈 Durum</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

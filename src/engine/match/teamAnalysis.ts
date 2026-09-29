@@ -1,5 +1,25 @@
+// src/engine/match/teamAnalysis.ts
+
 import type { Club, Player, Attributes } from '../types';
 import { getStartingXI } from '../data/generateData';
+
+// ═══════════════════════════════════════════════
+// 1-20 → 20-95 DÖNÜŞÜMÜ (motor uyumu için)
+// ═══════════════════════════════════════════════
+
+const FM_MIN = 1;
+const FM_MAX = 20;
+const ENGINE_MIN = 20;
+const ENGINE_MAX = 95;
+
+/**
+ * 1-20 arası FM değerini, motorun beklediği 20-95 aralığına çevirir.
+ * Örnek: 1 → 20, 10 → 57, 20 → 95
+ */
+function scaleToEngine(value: number): number {
+  const clamped = Math.max(1, Math.min(20, value));
+  return 30 + ((clamped - 1) / 19) * 50;
+}
 
 // ═══════════════════════════════════════════════
 // EFEKTIF ATTRIBUTE (kondisyon, form, moral)
@@ -10,7 +30,11 @@ export function eff(player: Player, key: keyof Attributes): number {
   const cond = 0.5 + (player.condition / 100) * 0.5;
   const form = 0.85 + (player.form / 100) * 0.15;
   const morale = 0.90 + (player.morale / 100) * 0.10;
-  return base * cond * form * morale;
+
+  // 🔧 1-20 → 20-95
+  const scaled = scaleToEngine(base);
+
+  return scaled * cond * form * morale;
 }
 
 export function avgEff(players: Player[], key: keyof Attributes): number {
@@ -32,11 +56,10 @@ export function avgEffMulti(players: Player[], keys: { key: keyof Attributes; we
 }
 
 // ═══════════════════════════════════════════════
-// TAKIM ANALİZİ — 6 BİRİM + BÖLGELER
+// TAKIM ANALİZİ
 // ═══════════════════════════════════════════════
 
 export interface TeamAnalysis {
-  // 6 ana birim
   attack: number;
   midfield: number;
   defense: number;
@@ -44,13 +67,11 @@ export interface TeamAnalysis {
   transition: number;
   goalkeeper: number;
 
-  // Ek birimler
   pressing: number;
   setPieces: number;
   aerial: number;
   discipline: number;
 
-  // Bölgesel güçler (8 bölge)
   zones: {
     leftDefense: number;
     centerDefense: number;
@@ -63,17 +84,13 @@ export interface TeamAnalysis {
     rightAttack: number;
   };
 
-  // Hücum tipi yetenekleri
-  canCross: number;       // Orta açma yeteneği
-  canDribble: number;     // Çalım yeteneği
-  canPass: number;        // Pas yeteneği
-  canShoot: number;       // Uzaktan şut yeteneği
-  canCounter: number;     // Kontra yeteneği
+  canCross: number;
+  canDribble: number;
+  canPass: number;
+  canShoot: number;
+  canCounter: number;
 }
 
-/**
- * Bir takımın tam analizini yap
- */
 export function analyzeTeam(
   club: Club,
   players: Record<string, Player>
@@ -86,7 +103,6 @@ export function analyzeTeam(
     return createEmptyAnalysis();
   }
 
-  // Pozisyon grupları
   const sts = workingXI.filter(p => p.position === 'ST');
   const amcs = workingXI.filter(p => p.position === 'AMC');
   const amls = workingXI.filter(p => p.position === 'AML' || p.position === 'ML');
@@ -103,7 +119,6 @@ export function analyzeTeam(
   const allWings = [...amls, ...amrs];
   const allAtt = [...sts, ...amcs, ...amls, ...amrs];
 
-  // ═══ 1. HÜCUM ═══
   const attack = (
     avgEff(sts, 'finishing') * 0.30 +
     avgEff(sts, 'offTheBall') * 0.15 +
@@ -113,7 +128,6 @@ export function analyzeTeam(
     avgEff(allAtt, 'pace') * 0.10
   );
 
-  // ═══ 2. ORTA SAHA ═══
   const midfield = (
     avgEff(allMid, 'passing') * 0.25 +
     avgEff(allMid, 'vision') * 0.20 +
@@ -123,7 +137,6 @@ export function analyzeTeam(
     avgEff(allMid, 'ballWinning') * 0.10
   );
 
-  // ═══ 3. SAVUNMA ═══
   const defense = (
     avgEff(allDef, 'marking') * 0.25 +
     avgEff(allDef, 'tackling') * 0.25 +
@@ -133,7 +146,6 @@ export function analyzeTeam(
     avgEff(allDef, 'decisions') * 0.05
   );
 
-  // ═══ 4. KANATLAR ═══
   const wings = (
     avgEff(allWings, 'dribbling') * 0.25 +
     avgEff(allWings, 'crossing') * 0.25 +
@@ -142,7 +154,6 @@ export function analyzeTeam(
     avgEff(allWings, 'offTheBall') * 0.15
   );
 
-  // ═══ 5. GEÇİŞ (KONTRA) ═══
   const transition = (
     avgEff([...sts, ...amls, ...amrs], 'pace') * 0.30 +
     avgEff([...sts, ...amls, ...amrs], 'acceleration') * 0.25 +
@@ -151,7 +162,6 @@ export function analyzeTeam(
     avgEff([...sts, ...amls, ...amrs], 'dribbling') * 0.10
   );
 
-  // ═══ 6. KALECİ ═══
   const goalkeeper = gks.length > 0 ? (
     avgEff(gks, 'reflexes') * 0.30 +
     avgEff(gks, 'gkPositioning') * 0.25 +
@@ -160,7 +170,6 @@ export function analyzeTeam(
     avgEff(gks, 'aerialReach') * 0.10
   ) : 40;
 
-  // ═══ EK BİRİMLER ═══
   const pressing = (
     avgEff(workingXI, 'workRate') * 0.35 +
     avgEff(workingXI, 'stamina') * 0.25 +
@@ -182,7 +191,6 @@ export function analyzeTeam(
 
   const discipline = avgEff(workingXI, 'concentration');
 
-  // ═══ BÖLGESEL GÜÇLER ═══
   const zones = {
     leftDefense: (
       avgEff(dls, 'marking') * 0.35 +
@@ -244,7 +252,6 @@ export function analyzeTeam(
     ),
   };
 
-  // ═══ HÜCUM TİPİ YETENEKLERİ ═══
   const canCross = avgEff(allWings, 'crossing') * 0.5 + avgEff(allWings, 'technique') * 0.5;
   const canDribble = avgEff(allAtt, 'dribbling') * 0.5 + avgEff(allAtt, 'agility') * 0.5;
   const canPass = avgEff(allMid, 'passing') * 0.6 + avgEff(allMid, 'vision') * 0.4;

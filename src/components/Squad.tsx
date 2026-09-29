@@ -5,10 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import { scorePlayer } from '../engine/data/generateData';
 import type { Player, Position } from '../engine/types';
 import { PlayerDetailModal } from './PlayerDetailModal';
-
-// ═══════════════════════════════════════════════
-// MEVKİ RENKLERİ
-// ═══════════════════════════════════════════════
+import { getAttrColor, getOverallColor } from '../utils/attributeColor';
 
 function getPositionColor(position: string): { bg: string; text: string; border: string } {
   if (position === 'GK') return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40' };
@@ -17,14 +14,6 @@ function getPositionColor(position: string): { bg: string; text: string; border:
   if (['AMC', 'AML', 'AMR'].includes(position)) return { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/40' };
   if (position === 'ST') return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/40' };
   return { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/40' };
-}
-
-function getRatingColor(rating: number): string {
-  if (rating >= 80) return 'text-green-400';
-  if (rating >= 70) return 'text-emerald-400';
-  if (rating >= 60) return 'text-yellow-400';
-  if (rating >= 50) return 'text-orange-400';
-  return 'text-red-400';
 }
 
 function getConditionColor(value: number): string {
@@ -51,10 +40,6 @@ function Bar({ value, color, label }: { value: number; color: string; label: str
   );
 }
 
-// ═══════════════════════════════════════════════
-// OYUNCU KARTI
-// ═══════════════════════════════════════════════
-
 function PlayerCard({ player, onClick }: { player: Player; onClick: () => void }) {
   const overall = scorePlayer(player);
   const posColor = getPositionColor(player.position);
@@ -79,8 +64,8 @@ function PlayerCard({ player, onClick }: { player: Player; onClick: () => void }
         <div className={`text-xs font-bold px-2 py-1 rounded ${posColor.bg} ${posColor.text} border ${posColor.border}`}>
           {player.position}
         </div>
-        <div className={`text-3xl font-bold ${getRatingColor(overall)}`}>
-          {overall.toFixed(0)}
+        <div className={`text-3xl font-bold tabular-nums ${getOverallColor(overall)}`}>
+          {overall}
         </div>
       </div>
 
@@ -102,10 +87,6 @@ function PlayerCard({ player, onClick }: { player: Player; onClick: () => void }
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════
-// ANA COMPONENT
-// ═══════════════════════════════════════════════
 
 const POSITION_FILTERS: { key: Position | 'ALL'; label: string }[] = [
   { key: 'ALL', label: 'Tümü' },
@@ -148,11 +129,6 @@ export function Squad() {
   const avgAge = allSquad.reduce((s, p) => s + p.age, 0) / allSquad.length;
   const avgRating = allSquad.reduce((s, p) => s + scorePlayer(p), 0) / allSquad.length;
 
-  const attrColor = (v: number) =>
-    v >= 80 ? 'text-green-400' :
-    v >= 65 ? 'text-yellow-400' :
-    v >= 50 ? 'text-orange-400' : 'text-red-400';
-
   return (
     <div className="space-y-4">
       {/* ÖZET */}
@@ -171,7 +147,7 @@ export function Squad() {
         </div>
         <div className="card">
           <p className="text-xs text-slate-400">Ortalama Reyting</p>
-          <p className={`text-2xl font-bold ${getRatingColor(avgRating)}`}>
+          <p className={`text-2xl font-bold tabular-nums ${getOverallColor(avgRating)}`}>
             {avgRating.toFixed(1)}
           </p>
         </div>
@@ -280,11 +256,6 @@ export function Squad() {
                           🚑 {p.injuryWeeks}h
                         </span>
                       )}
-                      {p.suspensionWeeks > 0 && (
-                        <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-yellow-900/60 text-yellow-300">
-                          🟨 {p.suspensionWeeks}h
-                        </span>
-                      )}
                     </td>
                     <td>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${posColor.bg} ${posColor.text}`}>
@@ -292,16 +263,16 @@ export function Squad() {
                       </span>
                     </td>
                     <td>{p.age}</td>
-                    <td className={`font-bold ${getRatingColor(overall)}`}>{overall.toFixed(0)}</td>
-                    <td className={attrColor(a.passing)}>{a.passing}</td>
-                    <td className={attrColor(a.dribbling)}>{a.dribbling}</td>
-                    <td className={attrColor(a.shooting)}>{a.shooting}</td>
-                    <td className={attrColor(a.finishing)}>{a.finishing}</td>
-                    <td className={attrColor(a.pace)}>{a.pace}</td>
-                    <td className={attrColor(a.stamina)}>{a.stamina}</td>
-                    <td className={attrColor(a.marking)}>{a.marking}</td>
-                    <td className={attrColor(a.decisions)}>{a.decisions}</td>
-                    <td className={attrColor(a.vision)}>{a.vision}</td>
+                    <td className={`font-bold tabular-nums ${getOverallColor(overall)}`}>{overall}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.passing)}`}>{a.passing}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.dribbling)}`}>{a.dribbling}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.shooting)}`}>{a.shooting}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.finishing)}`}>{a.finishing}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.pace)}`}>{a.pace}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.stamina)}`}>{a.stamina}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.marking)}`}>{a.marking}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.decisions)}`}>{a.decisions}</td>
+                    <td className={`tabular-nums ${getAttrColor(a.vision)}`}>{a.vision}</td>
                     <td>{p.form}</td>
                     <td>{p.condition}</td>
                     <td className="whitespace-nowrap text-accent">£{(p.value / 1_000_000).toFixed(2)}M</td>
@@ -326,7 +297,6 @@ export function Squad() {
         </div>
       )}
 
-      {/* MODAL */}
       {selectedPlayer && (
         <PlayerDetailModal
           player={selectedPlayer}
