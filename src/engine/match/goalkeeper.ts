@@ -35,7 +35,7 @@ export function resolveShot(
   // 2. KALECİ ETKİSİ
   const { goalProb: baseGoalProb } = applyGoalkeeper(goalkeeper, chance.xG);
 
-  // 🔧 FIX: xG = toplam gol olasılığı. Kaleci zaten xG içinde hesaba katıldı.
+  // xG = toplam gol olasılığı. Kaleci zaten xG içinde hesaba katıldı.
   // Sadece kaleci kalitesinden gelen küçük bir düzeltme uygula.
   const gkEffect = baseGoalProb / chance.xG; // ~0.90-1.10 arası
 
@@ -83,7 +83,6 @@ export function handleCrossChance(
 
   const gkPower = aerialReach * 0.4 + handling * 0.35 + positioning * 0.25;
 
-  // 🔧 FIX: gkPower 20-95 arası, crossQuality 20-95 arası
   const catchProb = 0.5 + (gkPower - crossQuality) / 200;
   return Math.random() < Math.max(0.20, Math.min(0.85, catchProb));
 }

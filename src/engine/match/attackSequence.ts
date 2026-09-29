@@ -17,13 +17,14 @@ export function createAttackSequence(
   let currentPlayer = pickPlayerForZone(attackXI, currentZone);
   let totalSpace = 0;
   let totalPressure = 0;
-  let actionCount = 0;
-  const maxActions = 6;
+  let actionCount = 1; // carry zaten yapıldı
+  const maxActions = 8;
 
   if (!currentPlayer) {
     return emptySequence(attackingTeam, defendingTeam, startingZone);
   }
 
+  // İlk aksiyon: carry
   actions.push({
     minute: 0,
     action: 'carry',
@@ -37,9 +38,8 @@ export function createAttackSequence(
     spaceCreated: 0,
     description: `${currentPlayer.name} topu aldi`,
   });
-
-  // Taşıma istatistiği
-  
+  attackingTeam.dribbles++;
+  attackingTeam.dribblesSuccess++;
 
   for (let i = 0; i < maxActions; i++) {
     const defender = pickDefender(defendXI, currentZone);
@@ -58,7 +58,7 @@ export function createAttackSequence(
       defendingTeam
     );
 
-    // 🆕 İSTATİSTİK ARTTIR (her aksiyon için)
+    // İstatistik
     if (actionType === 'pass' || actionType === 'throughBall' || actionType === 'recycle') {
       attackingTeam.passes++;
       if (success) attackingTeam.passesCompleted++;
@@ -89,43 +89,34 @@ export function createAttackSequence(
       description: `${currentPlayer.name} ${getActionLabel(actionType)} (${Math.round(pressure)}% baski, ${Math.round(space)}% alan)`,
     });
 
+    // Başarısız aksiyon = top kaybı → sequence biter
     if (!success) {
-      return {
-        attackingClubId: attackingTeam.club.id,
-        defendingClubId: defendingTeam.club.id,
-        startedZone: startingZone,
-        finalZone: currentZone,
-        actions,
-        totalActions: actionCount,
-        finalPressure: Math.round(totalPressure / actionCount),
-        spaceCreated: Math.round(totalSpace / actionCount),
-        chanceQuality: 0,
-        resultedInShot: false,
-        resultedInGoal: false,
-        xG: 0,
-      };
+      break;
     }
 
     currentZone = getNextZone(currentZone, actionType);
 
-    if (currentZone.includes('Attack')) {
-      break;
-    }
+    // Attack zone'unda break YOK — döngü devam eder.
 
-    const nextPlayer = pickPlayerForZone(attackXI, currentZone);
-    if (!nextPlayer || nextPlayer.id === currentPlayer.id) {
-      break;
+    // Aynı oyuncuya düşünce yeniden seç, break yok
+    let nextPlayer = pickPlayerForZone(attackXI, currentZone);
+    let tries = 0;
+    while (nextPlayer && nextPlayer.id === currentPlayer.id && tries < 5) {
+      nextPlayer = pickPlayerForZone(attackXI, currentZone);
+      tries++;
     }
-    currentPlayer = nextPlayer;
+    if (nextPlayer) {
+      currentPlayer = nextPlayer;
+    }
   }
 
-  const finalPressure = Math.round(totalPressure / Math.max(1, actionCount));
-  const avgSpace = Math.round(totalSpace / Math.max(1, actionCount));
+  const denom = Math.max(1, actionCount - 1);
+  const finalPressure = Math.round(totalPressure / denom);
+  const avgSpace = Math.round(totalSpace / denom);
   const inAttackZone = currentZone.includes('Attack');
 
-  const chanceQuality = inAttackZone
-    ? Math.round(avgSpace * 0.5 + (100 - finalPressure) * 0.4)
-    : 0;
+  const zoneBonus = inAttackZone ? 15 : (currentZone.includes('Midfield') ? 5 : 0);
+const chanceQuality = Math.round(avgSpace * 0.5 + (100 - finalPressure) * 0.4 + zoneBonus);
 
   return {
     attackingClubId: attackingTeam.club.id,
@@ -137,14 +128,14 @@ export function createAttackSequence(
     finalPressure,
     spaceCreated: avgSpace,
     chanceQuality,
-    resultedInShot: chanceQuality > 5,
+    resultedInShot: chanceQuality > 15,
     resultedInGoal: false,
     xG: 0,
   };
 }
 
 // ═══════════════════════════════════════════════
-// OYUNCU SEÇİMİ (17 pozisyon)
+// OYUNCU SEÇİMİ
 // ═══════════════════════════════════════════════
 
 function pickPlayerForZone(xi: Player[], zone: string): Player | null {
@@ -183,19 +174,19 @@ function chooseSequenceAction(
   const r = Math.random();
 
   if (isWing) {
-    if (r < 0.35) return 'cross';
-    if (r < 0.60) return 'dribble';
-    if (r < 0.85) return 'pass';
-    return 'run';
-  }
+  if (r < 0.20) return 'cross';   // %35 → %20
+  if (r < 0.38) return 'dribble'; // %25 → %20
+  if (r < 0.80) return 'pass';    // %25 → %40
+  return 'run';                    // %15 → %20
+}
 
   if (isAttack) {
-    if (r < 0.15) return 'throughBall';  // %15
-    if (r < 0.50) return 'pass';          // %35
-    if (r < 0.70) return 'dribble';       // %20
-    if (r < 0.90) return 'pass';          // %20
-    if (r < 0.95) return 'run';           // %5
-    return 'recycle';                      // %5
+    if (r < 0.15) return 'throughBall';
+    if (r < 0.50) return 'pass';
+    if (r < 0.70) return 'dribble';
+    if (r < 0.90) return 'pass';
+    if (r < 0.95) return 'run';
+    return 'recycle';
   }
 
   if (directness === 'direct' && r < 0.25) return 'throughBall';

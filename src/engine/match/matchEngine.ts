@@ -148,7 +148,6 @@ export function simulateMatch(
   const sentOff = new Set<string>();
   const matchYellows = new Set<string>();
 
-  // 🎯 Her oyuncunun GERÇEK oynadığı dakikayı takip et
   const minutesPlayed: Record<string, number> = {};
   const lastActiveMinute: Record<string, number> = {};
 
@@ -160,8 +159,6 @@ export function simulateMatch(
     lastActiveMinute[p.id] = 0;
   }
 
-  // 🎯 Bir oyuncunun aktif olup olmadığını kontrol et
-  // (kırmızı kart VEYA sakatlık)
   function isPlayerActive(playerId: string): boolean {
     if (sentOff.has(playerId)) return false;
     if (isInjured(state.home, playerId)) return false;
@@ -169,7 +166,6 @@ export function simulateMatch(
     return true;
   }
 
-  // 🎯 Oyuncunun dakikasını güncelle
   function updateMinutes(playerId: string, currentMinute: number): void {
     if (lastActiveMinute[playerId] !== undefined) {
       const elapsed = currentMinute - lastActiveMinute[playerId];
@@ -180,8 +176,6 @@ export function simulateMatch(
     lastActiveMinute[playerId] = currentMinute;
   }
 
-  // 🎯 Tüm aktif oyuncuların dakikalarını güncelle
-  // (kırmızı kart VEYA sakat olanlar DAHİL DEĞİL)
   function updateAllMinutes(currentMinute: number): void {
     for (const p of [...homeXI, ...awayXI]) {
       if (isPlayerActive(p.id)) {
@@ -194,7 +188,6 @@ export function simulateMatch(
     const baseMinute = Math.floor(tick * minutePerTick) + 1;
     const currentMinute = Math.min(90, baseMinute + Math.floor(Math.random() * 3));
 
-    // 🎯 Dakika farkını aktif oyunculara ekle
     updateAllMinutes(currentMinute);
 
     state.minute = currentMinute;
@@ -242,7 +235,20 @@ export function simulateMatch(
     const sequence = createAttackSequence(attackState, defendState, attackXI2, defendXI2, zone);
     state.sequences.push(sequence);
 
-    if (!sequence.resultedInShot || sequence.chanceQuality <= 30) {
+    // ═══════════════════════════════════════════════
+    // ŞUT KARARI — chanceQuality'ye bağlı olasılık
+    // ═══════════════════════════════════════════════
+    // chanceQuality 0–100 arası bir "şans kalitesi" metriği.
+    // Bunu doğrudan şut olasılığına çeviriyoruz:
+    //   chanceQuality = 40  → %40 şut olasılığı
+    //   chanceQuality = 70  → %70 şut olasılığı
+    // Tavan %85, taban %5 (çok düşük kaliteli sequence'lar da nadiren şut üretsin).
+    const shotProbability = Math.max(
+      0.05,
+      Math.min(0.90, sequence.chanceQuality / 72)
+    );
+
+    if (!sequence.resultedInShot || Math.random() > shotProbability) {
       if (sequence.actions.length > 0) {
         const lastAction = sequence.actions[sequence.actions.length - 1];
         if (!lastAction.success) {
@@ -285,7 +291,6 @@ export function simulateMatch(
 
       updateCareerStats(players, scorer.id, { goals: 1 });
 
-      // ASİST — %75 ihtimalle
       const hasAssist = Math.random() < 0.75;
 
       if (hasAssist) {
@@ -394,10 +399,8 @@ export function simulateMatch(
     consumeCondition(state);
   }
 
-  // 🎯 Maç sonu: son dakikayı da ekle (90. dakika)
   updateAllMinutes(90);
 
-  // 🎯 APPEARANCES ve MINUTESPLAYED'i maç sonunda gerçek dakikalarla kaydet
   for (const p of [...homeXI, ...awayXI]) {
     const realMinutes = minutesPlayed[p.id] ?? 0;
     updateCareerStats(players, p.id, {
@@ -410,7 +413,6 @@ export function simulateMatch(
 
   const possession = calculatePossession(state);
 
-  // ═══ MAÇ SONU REYTİNG ═══
   const allPlayers = [...homeXI, ...awayXI];
   const homeGoalDiff = state.homeScore - state.awayScore;
   const awayGoalDiff = state.awayScore - state.homeScore;
@@ -450,7 +452,7 @@ export function simulateMatch(
     updateCareerStats(players, bestPlayerId, { motm: 1 });
   }
 
-    return {
+  return {
     id: `match_${week}_${home.id}_${away.id}`,
     week,
     homeId: home.id,
@@ -458,7 +460,7 @@ export function simulateMatch(
     homeScore: state.homeScore,
     awayScore: state.awayScore,
     events,
-    sequences: state.sequences,  // 🆕 SEQUENCE'LARI EKLE
+    sequences: state.sequences,
     stats: {
       possession: { home: possession.home, away: possession.away },
       shots: { home: state.home.shots, away: state.away.shots },
@@ -477,6 +479,11 @@ export function simulateMatch(
     played: true,
   };
 }
+
+// ═══════════════════════════════════════════════
+// KART / SAKATLIK
+// ═══════════════════════════════════════════════
+
 function processCardsInMatch(
   state: MatchState,
   players: Record<string, Player>,
