@@ -10,6 +10,9 @@ import type {
   AssistantSettings,
   AcademyState,
   AcademyPlayer,
+  CustomFormation,
+  PitchZone,
+  SlotPosition,
 } from '../engine/types';
 import { generateGameData, replaceRetiredPlayers } from '../engine/data/generateData';
 import { generateFixtures } from '../engine/league/fixtures';
@@ -21,7 +24,14 @@ import { decrementContracts, evaluateContractOffer, applyContractRenewal } from 
 import { aiTransferWindow } from '../engine/transfer/aiTransfer';
 import { suggestTrainingFocus, analyzeMatch } from '../engine/assistant/assistantAI';
 import { generateAllIntakes } from '../engine/academy/academy';
+import { createEmptyZones, getFormationZoneMapping, findZoneByPosition } from '../engine/formation/zones';
 import { useInboxStore } from './useInboxStore';
+
+// ═══════════════════════════════════════════════
+// SABİT: MAX SAHA OYUNCUSU
+// ═══════════════════════════════════════════════
+
+const MAX_PITCH_PLAYERS = 11;
 
 // ═══════════════════════════════════════════════
 // TRANSFER PENCERESİ
@@ -58,6 +68,18 @@ const DEFAULT_ACADEMY: AcademyState = {
   lastIntakeSeason: 0,
 };
 
+function createEmptyCustomFormation(): CustomFormation {
+  return {
+    id: `custom_${Date.now()}`,
+    name: 'Serbest Diziliş',
+    zones: createEmptyZones(),
+  };
+}
+
+// ═══════════════════════════════════════════════
+// STORE INTERFACE
+// ═══════════════════════════════════════════════
+
 interface Store extends GameState {
   newGame: () => void;
   playWeek: () => void;
@@ -86,22 +108,32 @@ interface Store extends GameState {
   } | null;
   clearPendingPress: () => void;
 
-  // Akademi
   promoteToFirstTeam: (playerId: string) => void;
   promoteAllSelected: (playerIds: string[]) => void;
   releaseFromAcademy: (playerId: string) => void;
 
-  // 🆕 Kadro Dışı (U21)
   sendToReserves: (playerId: string) => void;
   sendAllSelectedToReserves: (playerIds: string[]) => void;
   promoteFromReserves: (playerId: string) => void;
 
-  // 🆕 Sözleşme
   renewContract: (playerId: string, offeredWage: number, offeredYears: number) => {
     accepted: boolean;
     reason: string;
   };
+
+  // ZONE-BASED
+  setZonePlayer: (zoneId: string, playerId: string | null) => void;
+  swapZones: (zoneIdA: string, zoneIdB: string) => void;
+  clearZone: (zoneId: string) => void;
+  setZoneLabel: (zoneId: string, label: SlotPosition) => void;
+  resetZoneFormation: () => void;
+  autoFillZones: (formation: Formation) => void;
+  setFormationMode: (mode: 'fixed' | 'custom') => void;
 }
+
+// ═══════════════════════════════════════════════
+// INITIAL STATE
+// ═══════════════════════════════════════════════
 
 function createInitialState(): GameState {
   const { clubs, players } = generateGameData();
@@ -594,17 +626,11 @@ export const useGameStore = create<Store>()(
       advanceSeason: () => {
         const state = get();
 
-        // 1. Oyuncuları geliştir
         let newPlayers = developPlayers(state.players);
-
-        // 2. 🆕 Sözleşmeleri azalt
         const contractResult = decrementContracts(newPlayers, state.userClubId);
         newPlayers = contractResult.updatedPlayers;
-
-        // 3. Emeklilerin yerine genç üret
         newPlayers = replaceRetiredPlayers(newPlayers, state.clubs);
 
-        // 4. Sezon istatistiklerini sıfırla
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           if (p.careerStats) {
@@ -623,7 +649,6 @@ export const useGameStore = create<Store>()(
           newPlayers[id] = p;
         }
 
-        // 5. AI TRANSFER
         const transferResult = aiTransferWindow(
           state.clubs,
           newPlayers,
@@ -632,7 +657,6 @@ export const useGameStore = create<Store>()(
         newPlayers = transferResult.players;
         const newClubs = transferResult.clubs;
 
-        // 6. AKADEMİ ALIMI
         const newAcademyIntakes = generateAllIntakes(newClubs);
         const newAcademy: AcademyState = {
           players: {
@@ -642,7 +666,6 @@ export const useGameStore = create<Store>()(
           lastIntakeSeason: state.season + 1,
         };
 
-        // 🆕 Akademi oyuncularının yaşını +1 yap, 20+ olanları serbest bırak
         const academyToRelease: AcademyPlayer[] = [];
         for (const id in newAcademy.players) {
           const p = newAcademy.players[id];
@@ -660,14 +683,12 @@ export const useGameStore = create<Store>()(
           p => p.clubId === state.userClubId
         );
 
-        // 7. Yeni sezon fikstürü
         const season = state.season + 1;
         const fixtures = generateFixtures(newClubs, season);
         const table = initTable(Object.keys(newClubs));
 
         const news = [`🏆 Sezon ${season} başladı!`, ...state.news];
 
-        // 🆕 Sözleşme haberleri
         if (contractResult.released.length > 0) {
           const userReleased = contractResult.released.filter(
             p => p.clubId === null
@@ -691,7 +712,6 @@ export const useGameStore = create<Store>()(
           );
         }
 
-        // Akademi bilgisi
         const userIntakeCount = Object.values(newAcademyIntakes).filter(
           p => p.clubId === state.userClubId
         ).length;
@@ -718,7 +738,6 @@ export const useGameStore = create<Store>()(
           academy: newAcademy,
         });
 
-        // Inbox mesajları
         useInboxStore.getState().addMessage({
           season,
           week: 1,
@@ -728,7 +747,6 @@ export const useGameStore = create<Store>()(
           category: 'BOARD',
         });
 
-        // 🆕 Sözleşme bitenler
         if (contractResult.released.length > 0) {
           const releasedNames = contractResult.released
             .map(p => p.name)
@@ -744,7 +762,6 @@ export const useGameStore = create<Store>()(
           });
         }
 
-        // 🆕 Sözleşmesi bitecekler (uyarı)
         if (contractResult.expiring.length > 0) {
           const expiringNames = contractResult.expiring
             .map(p => p.name)
@@ -760,7 +777,6 @@ export const useGameStore = create<Store>()(
           });
         }
 
-        // 🆕 Akademi mesajları
         if (userIntakeCount > 0) {
           useInboxStore.getState().addMessage({
             season,
@@ -1060,7 +1076,7 @@ export const useGameStore = create<Store>()(
       },
 
       // ═══════════════════════════════════════════════
-      // 🆕 KADRO DIŞI (U21)
+      // KADRO DIŞI (U21)
       // ═══════════════════════════════════════════════
 
       sendToReserves: (playerId) => {
@@ -1125,7 +1141,7 @@ export const useGameStore = create<Store>()(
       },
 
       // ═══════════════════════════════════════════════
-      // 🆕 SÖZLEŞME YENİLEME
+      // SÖZLEŞME YENİLEME
       // ═══════════════════════════════════════════════
 
       renewContract: (playerId, offeredWage, offeredYears) => {
@@ -1167,6 +1183,268 @@ export const useGameStore = create<Store>()(
 
         return evaluation;
       },
+
+      // ═══════════════════════════════════════════════
+      // ZONE-BASED FORMASYON
+      // ═══════════════════════════════════════════════
+
+      setZonePlayer: (zoneId, playerId) => {
+        const state = get();
+        const userClub = state.clubs[state.userClubId];
+        if (!userClub) return;
+
+        const custom = userClub.customFormation ?? createEmptyCustomFormation();
+
+        // ═══ MAX 11 KONTROLÜ ═══
+        if (playerId !== null) {
+          const targetZone = custom.zones.find(z => z.id === zoneId);
+          const isTargetEmpty = targetZone?.playerId === null;
+          const filledCount = custom.zones.filter(z => z.playerId !== null).length;
+
+          // Hedef bölge boşsa VE toplam zaten 11 ise → ENGEL
+          if (isTargetEmpty && filledCount >= MAX_PITCH_PLAYERS) {
+            console.warn(`❌ Sahaya en fazla ${MAX_PITCH_PLAYERS} oyuncu koyabilirsin!`);
+            return;
+          }
+        }
+
+        // Aynı oyuncu başka bölgede varsa, oradan çıkar
+        let updatedZones = custom.zones.map(z => {
+          if (playerId && z.playerId === playerId) {
+            return { ...z, playerId: null };
+          }
+          return z;
+        });
+
+        // Yeni bölgeye ata
+        updatedZones = updatedZones.map(z =>
+          z.id === zoneId ? { ...z, playerId } : z
+        );
+
+        set({
+          clubs: {
+            ...state.clubs,
+            [state.userClubId]: {
+              ...userClub,
+              formation: 'CUSTOM',
+              tactic: { ...userClub.tactic, formation: 'CUSTOM' },
+              customFormation: {
+                ...custom,
+                zones: updatedZones,
+              },
+            },
+          },
+        });
+      },
+
+      swapZones: (zoneIdA, zoneIdB) => {
+        const state = get();
+        const userClub = state.clubs[state.userClubId];
+        if (!userClub || !userClub.customFormation) return;
+
+        const zones = userClub.customFormation.zones;
+        const zoneA = zones.find(z => z.id === zoneIdA);
+        const zoneB = zones.find(z => z.id === zoneIdB);
+        if (!zoneA || !zoneB) return;
+
+        const updatedZones = zones.map(z => {
+          if (z.id === zoneIdA) return { ...z, playerId: zoneB.playerId };
+          if (z.id === zoneIdB) return { ...z, playerId: zoneA.playerId };
+          return z;
+        });
+
+        set({
+          clubs: {
+            ...state.clubs,
+            [state.userClubId]: {
+              ...userClub,
+              customFormation: {
+                ...userClub.customFormation,
+                zones: updatedZones,
+              },
+            },
+          },
+        });
+      },
+
+      clearZone: (zoneId) => {
+        const state = get();
+        const userClub = state.clubs[state.userClubId];
+        if (!userClub || !userClub.customFormation) return;
+
+        const updatedZones = userClub.customFormation.zones.map(z =>
+          z.id === zoneId ? { ...z, playerId: null } : z
+        );
+
+        set({
+          clubs: {
+            ...state.clubs,
+            [state.userClubId]: {
+              ...userClub,
+              customFormation: {
+                ...userClub.customFormation,
+                zones: updatedZones,
+              },
+            },
+          },
+        });
+      },
+
+      setZoneLabel: (zoneId, label) => {
+        const state = get();
+        const userClub = state.clubs[state.userClubId];
+        if (!userClub || !userClub.customFormation) return;
+
+        const updatedZones = userClub.customFormation.zones.map(z =>
+          z.id === zoneId ? { ...z, customLabel: label } : z
+        );
+
+        set({
+          clubs: {
+            ...state.clubs,
+            [state.userClubId]: {
+              ...userClub,
+              customFormation: {
+                ...userClub.customFormation,
+                zones: updatedZones,
+              },
+            },
+          },
+        });
+      },
+
+      resetZoneFormation: () => {
+        const state = get();
+        const userClub = state.clubs[state.userClubId];
+        if (!userClub) return;
+
+        set({
+          clubs: {
+            ...state.clubs,
+            [state.userClubId]: {
+              ...userClub,
+              customFormation: undefined,
+              formation: '4-4-2',
+              tactic: { ...userClub.tactic, formation: '4-4-2' },
+            },
+          },
+        });
+      },
+
+      autoFillZones: (formation) => {
+        const state = get();
+        const userClub = state.clubs[state.userClubId];
+        if (!userClub) return;
+
+        const custom = userClub.customFormation ?? createEmptyCustomFormation();
+
+        // ✅ ÖNCE TÜM BÖLGELERİ BOŞALT (garanti)
+        let zones = custom.zones.map(z => ({ ...z, playerId: null }));
+
+        // Kadrodaki oyuncuları al
+        const squad = Object.values(state.players).filter(
+          p =>
+            p.clubId === state.userClubId &&
+            p.squadRole !== 'u21' &&
+            p.injuryWeeks === 0 &&
+            p.suspensionWeeks === 0
+        );
+
+        // Formasyona göre bölge haritası
+        const mapping = getFormationZoneMapping(formation);
+        const usedIds = new Set<string>();
+        const usedZoneIds = new Set<string>();
+
+        // Her bölge için en iyi oyuncuyu bul (max 11)
+        for (let i = 0; i < mapping.length && i < MAX_PITCH_PLAYERS; i++) {
+          const { row, col } = mapping[i];
+          const zone = findZoneByPosition(zones, row, col, usedZoneIds);
+          if (!zone) continue;
+
+          const zonePos = zone.suggestedPosition;
+
+          // Önce doğal pozisyon
+          let candidate = squad
+            .filter(p => !usedIds.has(p.id))
+            .filter(p => p.position === zonePos)
+            .sort((a, b) => b.overall - a.overall)[0];
+
+          // Yoksa ikincil pozisyon
+          if (!candidate) {
+            candidate = squad
+              .filter(p => !usedIds.has(p.id))
+              .filter(p => p.secondaryPositions?.includes(zonePos))
+              .sort((a, b) => b.overall - a.overall)[0];
+          }
+
+          // Hâlâ yoksa en iyi uygun oyuncu
+          if (!candidate) {
+            candidate = squad
+              .filter(p => !usedIds.has(p.id))
+              .sort((a, b) => b.overall - a.overall)[0];
+          }
+
+          if (candidate) {
+            zones = zones.map(z =>
+              z.id === zone.id ? { ...z, playerId: candidate.id } : z
+            );
+            usedIds.add(candidate.id);
+            usedZoneIds.add(zone.id);
+          }
+        }
+
+        set({
+          clubs: {
+            ...state.clubs,
+            [state.userClubId]: {
+              ...userClub,
+              formation: 'CUSTOM',
+              tactic: { ...userClub.tactic, formation: 'CUSTOM' },
+              customFormation: {
+                ...custom,
+                zones,
+              },
+            },
+          },
+        });
+      },
+
+      setFormationMode: (mode) => {
+        const state = get();
+        const userClub = state.clubs[state.userClubId];
+        if (!userClub) return;
+
+        if (mode === 'custom') {
+          let custom = userClub.customFormation;
+
+          if (!custom) {
+            custom = createEmptyCustomFormation();
+          }
+
+          set({
+            clubs: {
+              ...state.clubs,
+              [state.userClubId]: {
+                ...userClub,
+                formation: 'CUSTOM',
+                tactic: { ...userClub.tactic, formation: 'CUSTOM' },
+                customFormation: custom,
+              },
+            },
+          });
+        } else {
+          set({
+            clubs: {
+              ...state.clubs,
+              [state.userClubId]: {
+                ...userClub,
+                formation: '4-4-2',
+                tactic: { ...userClub.tactic, formation: '4-4-2' },
+              },
+            },
+          });
+        }
+      },
     }),
     {
       name: 'fm-clone-save',
@@ -1189,7 +1467,6 @@ export const useGameStore = create<Store>()(
           merged.academy = { ...DEFAULT_ACADEMY };
         }
 
-        // Eski kayıtlarda contractYears yoksa ekle
         for (const id in merged.players) {
           const p = merged.players[id];
           if (p.contractYears === undefined) {

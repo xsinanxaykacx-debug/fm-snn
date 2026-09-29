@@ -14,8 +14,34 @@ export type Position =
   | 'KFL' | 'GF' | 'KFR'
   | 'ST';
 
-// Slot pozisyonu (aynı 17 pozisyon)
 export type SlotPosition = Position;
+
+// ═══════════════════════════════════════════════
+// 🆕 SAHA BÖLGELERİ (3 Sütun × 6 Satır = 16 Bölge)
+// ═══════════════════════════════════════════════
+
+// Satır: 0=GK, 1=DEFANS, 2=DEFANSİFORTA, 3=ORTA, 4=ATAKORTA, 5=FORVET
+// Sütun: 0=SOL, 1=ORTA, 2=SAĞ
+
+export type PitchRow = 'ST' | 'FORVET' | 'ATAKORTA' | 'ORTA' | 'DEFANSIFORTA' | 'DEFANS' | 'GK';
+export type PitchCol = 'SOL' | 'SOLORTA' | 'ORTA' | 'SAGORTA' | 'SAG';
+
+export interface PitchZone {
+  id: string;          // "r1_c0" gibi
+  row: number;         // 0-5
+  col: number;         // 0-2
+  rowName: PitchRow;
+  colName: PitchCol;
+  suggestedPosition: SlotPosition;  // Öneri (KFL, ST vs.)
+  playerId: string | null;          // Atanan oyuncu
+  customLabel?: SlotPosition;       // Kullanıcı etiketi değiştirdiyse
+}
+
+export interface CustomFormation {
+  id: string;
+  name: string;
+  zones: PitchZone[];  // 16 bölge
+}
 
 // ═══════════════════════════════════════════════
 // ATTRIBUTE'LAR (1-20)
@@ -66,7 +92,7 @@ export interface Attributes {
 }
 
 // ═══════════════════════════════════════════════
-// KARİYER İSTATİSTİKLERİ
+// KARİYER
 // ═══════════════════════════════════════════════
 
 export interface CareerStats {
@@ -153,24 +179,6 @@ export interface Tactic {
   width: 'narrow' | 'normal' | 'wide';
   directness: 'short' | 'mixed' | 'direct';
   defensiveLine: 'deep' | 'normal' | 'high';
-}
-
-// ═══════════════════════════════════════════════
-// 🆕 SERBEST FORMASYON
-// ═══════════════════════════════════════════════
-
-export interface CustomSlot {
-  id: string;
-  label: SlotPosition;
-  x: number;   // Saha X (%)
-  y: number;   // Saha Y (%)
-  playerId: string | null;
-}
-
-export interface CustomFormation {
-  id: string;
-  name: string;
-  slots: CustomSlot[];
 }
 
 // ═══════════════════════════════════════════════

@@ -54,7 +54,7 @@ export function resolveShot(
       xG: chance.xG,
       description: `GOL! ${shooter.name}`,
     };
-  } else if (roll < adjustedGoalProb + (1 - adjustedGoalProb) * 0.85) {
+  } else if (roll < adjustedGoalProb + (1 - adjustedGoalProb) * 0.92) {
     return {
       outcome: 'save',
       onTarget: true,

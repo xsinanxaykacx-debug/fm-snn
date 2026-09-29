@@ -14,14 +14,15 @@ import type { Player } from '../engine/types';
 function getPosColor(position: string): { bg: string; text: string; border: string } {
   if (position === 'GK') return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40' };
   if (['DC', 'DL', 'DR'].includes(position)) return { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/40' };
-  if (['DM', 'MC', 'ML', 'MR'].includes(position)) return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/40' };
+  if (['WBL', 'WBR'].includes(position)) return { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/40' };
+  if (['DMC', 'MC', 'ML', 'MR'].includes(position)) return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/40' };
   if (['AMC', 'AML', 'AMR'].includes(position)) return { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/40' };
-  if (position === 'ST') return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/40' };
+  if (['KFL', 'KFR', 'GF', 'ST'].includes(position)) return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/40' };
   return { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/40' };
 }
 
 // ═══════════════════════════════════════════════
-// LEADERBOARD TIPLERI
+// LEADERBOARD
 // ═══════════════════════════════════════════════
 
 type LeaderboardType = 'goals' | 'assists' | 'rating' | 'motm';
@@ -33,10 +34,6 @@ const LEADERBOARD_TABS: { key: LeaderboardType; label: string; icon: string }[] 
   { key: 'rating',  label: 'En İyi Reyting',  icon: '⭐' },
   { key: 'motm',    label: 'En Çok MVP',      icon: '🏆' },
 ];
-
-// ═══════════════════════════════════════════════
-// ANA COMPONENT
-// ═══════════════════════════════════════════════
 
 export function Stats() {
   const state = useGameStore();
@@ -62,7 +59,7 @@ export function Stats() {
   const getApps = (p: Player) =>
     mode === 'season' ? (p.careerStats?.seasonAppearances ?? 0) : (p.careerStats?.appearances ?? 0);
 
-  // ═══ LİSTELERİ HESAPLA ═══
+  // ═══ LİSTELER ═══
   const topScorers = allPlayers
     .filter(p => getGoals(p) > 0)
     .sort((a, b) => getGoals(b) - getGoals(a))
@@ -74,7 +71,7 @@ export function Stats() {
     .slice(0, 10);
 
   const topRated = allPlayers
-    .filter(p => getApps(p) >= (mode === 'season' ? 5 : 5) && getRating(p) > 0)
+    .filter(p => getApps(p) >= 5 && getRating(p) > 0)
     .sort((a, b) => getRating(b) - getRating(a))
     .slice(0, 10);
 
@@ -107,21 +104,30 @@ export function Stats() {
     ? Math.max(...currentList.map(p => getStatValue(p)), 1)
     : 1;
 
-  // ═══ ÖZET İSTATİSTİKLER ═══
-  const totalGoals = allPlayers.reduce((s, p) =>
+  // ═══ ÖZET — LİG TOPLAMI ═══
+  const leagueTotalGoals = allPlayers.reduce((s, p) =>
     s + (mode === 'season' ? (p.careerStats?.seasonGoals ?? 0) : (p.careerStats?.goals ?? 0)), 0);
 
-  const totalAssists = allPlayers.reduce((s, p) =>
+  const leagueTotalAssists = allPlayers.reduce((s, p) =>
     s + (mode === 'season' ? (p.careerStats?.seasonAssists ?? 0) : (p.careerStats?.assists ?? 0)), 0);
 
-  const totalApps = allPlayers.reduce((s, p) =>
+  const leagueTotalApps = allPlayers.reduce((s, p) =>
     s + (mode === 'season' ? (p.careerStats?.seasonAppearances ?? 0) : (p.careerStats?.appearances ?? 0)), 0);
 
-  const userSquadCount = allPlayers.filter(p => p.clubId === state.userClubId).length;
+  // ═══ ÖZET — SENİN TAKIMIN ═══
+  const userPlayers = allPlayers.filter(p => p.clubId === state.userClubId);
+
+  const userTotalGoals = userPlayers.reduce((s, p) =>
+    s + (mode === 'season' ? (p.careerStats?.seasonGoals ?? 0) : (p.careerStats?.goals ?? 0)), 0);
+
+  const userTotalAssists = userPlayers.reduce((s, p) =>
+    s + (mode === 'season' ? (p.careerStats?.seasonAssists ?? 0) : (p.careerStats?.assists ?? 0)), 0);
+
+  const userSquadCount = userPlayers.length;
 
   return (
     <div className="space-y-4">
-      {/* ═══ BAŞLIK ═══ */}
+      {/* BAŞLIK */}
       <div className="glass-panel rounded-xl p-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -135,7 +141,6 @@ export function Stats() {
             </p>
           </div>
 
-          {/* MOD SEÇİCİ */}
           <div className="flex gap-2 bg-pitch-900 rounded-lg p-1">
             <button
               onClick={() => setMode('season')}
@@ -161,7 +166,7 @@ export function Stats() {
         </div>
       </div>
 
-      {/* ═══ TAB SEÇİCİ ═══ */}
+      {/* TAB SEÇİCİ */}
       <div className="glass-panel rounded-xl p-3">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {LEADERBOARD_TABS.map(tab => (
@@ -181,15 +186,13 @@ export function Stats() {
         </div>
       </div>
 
-      {/* ═══ LİDERLİK TABLOSU ═══ */}
+      {/* LİDERLİK TABLOSU */}
       <div className="glass-panel rounded-xl p-5">
         {currentList.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-lg mb-2">📊 Henüz veri yok</p>
             <p className="text-xs text-slate-500">
-              {mode === 'season'
-                ? 'Bu sezon henüz maç oynanmadı'
-                : 'Henüz kariyer verisi yok'}
+              {mode === 'season' ? 'Bu sezon henüz maç oynanmadı' : 'Henüz kariyer verisi yok'}
             </p>
           </div>
         ) : (
@@ -271,38 +274,76 @@ export function Stats() {
         )}
       </div>
 
-      {/* ═══ ÖZET KARTLARI ═══ */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <TeamStatCard
-          label="Senin Takımın"
-          value={userSquadCount}
-          icon="👥"
-          suffix="oyuncu"
-        />
-        <TeamStatCard
-          label={mode === 'season' ? 'Bu Sezon Gol' : 'Toplam Gol'}
-          value={totalGoals}
-          icon="⚽"
-          suffix="gol"
-          color="text-green-400"
-        />
-        <TeamStatCard
-          label={mode === 'season' ? 'Bu Sezon Asist' : 'Toplam Asist'}
-          value={totalAssists}
-          icon="🎯"
-          suffix="asist"
-          color="text-blue-400"
-        />
-        <TeamStatCard
-          label={mode === 'season' ? 'Bu Sezon Maç' : 'Toplam Maç'}
-          value={totalApps}
-          icon="🏟️"
-          suffix="maç"
-          color="text-purple-400"
-        />
+      {/* ÖZET — LİG + SENİN TAKIM */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* LİG TOPLAMI */}
+        <div className="glass-panel rounded-xl p-5">
+          <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+            🌍 Lig Toplamı ({allPlayers.length} oyuncu)
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
+            <TeamStatCard
+              label={mode === 'season' ? 'Lig Gol' : 'Lig Toplam Gol'}
+              value={leagueTotalGoals}
+              icon="⚽"
+              suffix="gol"
+              color="text-green-400"
+            />
+            <TeamStatCard
+              label={mode === 'season' ? 'Lig Asist' : 'Lig Toplam Asist'}
+              value={leagueTotalAssists}
+              icon="🎯"
+              suffix="asist"
+              color="text-blue-400"
+            />
+            <TeamStatCard
+              label={mode === 'season' ? 'Lig Maç' : 'Lig Toplam Maç'}
+              value={leagueTotalApps}
+              icon="🏟️"
+              suffix="maç"
+              color="text-purple-400"
+            />
+          </div>
+        </div>
+
+        {/* SENİN TAKIM */}
+        <div className="glass-panel rounded-xl p-5">
+          <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+            🎯 {state.clubs[state.userClubId]?.name} ({userSquadCount} oyuncu)
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
+            <TeamStatCard
+              label={mode === 'season' ? 'Takım Gol' : 'Kariyer Gol'}
+              value={userTotalGoals}
+              icon="⚽"
+              suffix="gol"
+              color="text-cyan-400"
+            />
+            <TeamStatCard
+              label={mode === 'season' ? 'Takım Asist' : 'Kariyer Asist'}
+              value={userTotalAssists}
+              icon="🎯"
+              suffix="asist"
+              color="text-cyan-400"
+            />
+            <TeamStatCard
+              label={mode === 'season' ? 'Takım Maç' : 'Kariyer Maç'}
+              value={
+                userPlayers.reduce((s, p) =>
+                  s + (mode === 'season'
+                    ? (p.careerStats?.seasonAppearances ?? 0)
+                    : (p.careerStats?.appearances ?? 0)
+                  ), 0)
+              }
+              icon="🏟️"
+              suffix="maç"
+              color="text-cyan-400"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* ═══ SENİN TAKIMININ İSTATİSTİKLERİ ═══ */}
+      {/* SENİN TAKIMININ İSTATİSTİKLERİ */}
       <div className="glass-panel rounded-xl p-5">
         <h3 className="text-base font-bold text-white mb-3">
           🎯 {state.clubs[state.userClubId]?.name} — {mode === 'season' ? 'Bu Sezon' : 'Kariyer'}
@@ -325,8 +366,7 @@ export function Stats() {
               </tr>
             </thead>
             <tbody>
-              {Object.values(state.players)
-                .filter(p => p.clubId === state.userClubId)
+              {userPlayers
                 .sort((a, b) => {
                   const aGoals = mode === 'season'
                     ? (a.careerStats?.seasonGoals ?? 0)
@@ -397,7 +437,7 @@ export function Stats() {
 }
 
 // ═══════════════════════════════════════════════
-// YARDIMCI COMPONENT
+// YARDIMCI
 // ═══════════════════════════════════════════════
 
 function TeamStatCard({
@@ -414,14 +454,14 @@ function TeamStatCard({
   color?: string;
 }) {
   return (
-    <div className="glass-panel rounded-xl p-4">
+    <div className="glass-card rounded-lg p-3 border border-pitch-700/50">
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-lg">{icon}</span>
-        <span className="text-[10px] text-slate-400 uppercase">{label}</span>
+        <span className="text-base">{icon}</span>
+        <span className="text-[9px] text-slate-400 uppercase">{label}</span>
       </div>
-      <div className={`text-2xl font-bold ${color ?? 'text-slate-200'}`}>
+      <div className={`text-xl font-bold ${color ?? 'text-slate-200'}`}>
         {value.toLocaleString()}
-        <span className="text-xs text-slate-500 ml-1 font-normal">{suffix}</span>
+        <span className="text-[10px] text-slate-500 ml-1 font-normal">{suffix}</span>
       </div>
     </div>
   );

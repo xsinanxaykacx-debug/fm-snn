@@ -1,6 +1,6 @@
 // src/components/Squad.tsx
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { scorePlayer } from '../engine/data/generateData';
 import { getContractStatus } from '../engine/progression/contract';
@@ -15,10 +15,18 @@ import { getAttrColor, getOverallColor } from '../utils/attributeColor';
 function getPositionColor(position: string): { bg: string; text: string; border: string } {
   if (position === 'GK') return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40' };
   if (['DC', 'DL', 'DR'].includes(position)) return { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/40' };
-  if (['DM', 'MC', 'ML', 'MR'].includes(position)) return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/40' };
+  if (['WBL', 'WBR'].includes(position)) return { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500/40' };
+  if (['DMC', 'MC', 'ML', 'MR'].includes(position)) return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/40' };
   if (['AMC', 'AML', 'AMR'].includes(position)) return { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/40' };
-  if (position === 'ST') return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/40' };
+  if (['KFL', 'KFR', 'GF', 'ST'].includes(position)) return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/40' };
   return { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/40' };
+}
+
+function getConditionColor(value: number): string {
+  if (value >= 80) return 'bg-green-500';
+  if (value >= 60) return 'bg-yellow-500';
+  if (value >= 40) return 'bg-orange-500';
+  return 'bg-red-500';
 }
 
 function getSquadRoleLabel(role: string): { icon: string; label: string; color: string } {
@@ -32,27 +40,14 @@ function getSquadRoleLabel(role: string): { icon: string; label: string; color: 
 }
 
 // ═══════════════════════════════════════════════
-// SIRALAMA TİPLERİ
+// SIRALAMA
 // ═══════════════════════════════════════════════
 
 type SortKey =
-  | 'name'
-  | 'position'
-  | 'age'
-  | 'overall'
-  | 'role'
-  | 'contract'
-  | 'form'
-  | 'condition'
-  | 'morale'
-  | 'pace'
-  | 'shooting'
-  | 'passing'
-  | 'dribbling'
-  | 'marking'
-  | 'strength'
-  | 'value'
-  | 'wage';
+  | 'name' | 'position' | 'age' | 'overall' | 'role' | 'contract'
+  | 'form' | 'condition' | 'morale'
+  | 'pace' | 'shooting' | 'passing' | 'dribbling' | 'marking' | 'strength'
+  | 'value' | 'wage';
 
 type SortDir = 'asc' | 'desc';
 
@@ -61,7 +56,18 @@ interface SortConfig {
   dir: SortDir;
 }
 
-const POSITION_ORDER = ['GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST'];
+// 17 Pozisyon Sırası
+const POSITION_ORDER: Position[] = [
+  'GK',
+  'DL', 'DC', 'DR',
+  'WBL', 'WBR',
+  'DMC',
+  'ML', 'MC', 'MR',
+  'AML', 'AMC', 'AMR',
+  'KFL', 'GF', 'KFR',
+  'ST',
+];
+
 const ROLE_ORDER = ['first', 'rotation', 'backup', 'u21'];
 
 function getSortValue(p: Player, key: SortKey): number | string {
@@ -88,19 +94,28 @@ function getSortValue(p: Player, key: SortKey): number | string {
   }
 }
 
+// ═══════════════════════════════════════════════
+// 17 POZİSYON FİLTRELERİ
+// ═══════════════════════════════════════════════
+
 const POSITION_FILTERS: { key: Position | 'ALL'; label: string }[] = [
   { key: 'ALL', label: 'Tümü' },
   { key: 'GK',  label: 'GK' },
-  { key: 'DC',  label: 'DC' },
   { key: 'DL',  label: 'DL' },
+  { key: 'DC',  label: 'DC' },
   { key: 'DR',  label: 'DR' },
-  { key: 'DM',  label: 'DM' },
-  { key: 'MC',  label: 'MC' },
+  { key: 'WBL', label: 'WBL' },
+  { key: 'WBR', label: 'WBR' },
+  { key: 'DMC', label: 'DMC' },
   { key: 'ML',  label: 'ML' },
+  { key: 'MC',  label: 'MC' },
   { key: 'MR',  label: 'MR' },
-  { key: 'AMC', label: 'AMC' },
   { key: 'AML', label: 'AML' },
+  { key: 'AMC', label: 'AMC' },
   { key: 'AMR', label: 'AMR' },
+  { key: 'KFL', label: 'KFL' },
+  { key: 'GF',  label: 'GF' },
+  { key: 'KFR', label: 'KFR' },
   { key: 'ST',  label: 'ST' },
 ];
 
@@ -178,13 +193,10 @@ export function Squad() {
   const allSquad = Object.values(state.players)
     .filter(p => p.clubId === state.userClubId);
 
-  const squad = useMemo(() => {
-    const filtered = allSquad
-      .filter(p => squadView === 'all' || p.squadRole === squadView)
-      .filter(p => posFilter === 'ALL' || p.position === posFilter);
-
-    // Sırala
-    const sorted = [...filtered].sort((a, b) => {
+  const squad = allSquad
+    .filter(p => squadView === 'all' || p.squadRole === squadView)
+    .filter(p => posFilter === 'ALL' || p.position === posFilter)
+    .sort((a, b) => {
       const aVal = getSortValue(a, sort.key);
       const bVal = getSortValue(b, sort.key);
 
@@ -197,9 +209,6 @@ export function Squad() {
 
       return sort.dir === 'asc' ? cmp : -cmp;
     });
-
-    return sorted;
-  }, [allSquad, squadView, posFilter, sort]);
 
   // İstatistikler
   const firstTeam = allSquad.filter(p => p.squadRole !== 'u21');
@@ -300,7 +309,6 @@ export function Squad() {
           })}
         </div>
 
-        {/* SEÇİLİ AKSİYONLAR */}
         {checkedPlayers.size > 0 && (
           <div className="bg-accent/10 border border-accent/40 rounded-lg p-3 flex items-center justify-between flex-wrap gap-2">
             <span className="text-xs text-accent font-bold">
@@ -363,7 +371,7 @@ export function Squad() {
                 />
               </th>
               <SortHeader label="İsim" sortKey="name" currentSort={sort} onSort={handleSort} />
-              <SortHeader label="Poz" sortKey="position" currentSort={sort} onSort={handleSort} className="text-center" align="center" />
+              <SortHeader label="Poz" sortKey="position" currentSort={sort} onSort={handleSort} align="center" />
               <SortHeader label="Yaş" sortKey="age" currentSort={sort} onSort={handleSort} align="center" />
               <SortHeader label="Gen" sortKey="overall" currentSort={sort} onSort={handleSort} align="center" />
               <SortHeader label="Rol" sortKey="role" currentSort={sort} onSort={handleSort} />

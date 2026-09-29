@@ -2,7 +2,7 @@
 
 import type { Club, Match, MatchEvent, Player } from '../types';
 import { getStartingXI } from '../data/generateData';
-import { analyzeTeam } from './teamAnalysis';
+import { analyzeTeam, eff } from './teamAnalysis';
 import {
   createTeamMatchState,
   updateDynamicTactics,
@@ -17,7 +17,7 @@ import {
 import { createAttackSequence } from './attackSequence';
 import { calculateChanceFromSequence } from './chance';
 import { resolveShot } from './goalkeeper';
-import { pickShooter } from './attack';
+import { pickShooter, pickScorer } from './attack';
 
 function pickInjuryType(severity: 'light' | 'medium' | 'severe'): string {
   const light = ['Kas Agrisi', 'Kucuk Burkulma', 'Hafif Darbe'];
@@ -39,7 +39,7 @@ function ensureInjuredPlayers(teamState: any): void {
 }
 
 // ═══════════════════════════════════════════════
-// İSTATİSTİK GÜNCELLEME (Kariyer + Sezon + recentRatings)
+// İSTATİSTİK GÜNCELLEME
 // ═══════════════════════════════════════════════
 
 interface StatsUpdate {
@@ -62,25 +62,13 @@ function updateCareerStats(
   if (!player) return;
 
   const stats = player.careerStats ?? {
-    appearances: 0,
-    goals: 0,
-    assists: 0,
-    yellowCards: 0,
-    redCards: 0,
-    avgRating: 0,
-    minutesPlayed: 0,
-    motm: 0,
-    seasonAppearances: 0,
-    seasonGoals: 0,
-    seasonAssists: 0,
-    seasonYellowCards: 0,
-    seasonRedCards: 0,
-    seasonAvgRating: 0,
-    seasonMinutesPlayed: 0,
-    seasonMotm: 0,
+    appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0,
+    avgRating: 0, minutesPlayed: 0, motm: 0,
+    seasonAppearances: 0, seasonGoals: 0, seasonAssists: 0,
+    seasonYellowCards: 0, seasonRedCards: 0, seasonAvgRating: 0,
+    seasonMinutesPlayed: 0, seasonMotm: 0,
   };
 
-  // ═══ KARİYER ═══
   if (update.goals) stats.goals += update.goals;
   if (update.assists) stats.assists += update.assists;
   if (update.yellowCards) stats.yellowCards += update.yellowCards;
@@ -89,7 +77,6 @@ function updateCareerStats(
   if (update.minutesPlayed) stats.minutesPlayed += update.minutesPlayed;
   if (update.motm) stats.motm += update.motm;
 
-  // ═══ SEZON ═══
   if (update.goals) stats.seasonGoals += update.goals;
   if (update.assists) stats.seasonAssists += update.assists;
   if (update.yellowCards) stats.seasonYellowCards += update.yellowCards;
@@ -98,21 +85,18 @@ function updateCareerStats(
   if (update.minutesPlayed) stats.seasonMinutesPlayed += update.minutesPlayed;
   if (update.motm) stats.seasonMotm += update.motm;
 
-  // ═══ KARİYER ORTALAMA REYTİNG ═══
   if (update.rating !== undefined && update.rating > 0) {
     const previousTotal = stats.avgRating * Math.max(0, stats.appearances - 1);
     const newTotal = previousTotal + update.rating;
     const divisor = Math.max(1, stats.appearances);
     stats.avgRating = Math.round((newTotal / divisor) * 100) / 100;
 
-    // SEZON ORTALAMA
     const prevSeasonTotal = stats.seasonAvgRating * Math.max(0, stats.seasonAppearances - 1);
     const newSeasonTotal = prevSeasonTotal + update.rating;
     const seasonDivisor = Math.max(1, stats.seasonAppearances);
     stats.seasonAvgRating = Math.round((newSeasonTotal / seasonDivisor) * 100) / 100;
   }
 
-  // ═══ SON 5 MAÇ REYTİNGİ ═══
   let recentRatings = player.recentRatings ?? [];
   if (update.rating !== undefined && update.rating > 0) {
     recentRatings = [...recentRatings, update.rating].slice(-5);
@@ -235,6 +219,9 @@ export function simulateMatch(
       continue;
     }
 
+    // 🎯 Gerçek golcü
+    const scorer = pickScorer(attackXI2, sequence.finalZone, shooter);
+
     const chance = calculateChanceFromSequence(sequence, shooter, attackState, defendState);
 
     attackState.shots++;
@@ -256,13 +243,65 @@ export function simulateMatch(
       attackState.onTarget++;
       attackState.dangerousAttacks++;
 
-      updateCareerStats(players, shooter.id, { goals: 1 });
+      // 🎯 GOLCÜYÜ kaydet
+      updateCareerStats(players, scorer.id, { goals: 1 });
 
-      const lastPass = sequence.actions
-        .filter(a => a.success && (a.action === 'pass' || a.action === 'throughBall' || a.action === 'cross'))
-        .slice(-1)[0];
-      if (lastPass && lastPass.playerId !== shooter.id) {
-        updateCareerStats(players, lastPass.playerId, { assists: 1 });
+      // 🎯 ASİST — %75 ihtimalle asist var
+      const assistChance = 0.75;
+      const hasAssist = Math.random() < assistChance;
+
+      if (hasAssist) {
+        const successfulPasses = sequence.actions.filter(a =>
+          a.success &&
+          a.playerId !== scorer.id &&
+          (a.action === 'pass' || a.action === 'throughBall' || a.action === 'cross')
+        );
+
+        let assisterId: string | null = null;
+
+        if (successfulPasses.length > 0) {
+          assisterId = successfulPasses[successfulPasses.length - 1].playerId;
+        } else {
+          const assistCandidates = attackXI2.filter(p => {
+            if (p.id === scorer.id) return false;
+            if (p.position === 'GK') return false;
+            return true;
+          });
+
+          if (assistCandidates.length > 0) {
+            const weights = assistCandidates.map(p => {
+              const passing = eff(p, 'passing');
+              const vision = eff(p, 'vision');
+              const crossing = eff(p, 'crossing');
+
+              let positionWeight = 1;
+              if (['MC', 'ML', 'MR', 'AMC', 'AML', 'AMR'].includes(p.position)) positionWeight = 3;
+              else if (['WBL', 'WBR', 'DMC'].includes(p.position)) positionWeight = 2;
+              else if (['ST', 'GF', 'KFL', 'KFR'].includes(p.position)) positionWeight = 1.5;
+              else if (['DC', 'DL', 'DR'].includes(p.position)) positionWeight = 1;
+
+              const attrWeight = passing * 0.5 + vision * 0.3 + crossing * 0.2;
+              return Math.max(1, positionWeight * (attrWeight / 50));
+            });
+
+            const totalWeight = weights.reduce((a, b) => a + b, 0);
+            let r = Math.random() * totalWeight;
+            for (let i = 0; i < assistCandidates.length; i++) {
+              r -= weights[i];
+              if (r <= 0) {
+                assisterId = assistCandidates[i].id;
+                break;
+              }
+            }
+            if (!assisterId) {
+              assisterId = assistCandidates[assistCandidates.length - 1].id;
+            }
+          }
+        }
+
+        if (assisterId) {
+          updateCareerStats(players, assisterId, { assists: 1 });
+        }
       }
 
       const zoneLabel = getZoneLabel(sequence.finalZone);
@@ -272,9 +311,9 @@ export function simulateMatch(
         event: {
           minute: state.minute,
           type: 'goal',
-          playerId: shooter.id,
+          playerId: scorer.id,
           clubId: attackClub.id,
-          description: `GOL! ${shooter.name} (${attackClub.shortName}) - ${zoneLabel} ${chance.distance.toFixed(0)}m (xG: ${chance.xG.toFixed(2)})`,
+          description: `GOL! ${scorer.name} (${attackClub.shortName}) - ${zoneLabel} ${chance.distance.toFixed(0)}m (xG: ${chance.xG.toFixed(2)})`,
         },
       });
     } else if (shotResult.outcome === 'save') {
@@ -321,10 +360,7 @@ export function simulateMatch(
 
   const possession = calculatePossession(state);
 
-  // ═══════════════════════════════════════════════
-  // MAÇ SONUNDA TÜM OYUNCULARA REYTİNG VER
-  // ═══════════════════════════════════════════════
-
+  // ═══ MAÇ SONU REYTİNG ═══
   const allPlayers = [...homeXI, ...awayXI];
   const homeGoalDiff = state.homeScore - state.awayScore;
   const awayGoalDiff = state.awayScore - state.homeScore;
@@ -411,7 +447,7 @@ function processCardsInMatch(
   );
 
   const defenders = activePlayers.filter(p =>
-    ['DC', 'DL', 'DR', 'DM', 'MC'].includes(p.position)
+    ['DC', 'DL', 'DR', 'DMC', 'MC'].includes(p.position)
   );
   const pool = defenders.length > 0 ? defenders : activePlayers;
   if (pool.length === 0) return;

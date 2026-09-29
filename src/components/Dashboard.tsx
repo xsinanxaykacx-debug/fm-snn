@@ -18,7 +18,7 @@ interface Props {
 }
 
 // ═══════════════════════════════════════════════
-// FORM GRAFİĞİ (xG trendi)
+// FORM GRAFİĞİ
 // ═══════════════════════════════════════════════
 
 function FormChart({ clubId }: { clubId: string }) {
@@ -34,7 +34,6 @@ function FormChart({ clubId }: { clubId: string }) {
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
-    // Son 8 maçı al
     const last8 = [...state.fixtures]
       .filter(m => m.played && (m.homeId === clubId || m.awayId === clubId))
       .sort((a, b) => (a.week ?? 0) - (b.week ?? 0))
@@ -255,14 +254,14 @@ export function Dashboard({ onNavigate }: Props) {
             </div>
 
             <button
-              onClick={() => onNavigate('match')}
+              onClick={() => onNavigate('fixtures')}
               className="w-full py-3 rounded-md font-bold text-white transition-all hover:scale-[1.02]"
               style={{
                 backgroundColor: '#22c55e',
                 boxShadow: '0 0 20px rgba(34,197,94,0.4)',
               }}
             >
-              ▶ Haftayı Oyna
+              ▶ Fikstüre Git
             </button>
           </div>
         ) : (
