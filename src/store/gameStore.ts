@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { GameState, Player, Club, TrainingFocus, AssistantSettings } from '../engine/types';
-import { generateGameData } from '../engine/data/generateData';
+import { generateGameData, replaceRetiredPlayers } from '../engine/data/generateData';
 import { generateFixtures } from '../engine/league/fixtures';
 import { initTable, updateTable } from '../engine/league/table';
 import { simulateMatch } from '../engine/match/simulate';
@@ -364,8 +364,8 @@ export const useGameStore = create<Store>()(
       // ═══════════════════════════════════════════════
       simulateAssistantPress: () => {
         const state = get();
-        const moraleDelta = Math.floor((Math.random() - 0.5) * 6); // -3..+3
-        const boardDelta = Math.floor((Math.random() - 0.5) * 3); // -1..+1
+        const moraleDelta = Math.floor((Math.random() - 0.5) * 6);
+        const boardDelta = Math.floor((Math.random() - 0.5) * 3);
 
         get().applyPressEffects(moraleDelta, boardDelta);
 
@@ -447,7 +447,6 @@ export const useGameStore = create<Store>()(
               isHome,
             };
 
-            // 🆕 MAÇ ANALİZİ (yardımcı menajer açıksa)
             const currentAssistant = state.assistant ?? DEFAULT_ASSISTANT;
             if (currentAssistant.matchAnalysis) {
               const analysis = analyzeMatch(
@@ -513,7 +512,7 @@ export const useGameStore = create<Store>()(
           newPlayers[id] = p;
         }
 
-        // 🆕 ANTRENMAN — Asistan veya manuel
+        // ANTRENMAN — Asistan veya manuel
         const currentAssistant = state.assistant ?? DEFAULT_ASSISTANT;
         let trainingToApply = state.training;
 
@@ -545,7 +544,6 @@ export const useGameStore = create<Store>()(
           pendingPressMatch: userMatch,
         });
 
-        // Inbox mesajları
         addInjuryMessages(
           newPlayers,
           state.userClubId,
@@ -573,8 +571,13 @@ export const useGameStore = create<Store>()(
       advanceSeason: () => {
         const state = get();
 
+        // 1. Oyuncuları geliştir (yaş +1, attribute güncelle, 36+ emekli → silinir)
         let newPlayers = developPlayers(state.players);
 
+        // 2. Emekli olanların yerine genç üret (eksik kadroları doldur)
+        newPlayers = replaceRetiredPlayers(newPlayers, state.clubs);
+
+        // 3. Sezon istatistiklerini sıfırla
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
           if (p.careerStats) {
@@ -593,7 +596,7 @@ export const useGameStore = create<Store>()(
           newPlayers[id] = p;
         }
 
-        // AI TRANSFER
+        // 4. AI TRANSFER
         const transferResult = aiTransferWindow(
           state.clubs,
           newPlayers,
@@ -602,6 +605,7 @@ export const useGameStore = create<Store>()(
         newPlayers = transferResult.players;
         const newClubs = transferResult.clubs;
 
+        // 5. Yeni sezon fikstürü
         const season = state.season + 1;
         const fixtures = generateFixtures(newClubs, season);
         const table = initTable(Object.keys(newClubs));
@@ -712,7 +716,7 @@ export const useGameStore = create<Store>()(
       },
 
       // ═══════════════════════════════════════════════
-      // TRANSFER SAT — ALICI KULÜBE GİDER
+      // TRANSFER SAT
       // ═══════════════════════════════════════════════
       transferSell: (playerId, buyerClubId) => {
         const state = get();
@@ -814,21 +818,17 @@ export const useGameStore = create<Store>()(
     }),
     {
       name: 'fm-clone-save',
-      // Eski kayıtlarda eksik alanlar için fallback
       merge: (persistedState: any, currentState: Store) => {
         const merged = { ...currentState, ...persistedState };
 
-        // assistant fallback
         if (!merged.assistant) {
           merged.assistant = { ...DEFAULT_ASSISTANT };
         }
 
-        // userLineup fallback
         if (!merged.userLineup) {
           merged.userLineup = [];
         }
 
-        // training fallback
         if (!merged.training) {
           merged.training = { focus: 'balanced', intensity: 'normal' };
         }

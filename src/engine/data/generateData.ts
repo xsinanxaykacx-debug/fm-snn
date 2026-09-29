@@ -1,3 +1,5 @@
+// src/engine/data/generateData.ts
+
 import type {
   Attributes,
   CareerStats,
@@ -8,19 +10,33 @@ import type {
   Tactic,
 } from '../types';
 
+// ═══════════════════════════════════════════════
+// SABİTLER
+// ═══════════════════════════════════════════════
+
+export const MIN_AGE = 15;
+export const MAX_AGE = 35;
+export const RETIREMENT_AGE = 35;  // 35 yaşında son sezon, 36'da emekli
+
 const FIRST_NAMES = [
   'Luis', 'Marco', 'Carlos', 'Diego', 'Juan', 'Pedro', 'Miguel', 'Sergio', 'Andres', 'Javier',
   'Emre', 'Mehmet', 'Can', 'Hakan', 'Ozan', 'Yusuf', 'Burak', 'Arda', 'Cenk', 'Kerem',
   'John', 'Michael', 'William', 'Robert', 'James', 'Thomas', 'Daniel', 'David', 'Paul', 'Peter',
+  'Leo', 'Theo', 'Luca', 'Kaan', 'Mert', 'Ali', 'Efe', 'Poyraz', 'Miraç', 'Alp',
 ];
 
 const LAST_NAMES = [
   'Kaya', 'Demir', 'Yılmaz', 'Çelik', 'Şahin', 'Yıldız', 'Aydın', 'Öztürk', 'Arslan', 'Doğan',
   'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez',
   'Silva', 'Santos', 'Ferreira', 'Costa', 'Oliveira', 'Pereira', 'Romano', 'Esposito', 'Rossi', 'Ferrari',
+  'Yalçın', 'Koç', 'Kurt', 'Özdemir', 'Erdoğan', 'Aslan', 'Çetin', 'Kılıç', 'Aksoy', 'Polat',
 ];
 
 const NATIONALITIES = ['TR', 'EN', 'DE', 'FR', 'ES', 'IT', 'BR', 'AR', 'NL', 'PT'];
+
+// ═══════════════════════════════════════════════
+// YARDIMCI FONKSİYONLAR
+// ═══════════════════════════════════════════════
 
 function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -39,6 +55,32 @@ function randomName(): string {
 
 function randomNationality(): string {
   return NATIONALITIES[Math.floor(Math.random() * NATIONALITIES.length)];
+}
+
+// ═══════════════════════════════════════════════
+// YAŞ DAĞILIMI (15-35)
+// ═══════════════════════════════════════════════
+
+function generateAge(): number {
+  const roll = Math.random();
+  if (roll < 0.10) return 15 + Math.floor(Math.random() * 3);   // 15-17
+  if (roll < 0.30) return 18 + Math.floor(Math.random() * 4);   // 18-21
+  if (roll < 0.55) return 22 + Math.floor(Math.random() * 4);   // 22-25
+  if (roll < 0.80) return 26 + Math.floor(Math.random() * 4);   // 26-29
+  if (roll < 0.95) return 30 + Math.floor(Math.random() * 3);   // 30-32
+  return 33 + Math.floor(Math.random() * 3);                     // 33-35
+}
+
+function ageAttributeBias(age: number): number {
+  if (age <= 16) return -4;
+  if (age <= 18) return -3;
+  if (age <= 20) return -2;
+  if (age <= 22) return -1;
+  if (age <= 26) return 0;
+  if (age <= 29) return 0;
+  if (age <= 31) return -0.5;
+  if (age <= 33) return -1;
+  return -1.5;
 }
 
 export function createEmptyCareerStats(): CareerStats {
@@ -82,8 +124,9 @@ function generateSecondaryPositions(position: Position): Position[] {
 // ATTRIBUTE ÜRETİMİ
 // ═══════════════════════════════════════════════
 
-function randomAttributes(position: Position): Attributes {
-  const base = (avg = 10) => fmRandom(avg, 4);
+function randomAttributes(position: Position, age: number): Attributes {
+  const bias = ageAttributeBias(age);
+  const base = (avg = 10) => fmRandom(Math.max(3, avg + bias), 4);
 
   const a: Attributes = {
     passing: base(), firstTouch: base(), dribbling: base(), crossing: base(),
@@ -103,116 +146,115 @@ function randomAttributes(position: Position): Attributes {
     handling: fmRandom(3, 2), oneOnOne: fmRandom(3, 2), aerialReach: fmRandom(3, 2),
   };
 
-  // Mevki bazlı boost
   if (position === 'GK') {
-    a.goalkeeper = fmRandom(15, 3);
-    a.reflexes = fmRandom(15, 3);
-    a.gkPositioning = fmRandom(15, 3);
-    a.handling = fmRandom(14, 3);
-    a.oneOnOne = fmRandom(14, 3);
-    a.aerialReach = fmRandom(14, 3);
-    a.concentration = fmRandom(13, 3);
-    a.decisions = fmRandom(12, 3);
+    a.goalkeeper = fmRandom(Math.max(3, 15 + bias), 3);
+    a.reflexes = fmRandom(Math.max(3, 15 + bias), 3);
+    a.gkPositioning = fmRandom(Math.max(3, 15 + bias), 3);
+    a.handling = fmRandom(Math.max(3, 14 + bias), 3);
+    a.oneOnOne = fmRandom(Math.max(3, 14 + bias), 3);
+    a.aerialReach = fmRandom(Math.max(3, 14 + bias), 3);
+    a.concentration = fmRandom(Math.max(3, 13 + bias), 3);
+    a.decisions = fmRandom(Math.max(3, 12 + bias), 3);
     a.finishing = fmRandom(3, 1);
     a.shooting = fmRandom(4, 2);
     a.dribbling = fmRandom(4, 2);
     a.crossing = fmRandom(4, 2);
     a.marking = fmRandom(3, 1);
     a.tackling = fmRandom(3, 1);
-    a.pace = fmRandom(7, 3);
+    a.pace = fmRandom(Math.max(3, 7 + bias), 3);
     a.offTheBall = fmRandom(4, 2);
   } else if (position === 'DC') {
-    a.marking = fmRandom(15, 3);
-    a.tackling = fmRandom(15, 3);
-    a.defensivePositioning = fmRandom(14, 3);
-    a.heading = fmRandom(14, 3);
-    a.strength = fmRandom(14, 3);
-    a.anticipation = fmRandom(13, 3);
-    a.concentration = fmRandom(13, 3);
-    a.bravery = fmRandom(13, 3);
+    a.marking = fmRandom(Math.max(3, 15 + bias), 3);
+    a.tackling = fmRandom(Math.max(3, 15 + bias), 3);
+    a.defensivePositioning = fmRandom(Math.max(3, 14 + bias), 3);
+    a.heading = fmRandom(Math.max(3, 14 + bias), 3);
+    a.strength = fmRandom(Math.max(3, 14 + bias), 3);
+    a.anticipation = fmRandom(Math.max(3, 13 + bias), 3);
+    a.concentration = fmRandom(Math.max(3, 13 + bias), 3);
+    a.bravery = fmRandom(Math.max(3, 13 + bias), 3);
     a.finishing = fmRandom(4, 2);
     a.shooting = fmRandom(5, 2);
     a.dribbling = fmRandom(6, 3);
     a.crossing = fmRandom(6, 3);
     a.longShots = fmRandom(4, 2);
-    a.pace = fmRandom(10, 3);
+    a.pace = fmRandom(Math.max(3, 10 + bias), 3);
   } else if (position === 'DL' || position === 'DR') {
-    a.marking = fmRandom(13, 3);
-    a.tackling = fmRandom(13, 3);
-    a.defensivePositioning = fmRandom(12, 3);
-    a.pace = fmRandom(14, 3);
-    a.acceleration = fmRandom(14, 3);
-    a.stamina = fmRandom(14, 3);
-    a.crossing = fmRandom(12, 3);
-    a.workRate = fmRandom(13, 3);
+    a.marking = fmRandom(Math.max(3, 13 + bias), 3);
+    a.tackling = fmRandom(Math.max(3, 13 + bias), 3);
+    a.defensivePositioning = fmRandom(Math.max(3, 12 + bias), 3);
+    a.pace = fmRandom(Math.max(3, 14 + bias), 3);
+    a.acceleration = fmRandom(Math.max(3, 14 + bias), 3);
+    a.stamina = fmRandom(Math.max(3, 14 + bias), 3);
+    a.crossing = fmRandom(Math.max(3, 12 + bias), 3);
+    a.workRate = fmRandom(Math.max(3, 13 + bias), 3);
     a.finishing = fmRandom(5, 2);
     a.shooting = fmRandom(6, 2);
     a.heading = fmRandom(9, 3);
     a.longShots = fmRandom(5, 2);
     a.strength = fmRandom(10, 3);
   } else if (position === 'DM') {
-    a.passing = fmRandom(14, 3);
-    a.tackling = fmRandom(14, 3);
-    a.ballWinning = fmRandom(14, 3);
-    a.positioning = fmRandom(14, 3);
-    a.decisions = fmRandom(13, 3);
-    a.workRate = fmRandom(14, 3);
-    a.stamina = fmRandom(14, 3);
-    a.teamwork = fmRandom(13, 3);
+    a.passing = fmRandom(Math.max(3, 14 + bias), 3);
+    a.tackling = fmRandom(Math.max(3, 14 + bias), 3);
+    a.ballWinning = fmRandom(Math.max(3, 14 + bias), 3);
+    a.positioning = fmRandom(Math.max(3, 14 + bias), 3);
+    a.decisions = fmRandom(Math.max(3, 13 + bias), 3);
+    a.workRate = fmRandom(Math.max(3, 14 + bias), 3);
+    a.stamina = fmRandom(Math.max(3, 14 + bias), 3);
+    a.teamwork = fmRandom(Math.max(3, 13 + bias), 3);
     a.finishing = fmRandom(6, 2);
     a.shooting = fmRandom(7, 3);
     a.dribbling = fmRandom(9, 3);
     a.crossing = fmRandom(8, 3);
     a.pace = fmRandom(10, 3);
   } else if (position === 'MC') {
-    a.passing = fmRandom(15, 3);
-    a.vision = fmRandom(13, 3);
-    a.decisions = fmRandom(14, 3);
-    a.technique = fmRandom(13, 3);
-    a.firstTouch = fmRandom(13, 3);
-    a.workRate = fmRandom(13, 3);
-    a.stamina = fmRandom(13, 3);
-    a.teamwork = fmRandom(13, 3);
+    a.passing = fmRandom(Math.max(3, 15 + bias), 3);
+    a.vision = fmRandom(Math.max(3, 13 + bias), 3);
+    a.decisions = fmRandom(Math.max(3, 14 + bias), 3);
+    a.technique = fmRandom(Math.max(3, 13 + bias), 3);
+    a.firstTouch = fmRandom(Math.max(3, 13 + bias), 3);
+    a.workRate = fmRandom(Math.max(3, 13 + bias), 3);
+    a.stamina = fmRandom(Math.max(3, 13 + bias), 3);
+    a.teamwork = fmRandom(Math.max(3, 13 + bias), 3);
     a.finishing = fmRandom(8, 3);
     a.heading = fmRandom(9, 3);
     a.marking = fmRandom(10, 3);
     a.tackling = fmRandom(10, 3);
   } else if (position === 'ML' || position === 'MR') {
-    a.pace = fmRandom(14, 3);
-    a.acceleration = fmRandom(14, 3);
-    a.dribbling = fmRandom(14, 3);
-    a.crossing = fmRandom(14, 3);
-    a.stamina = fmRandom(14, 3);
-    a.agility = fmRandom(13, 3);
-    a.workRate = fmRandom(13, 3);
+    a.pace = fmRandom(Math.max(3, 14 + bias), 3);
+    a.acceleration = fmRandom(Math.max(3, 14 + bias), 3);
+    a.dribbling = fmRandom(Math.max(3, 14 + bias), 3);
+    a.crossing = fmRandom(Math.max(3, 14 + bias), 3);
+    a.stamina = fmRandom(Math.max(3, 14 + bias), 3);
+    a.agility = fmRandom(Math.max(3, 13 + bias), 3);
+    a.workRate = fmRandom(Math.max(3, 13 + bias), 3);
     a.marking = fmRandom(8, 3);
     a.tackling = fmRandom(8, 3);
     a.heading = fmRandom(7, 3);
     a.defensivePositioning = fmRandom(8, 3);
     a.strength = fmRandom(9, 3);
   } else if (position === 'AML' || position === 'AMR') {
-    a.pace = fmRandom(16, 3);
-    a.acceleration = fmRandom(16, 3);
-    a.dribbling = fmRandom(16, 3);
-    a.technique = fmRandom(14, 3);
-    a.finishing = fmRandom(13, 3);
-    a.offTheBall = fmRandom(14, 3);
-    a.agility = fmRandom(14, 3);
-    a.crossing = fmRandom(12, 3);
+    a.pace = fmRandom(Math.max(3, 16 + bias), 3);
+    a.acceleration = fmRandom(Math.max(3, 16 + bias), 3);
+    a.dribbling = fmRandom(Math.max(3, 16 + bias), 3);
+    a.technique = fmRandom(Math.max(3, 14 + bias), 3);
+    a.finishing = fmRandom(Math.max(3, 13 + bias), 3);
+    a.offTheBall = fmRandom(Math.max(3, 14 + bias), 3);
+    a.agility = fmRandom(Math.max(3, 14 + bias), 3);
+    a.crossing = fmRandom(Math.max(3, 12 + bias), 3);
     a.marking = fmRandom(5, 2);
     a.tackling = fmRandom(5, 2);
     a.heading = fmRandom(7, 3);
     a.defensivePositioning = fmRandom(5, 2);
     a.strength = fmRandom(8, 3);
   } else if (position === 'AMC') {
-    a.passing = fmRandom(16, 3);
-    a.vision = fmRandom(16, 3);
-    a.technique = fmRandom(15, 3);
-    a.decisions = fmRandom(14, 3);
-    a.firstTouch = fmRandom(15, 3);
-    a.dribbling = fmRandom(14, 3);
-    a.finishing = fmRandom(13, 3);
-    a.composure = fmRandom(13, 3);
+    a.passing = fmRandom(Math.max(3, 16 + bias), 3);
+    a.vision = fmRandom(Math.max(3, 16 + bias), 3);
+    a.technique = fmRandom(Math.max(3, 15 + bias), 3);
+    a.decisions = fmRandom(Math.max(3, 14 + bias), 3);
+    a.firstTouch = fmRandom(Math.max(3, 15 + bias), 3);
+    a.dribbling = fmRandom(Math.max(3, 14 + bias), 3);
+    a.finishing = fmRandom(Math.max(3, 13 + bias), 3);
+    a.composure = fmRandom(Math.max(3, 13 + bias), 3);
     a.marking = fmRandom(5, 2);
     a.tackling = fmRandom(5, 2);
     a.heading = fmRandom(7, 3);
@@ -220,14 +262,14 @@ function randomAttributes(position: Position): Attributes {
     a.strength = fmRandom(8, 3);
     a.ballWinning = fmRandom(5, 2);
   } else if (position === 'ST') {
-    a.finishing = fmRandom(16, 3);
-    a.shooting = fmRandom(15, 3);
-    a.offTheBall = fmRandom(15, 3);
-    a.composure = fmRandom(14, 3);
-    a.technique = fmRandom(13, 3);
-    a.heading = fmRandom(13, 3);
-    a.firstTouch = fmRandom(13, 3);
-    a.anticipation = fmRandom(13, 3);
+    a.finishing = fmRandom(Math.max(3, 16 + bias), 3);
+    a.shooting = fmRandom(Math.max(3, 15 + bias), 3);
+    a.offTheBall = fmRandom(Math.max(3, 15 + bias), 3);
+    a.composure = fmRandom(Math.max(3, 14 + bias), 3);
+    a.technique = fmRandom(Math.max(3, 13 + bias), 3);
+    a.heading = fmRandom(Math.max(3, 13 + bias), 3);
+    a.firstTouch = fmRandom(Math.max(3, 13 + bias), 3);
+    a.anticipation = fmRandom(Math.max(3, 13 + bias), 3);
     a.marking = fmRandom(4, 2);
     a.tackling = fmRandom(4, 2);
     a.defensivePositioning = fmRandom(4, 2);
@@ -235,7 +277,7 @@ function randomAttributes(position: Position): Attributes {
     a.crossing = fmRandom(7, 3);
   }
 
-  // 🔧 Clamp 1-20
+  // Clamp 1-20
   for (const key in a) {
     const k = key as keyof Attributes;
     a[k] = Math.max(1, Math.min(20, a[k]));
@@ -277,38 +319,38 @@ function calculateOverall(a: Attributes, position: Position): number {
 }
 
 // ═══════════════════════════════════════════════
-// DEĞER HESABI (1-20 reyting)
+// DEĞER HESABI (1-20 reyting) — 15-35 YAŞ ARASI
 // ═══════════════════════════════════════════════
 
-/**
- * FM tarzı oyuncu değeri (1-20 reyting).
- * 
- * Reyting 5  → £100K
- * Reyting 10 → £2M
- * Reyting 14 → £15M
- * Reyting 17 → £40M
- * Reyting 20 → £90M
- */
-function calculateValue(overall: number, age: number): number {
-  // Reyting faktörü: 5-20 → 0-1
+export function calculateValue(overall: number, age: number): number {
   const ratingFactor = Math.max(0, (overall - 5) / 15);
-
-  // Baz değer: ratingFactor^3 * 90M (üstel artış)
   const baseValue = Math.pow(ratingFactor, 3) * 90_000_000;
 
-  // Yaş faktörü
-  let ageModifier = 1.0;
-  if (age <= 21) ageModifier = 1.35;       // Genç → yüksek potansiyel
-  else if (age <= 24) ageModifier = 1.20;
-  else if (age <= 27) ageModifier = 1.00;   // Zirve
-  else if (age <= 30) ageModifier = 0.75;
-  else if (age <= 33) ageModifier = 0.45;
-  else ageModifier = 0.20;                  // 34+ → çok düşük
+  let ageModifier: number;
 
-  const value = baseValue * ageModifier;
+  if (age <= 15) {
+    ageModifier = 0.60;
+  } else if (age <= 17) {
+    ageModifier = 0.60 + (age - 15) * 0.20;
+  } else if (age <= 20) {
+    ageModifier = 1.00 + (age - 17) * 0.10;
+  } else if (age <= 23) {
+    ageModifier = 1.30 + (age - 20) * 0.0167;
+  } else if (age <= 26) {
+    ageModifier = 1.35 - (age - 23) * 0.05;
+  } else if (age <= 29) {
+    ageModifier = 1.20 - (age - 26) * 0.10;
+  } else if (age <= 31) {
+    ageModifier = 0.90 - (age - 29) * 0.125;
+  } else if (age <= 33) {
+    ageModifier = 0.65 - (age - 31) * 0.125;
+  } else if (age <= 35) {
+    ageModifier = 0.40 - (age - 33) * 0.10;
+  } else {
+    ageModifier = Math.max(0.05, 0.20 - (age - 35) * 0.075);
+  }
 
-  // Minimum değer
-  return Math.max(50_000, Math.round(value));
+  return Math.max(50_000, Math.round(baseValue * ageModifier));
 }
 
 // ═══════════════════════════════════════════════
@@ -329,20 +371,20 @@ const SQUAD_TEMPLATE: Position[] = [
 ];
 
 export function generatePlayer(position: Position, clubId: string, index: number): Player {
-  const age = randomBetween(18, 34);
-  const attributes = randomAttributes(position);
+  const age = generateAge();
+  const attributes = randomAttributes(position, age);
   const overall = calculateOverall(attributes, position);
 
   const value = calculateValue(overall, age);
   const wage = Math.round(value / 500);
 
-  const ageFactor = Math.max(0, age - 18);
-  const initialApps = ageFactor * randomBetween(15, 30);
+  const ageFactor = Math.max(0, age - 15);
+  const initialApps = ageFactor * randomBetween(10, 25);
   const initialAvgRating = ageFactor > 0 ? Math.round((5.8 + Math.random() * 1.2) * 100) / 100 : 0;
 
   const careerStats: CareerStats = {
     appearances: initialApps, goals: 0, assists: 0, yellowCards: 0, redCards: 0,
-    avgRating: initialAvgRating, minutesPlayed: ageFactor * randomBetween(1000, 2500), motm: 0,
+    avgRating: initialAvgRating, minutesPlayed: ageFactor * randomBetween(800, 2000), motm: 0,
     seasonAppearances: 0, seasonGoals: 0, seasonAssists: 0,
     seasonYellowCards: 0, seasonRedCards: 0, seasonAvgRating: 0,
     seasonMinutesPlayed: 0, seasonMotm: 0,
@@ -374,6 +416,108 @@ export function generatePlayer(position: Position, clubId: string, index: number
     recentRatings: [],
     overall,
   };
+}
+
+// ═══════════════════════════════════════════════
+// GENÇ OYUNCU ÜRETİMİ (RE-GEN)
+// ═══════════════════════════════════════════════
+
+/**
+ * Emekli olan oyuncunun yerine genç yetenek üretir.
+ * Yaş: 15-18 arası
+ */
+export function generateYouthPlayer(
+  position?: Position,
+  nationality?: string,
+  clubId: string | null = null
+): Player {
+  const positions: Position[] = ['GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST'];
+  const pos = position ?? positions[Math.floor(Math.random() * positions.length)];
+  const nat = nationality ?? randomNationality();
+  const age = randomBetween(15, 18);
+
+  const attributes = randomAttributes(pos, age);
+  const overall = calculateOverall(attributes, pos);
+  const value = calculateValue(overall, age);
+
+  return {
+    id: `youth_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    name: randomName(),
+    age,
+    nationality: nat,
+    position: pos,
+    secondaryPositions: generateSecondaryPositions(pos),
+    attributes,
+    condition: 100,
+    morale: randomBetween(70, 95),
+    form: randomBetween(50, 70),
+    fatigue: 0,
+    wage: Math.round(value / 500),
+    value,
+    clubId,
+    injuryWeeks: 0,
+    injuryType: null,
+    yellowCards: 0,
+    suspensionWeeks: 0,
+    sentOff: false,
+    injured: false,
+    redCard: false,
+    careerStats: createEmptyCareerStats(),
+    recentRatings: [],
+    overall,
+  };
+}
+
+/**
+ * Emekli olan oyuncuların yerine genç üretir.
+ * developPlayers'dan SONRA çağrılmalı (emekliler zaten silinmiş olur).
+ *
+ * Kadro hedefi 24. Eksik pozisyonları tespit edip genç üretir.
+ */
+export function replaceRetiredPlayers(
+  players: Record<string, Player>,
+  clubs: Record<string, Club>
+): Record<string, Player> {
+  const newPlayers = { ...players };
+
+  // Her kulüp için kadro sayısını kontrol et
+  for (const clubId in clubs) {
+    const clubPlayers = Object.values(newPlayers).filter(
+      p => p.clubId === clubId
+    );
+    const squadSize = clubPlayers.length;
+
+    // 24 kişilik kadro hedefi
+    const TARGET_SQUAD_SIZE = 24;
+    const missing = TARGET_SQUAD_SIZE - squadSize;
+
+    if (missing > 0) {
+      // Eksik pozisyonları belirle
+      const positionCounts: Record<string, number> = {};
+      clubPlayers.forEach(p => {
+        positionCounts[p.position] = (positionCounts[p.position] || 0) + 1;
+      });
+
+      // SQUAD_TEMPLATE'e göre eksik pozisyonları bul
+      const needPositions: Position[] = [];
+      for (const pos of SQUAD_TEMPLATE) {
+        const have = positionCounts[pos] || 0;
+        const templateCount = SQUAD_TEMPLATE.filter(p => p === pos).length;
+        if (have < templateCount) {
+          needPositions.push(pos);
+        }
+      }
+
+      // Eksik sayı kadar genç üret
+      for (let i = 0; i < missing; i++) {
+        const pos = needPositions[i] ?? SQUAD_TEMPLATE[i % SQUAD_TEMPLATE.length];
+        const youth = generateYouthPlayer(pos, undefined, clubId);
+        newPlayers[youth.id] = youth;
+      }
+    }
+  }
+
+  return newPlayers;
 }
 
 // ═══════════════════════════════════════════════

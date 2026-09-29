@@ -35,42 +35,42 @@ function computeOverall(a: Player['attributes'], position: string): number {
 }
 
 // ═══════════════════════════════════════════════
-// DEĞER HESABI (1-20 reyting) — generateData.ts ile AYNI
+// DEĞER HESABI (1-20 reyting) — 15-35 YAŞ ARASI
 // ═══════════════════════════════════════════════
 
 export function calculateValue(overall: number, age: number): number {
   const ratingFactor = Math.max(0, (overall - 5) / 15);
   const baseValue = Math.pow(ratingFactor, 3) * 90_000_000;
 
-  // 🔧 Yumuşak yaş eğrisi (lineer interpolasyon)
   let ageModifier: number;
-  if (age <= 21) {
-    ageModifier = 1.35;
-  } else if (age <= 24) {
-    // 21 → 1.35, 24 → 1.20
-    ageModifier = 1.35 - (age - 21) * 0.05;
-  } else if (age <= 27) {
-    // 24 → 1.20, 27 → 1.00
-    ageModifier = 1.20 - (age - 24) * 0.0667;
-  } else if (age <= 30) {
-    // 27 → 1.00, 30 → 0.75
-    ageModifier = 1.00 - (age - 27) * 0.0833;
+
+  if (age <= 15) {
+    ageModifier = 0.60;
+  } else if (age <= 17) {
+    ageModifier = 0.60 + (age - 15) * 0.20;
+  } else if (age <= 20) {
+    ageModifier = 1.00 + (age - 17) * 0.10;
+  } else if (age <= 23) {
+    ageModifier = 1.30 + (age - 20) * 0.0167;
+  } else if (age <= 26) {
+    ageModifier = 1.35 - (age - 23) * 0.05;
+  } else if (age <= 29) {
+    ageModifier = 1.20 - (age - 26) * 0.10;
+  } else if (age <= 31) {
+    ageModifier = 0.90 - (age - 29) * 0.125;
   } else if (age <= 33) {
-    // 30 → 0.75, 33 → 0.45
-    ageModifier = 0.75 - (age - 30) * 0.10;
-  } else if (age <= 36) {
-    // 33 → 0.45, 36 → 0.20
-    ageModifier = 0.45 - (age - 33) * 0.0833;
+    ageModifier = 0.65 - (age - 31) * 0.125;
+  } else if (age <= 35) {
+    ageModifier = 0.40 - (age - 33) * 0.10;
   } else {
-    // 36+ → kademeli düşüş
-    ageModifier = Math.max(0.05, 0.20 - (age - 36) * 0.05);
+    ageModifier = Math.max(0.05, 0.20 - (age - 35) * 0.075);
   }
 
   return Math.max(50_000, Math.round(baseValue * ageModifier));
 }
 
 // ═══════════════════════════════════════════════
-// YAŞ BAZLI GELİŞİM
+// YAŞ BAZLI GELİŞİM (15-35 ARASI)
 // ═══════════════════════════════════════════════
 
 interface AgeProgression {
@@ -80,14 +80,17 @@ interface AgeProgression {
 }
 
 function getAgeProgression(age: number): AgeProgression {
-  if (age <= 20) return { physical: 1.5, technical: 1.2, mental: 0.8 };
-  if (age <= 23) return { physical: 1.0, technical: 1.0, mental: 0.8 };
-  if (age <= 26) return { physical: 0.4, technical: 0.6, mental: 0.6 };
-  if (age <= 28) return { physical: -0.2, technical: 0.3, mental: 0.5 };
-  if (age <= 30) return { physical: -0.6, technical: 0.1, mental: 0.4 };
-  if (age <= 32) return { physical: -1.2, technical: -0.1, mental: 0.3 };
-  if (age <= 35) return { physical: -1.8, technical: -0.4, mental: 0.1 };
-  return { physical: -2.5, technical: -0.6, mental: -0.3 };
+  if (age <= 16) return { physical: 1.8, technical: 1.5, mental: 1.0 };
+  if (age <= 18) return { physical: 1.5, technical: 1.3, mental: 0.9 };
+  if (age <= 20) return { physical: 1.2, technical: 1.1, mental: 0.8 };
+  if (age <= 23) return { physical: 0.8, technical: 0.9, mental: 0.7 };
+  if (age <= 25) return { physical: 0.4, technical: 0.6, mental: 0.6 };
+  if (age <= 27) return { physical: 0.0, technical: 0.3, mental: 0.5 };
+  if (age <= 29) return { physical: -0.5, technical: 0.1, mental: 0.4 };
+  if (age <= 31) return { physical: -1.0, technical: -0.1, mental: 0.3 };
+  if (age <= 33) return { physical: -1.5, technical: -0.3, mental: 0.2 };
+  if (age <= 35) return { physical: -2.0, technical: -0.5, mental: 0.1 };
+  return { physical: -2.5, technical: -0.7, mental: 0.0 };
 }
 
 // ═══════════════════════════════════════════════
@@ -105,6 +108,11 @@ export function developPlayers(
 
     // Yaş ilerle
     p.age = p.age + 1;
+
+    // 🎯 36+ EMEKLİ — kayıttan tamamen çıkar (yerine genç üretilecek)
+    if (p.age > 35) {
+      continue;
+    }
 
     // Yaşa göre gelişim
     const progression = getAgeProgression(p.age);
@@ -149,7 +157,7 @@ export function developPlayers(
     a.aggression = Math.max(1, Math.min(20, Math.round(a.aggression + progression.physical * 0.4 + progression.mental * 0.3 + r())));
 
     // ─────────────────────────────────────────
-    // 🛡️ SAVUNMA (YENİ EKLENDİ)
+    // SAVUNMA
     // ─────────────────────────────────────────
     a.marking = Math.max(1, Math.min(20, Math.round(a.marking + progression.technical * 0.7 + progression.mental * 0.3 + r())));
     a.tackling = Math.max(1, Math.min(20, Math.round(a.tackling + progression.technical * 0.7 + progression.mental * 0.3 + r())));
@@ -158,7 +166,7 @@ export function developPlayers(
     a.ballWinning = Math.max(1, Math.min(20, Math.round(a.ballWinning + progression.mental * 0.7 + progression.physical * 0.3 + r())));
 
     // ─────────────────────────────────────────
-    // 🧤 KALECİ (YENİ EKLENDİ)
+    // KALECİ
     // ─────────────────────────────────────────
     a.goalkeeper = Math.max(1, Math.min(20, Math.round(a.goalkeeper + progression.technical * 0.5 + progression.mental * 0.5 + r())));
     a.reflexes = Math.max(1, Math.min(20, Math.round(a.reflexes + progression.physical * 0.6 + progression.technical * 0.4 + r())));
@@ -169,18 +177,13 @@ export function developPlayers(
 
     p.attributes = a;
 
-    // 🔧 Overall güncelle
+    // Overall güncelle
     const newOverall = computeOverall(a, p.position);
     p.overall = newOverall;
 
-    // 🔧 Value ve wage YENİ formülle
+    // Value ve wage
     p.value = calculateValue(newOverall, p.age);
     p.wage = Math.round(p.value / 500);
-
-    // Emeklilik
-    if (p.age >= 40) {
-      p.clubId = null;
-    }
 
     newPlayers[id] = p;
   }
