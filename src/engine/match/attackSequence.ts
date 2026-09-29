@@ -268,7 +268,8 @@ function resolveSequenceAction(
   const attackerPower = calculateAttackerPower(attacker, action);
   const defenderPower = calculateDefenderPower(defender, defendTeam);
 
-  let probability = 0.52 + (attackerPower - defenderPower) / ACTION_SUCCESS_DIVISOR;
+  // 🔧 KALİBRASYON: Base probability 0.52 → 0.58
+  let probability = 0.58 + (attackerPower - defenderPower) / ACTION_SUCCESS_DIVISOR;
 
   if (zone.includes('Attack')) probability += 0.05;
   if (zone.includes('Defense')) probability -= 0.10;
