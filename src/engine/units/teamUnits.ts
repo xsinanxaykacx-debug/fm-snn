@@ -3,7 +3,7 @@
 import type { Club, Player, TeamUnits, UnitComparison } from '../types';
 
 // ═══════════════════════════════════════════════
-// 1-20 → 20-95 DÖNÜŞÜMÜ
+// 1-20 → 30-80 DÖNÜŞÜMÜ
 // ═══════════════════════════════════════════════
 
 function scaleToEngine(value: number): number {

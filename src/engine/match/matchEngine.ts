@@ -19,6 +19,10 @@ import { calculateChanceFromSequence } from './chance';
 import { resolveShot } from './goalkeeper';
 import { pickShooter, pickScorer } from './attack';
 
+// ═══════════════════════════════════════════════
+// YARDIMCILAR
+// ═══════════════════════════════════════════════
+
 function pickInjuryType(severity: 'light' | 'medium' | 'severe'): string {
   const light = ['Kas Agrisi', 'Kucuk Burkulma', 'Hafif Darbe'];
   const medium = ['Hamstring', 'Ayak Bilegi', 'Diz Burkulmasi'];
@@ -144,19 +148,48 @@ export function simulateMatch(
   const sentOff = new Set<string>();
   const matchYellows = new Set<string>();
 
+  // 🎯 Her oyuncunun GERÇEK oynadığı dakikayı takip et
+  const minutesPlayed: Record<string, number> = {};
+  const lastActiveMinute: Record<string, number> = {};
+
   const homeXI = getStartingXI(home.id, players, home.tactic.formation, home.isUser ? userLineup : undefined);
   const awayXI = getStartingXI(away.id, players, away.tactic.formation, away.isUser ? userLineup : undefined);
 
-  for (const p of homeXI) {
-    updateCareerStats(players, p.id, { appearances: 1, minutesPlayed: 90 });
+  // Maç başında herkes 0 dakika
+  for (const p of [...homeXI, ...awayXI]) {
+    minutesPlayed[p.id] = 0;
+    lastActiveMinute[p.id] = 0;
   }
-  for (const p of awayXI) {
-    updateCareerStats(players, p.id, { appearances: 1, minutesPlayed: 90 });
+
+  // Maç içi yardımcı: oyuncu aktifse dakikasını güncelle
+  function updateMinutes(playerId: string, currentMinute: number): void {
+    if (lastActiveMinute[playerId] !== undefined) {
+      const elapsed = currentMinute - lastActiveMinute[playerId];
+      if (elapsed > 0) {
+        minutesPlayed[playerId] = (minutesPlayed[playerId] ?? 0) + elapsed;
+      }
+    }
+    lastActiveMinute[playerId] = currentMinute;
+  }
+
+  // Maç içi yardımcı: tüm aktif oyuncuların dakikalarını güncelle
+  function updateAllMinutes(currentMinute: number, sentOffSet: Set<string>): void {
+    for (const p of [...homeXI, ...awayXI]) {
+      if (!sentOffSet.has(p.id)) {
+        updateMinutes(p.id, currentMinute);
+      }
+    }
   }
 
   for (let tick = 0; tick < totalTicks; tick++) {
     const baseMinute = Math.floor(tick * minutePerTick) + 1;
-    state.minute = Math.min(90, baseMinute + Math.floor(Math.random() * 3));
+    const currentMinute = Math.min(90, baseMinute + Math.floor(Math.random() * 3));
+    const prevMinute = state.minute;
+
+    // 🎯 Dakika farkını aktif oyunculara ekle
+    updateAllMinutes(currentMinute, sentOff);
+
+    state.minute = currentMinute;
 
     updateDynamicTactics(state);
     processCardsInMatch(state, players, sentOff, matchYellows, pendingEvents);
@@ -354,6 +387,18 @@ export function simulateMatch(
     }
 
     consumeCondition(state);
+  }
+
+  // 🎯 Maç sonu: son dakikayı da ekle (90. dakika)
+  updateAllMinutes(90, sentOff);
+
+  // 🎯 APPEARANCES ve MINUTESPLAYED'i maç sonunda gerçek dakikalarla kaydet
+  for (const p of [...homeXI, ...awayXI]) {
+    const realMinutes = minutesPlayed[p.id] ?? 0;
+    updateCareerStats(players, p.id, {
+      appearances: 1,
+      minutesPlayed: realMinutes,
+    });
   }
 
   events.push(...pendingEvents.sort((a, b) => a.minute - b.minute).map(e => e.event));
