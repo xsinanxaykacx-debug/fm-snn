@@ -522,3 +522,121 @@ export function resolveShotAction(
     goalkeeperSkill,
   };
 }
+
+
+export interface TransitionResolution {
+  probability: number;
+  quality: number;
+  playerId: string | null;
+}
+
+export function resolveCounterPress(
+  pressingTeam: LivePlayer[],
+  ballPosition: Vec2,
+  state: LiveMatchState
+): TransitionResolution {
+  if (pressingTeam.length === 0) {
+    return { probability: 0.05, quality: 0.05, playerId: null };
+  }
+
+  let total = 0;
+  let bestScore = -Infinity;
+  let bestPlayer: LivePlayer | null = null;
+
+  for (const player of pressingTeam) {
+    if (player.role === 'GK') continue;
+
+    const a = player.player.attributes;
+    const d = distance(player.position, ballPosition);
+    const proximity = clamp(1 - d / 18, 0, 1);
+    const defensiveSkill =
+      avg(a.tackling, a.anticipation, a.positioning, a.workRate) *
+      conditionFactor(player);
+
+    const tactic = player.isHome
+      ? state.home.club.tactic
+      : state.away.club.tactic;
+
+    const role = roleModifier(player.role, 'press');
+    const press = pressingModifier(tactic.pressing);
+    const mentality = mentalityModifier(tactic.mentality, false);
+
+    const score =
+      (defensiveSkill / 100) *
+      (0.35 + proximity * 0.65) *
+      role *
+      press *
+      (0.92 + a.aggression / 1250) *
+      mentality;
+
+    total += score;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestPlayer = player;
+    }
+  }
+
+  const pressureDensity = clamp(total / 3.2, 0, 1);
+  const probability = clamp(
+    0.05 + pressureDensity * 0.52,
+    0.05,
+    0.62
+  );
+
+  return {
+    probability,
+    quality: clamp(
+      bestScore > 0 ? bestScore : pressureDensity,
+      0.05,
+      1
+    ),
+    playerId: bestPlayer?.player.id ?? null,
+  };
+}
+
+export function resolveBreakAction(
+  ballWinner: LivePlayer,
+  state: LiveMatchState
+): TransitionResolution {
+  const tactic = ballWinner.isHome
+    ? state.home.club.tactic
+    : state.away.club.tactic;
+
+  const a = ballWinner.player.attributes;
+
+  const directness =
+    tactic.directness === 'direct' ? 1.12 :
+    tactic.directness === 'short' ? 0.94 : 1;
+
+  const tempo = tempoModifier(tactic.tempo);
+
+  const mentality = mentalityModifier(tactic.mentality, true);
+
+  const role = roleModifier(ballWinner.role, 'attack');
+
+  const condition = conditionFactor(ballWinner);
+
+  const pace =
+    avg(a.pace, a.acceleration, a.offTheBall, a.decisions) / 100;
+
+  const breakBase =
+    pace *
+    condition *
+    directness *
+    tempo *
+    mentality *
+    role;
+
+  const probability = clamp(
+    0.10 + breakBase * 0.48,
+    0.10,
+    0.72
+  );
+
+  return {
+    probability,
+    quality: clamp(breakBase, 0.05, 1),
+    playerId: ballWinner.player.id,
+  };
+}
