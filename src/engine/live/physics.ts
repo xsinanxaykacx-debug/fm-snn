@@ -106,8 +106,8 @@ export function computePairPhysics(
     distance,
     relativeSpeed,
     closingSpeedAB,
-    // Yapısal invariant: ters yön yeniden hesaplanmıyor.
-    closingSpeedBA: -closingSpeedAB,
+    // Pair kapanma hızı mesafe değişim hızıdır ve erişim yönüne göre değişmez.
+    closingSpeedBA: closingSpeedAB,
   };
 }
 
@@ -134,9 +134,7 @@ export function getClosingSpeed(
     return undefined;
   }
 
-  return fromId < toId
-    ? pair.closingSpeedAB
-    : pair.closingSpeedBA;
+  return pair.closingSpeedAB;
 }
 
 // ─────────────────────────────────────────────────────────────
