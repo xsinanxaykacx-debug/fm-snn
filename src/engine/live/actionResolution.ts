@@ -239,6 +239,10 @@ export function resolvePassAction(
   const role = roleModifier(owner.role, 'midfield');
   const pressing = pressingModifier(tactic.pressing);
 
+  const directness =
+    tactic.directness === 'direct' ? 1.06 :
+    tactic.directness === 'short' ? 0.97 : 1;
+
   const raw =
     (passingSkill / 100) *
     (0.55 + lane * 0.45) *
@@ -247,6 +251,7 @@ export function resolvePassAction(
     attackingModifier *
     tempo *
     role *
+    directness *
     (0.94 + pressing * 0.06);
 
   return {
