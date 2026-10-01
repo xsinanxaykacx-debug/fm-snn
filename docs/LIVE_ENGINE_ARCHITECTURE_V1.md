@@ -103,7 +103,7 @@ For every pair:
 
 `closingSpeedAB` is the signed radial closing component from A toward B.
 
-The same `PairPhysics` contract is used for player-player and player-ball physics. Ball-specific concepts such as ownership, control quality and spin remain outside `PairPhysics`.
+The same `PairPhysics` contract is used for player-player and player-ball physics. `playerPairs` uses the symmetric `pairKey(a, b)` key; `ballPairs` uses the player ID directly because the ball is a singleton and each player has exactly one player→ball relation. Ball-specific concepts such as ownership, control quality and spin remain outside `PairPhysics`.
 
 ### Coincident-position rule
 
