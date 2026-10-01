@@ -146,6 +146,7 @@ export interface SimulateMatchLiveOptions {
   userLineup?: string[];
   pitchDimensions?: PitchDimensions;
   onTick?: (state: LiveMatchState) => void;
+  maxTicks?: number;
 }
 
 export function simulateMatchLive(
@@ -274,7 +275,7 @@ export function simulateMatchLive(
   });
 
   // ─── Tick döngüsü ───
-  while (!state.isFinished) {
+  while (!state.isFinished && (options.maxTicks === undefined || state.tick < options.maxTicks)) {
     runTick(
       state,
       players,
