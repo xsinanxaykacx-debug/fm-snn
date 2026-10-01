@@ -2,16 +2,77 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import type { Match } from '../engine/types';
 
-type FramePlayer = { id: string; x: number; y: number; isHome: boolean; facing: number; intent: string };
+type FramePlayer = {
+  id: string;
+  x: number;
+  y: number;
+  isHome: boolean;
+  facing: number;
+  intent: string;
+};
+
 type LiveFrame = {
   type: 'frame';
   time: number;
+  tick: number;
   phase: string;
   score: { home: number; away: number };
-  ball: { x: number; y: number; z: number; ownerId: string | null };
+  ball: {
+    x: number;
+    y: number;
+    z: number;
+    vx: number;
+    vy: number;
+    ownerId: string | null;
+    lastTouchId: string | null;
+  };
   players: FramePlayer[];
 };
-type WorkerMessage = LiveFrame | { type: 'complete'; result: Match } | { type: 'error'; message: string };
+
+type DebugFrame = Omit<LiveFrame, 'type'> & {
+  players: Array<{
+    id: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    homeX: number;
+    homeY: number;
+    isHome: boolean;
+    role: string;
+    facing: number;
+    intent: string;
+    isBallOwner: boolean;
+    isChasingBall: boolean;
+    isMarking: string | null;
+    decisionReason: string | null;
+    targetX: number | null;
+    targetY: number | null;
+    targetPlayerId: string | null;
+  }>;
+};
+
+type DebugRecording = {
+  version: 1;
+  sampleEveryTicks: number;
+  maxSimulationSeconds: number;
+  startedAt: number;
+  frames: DebugFrame[];
+};
+
+type WorkerMessage =
+  | LiveFrame
+  | { type: 'complete'; result: Match; debug: DebugRecording }
+  | { type: 'error'; message: string };
+
+declare global {
+  interface Window {
+    __LIVE_MATCH_DEBUG__?: DebugRecording;
+    dumpLiveMatchDebug?: () => DebugRecording | null;
+    copyLiveMatchDebug?: () => Promise<void>;
+    downloadLiveMatchDebug?: () => void;
+  }
+}
 
 const PITCH_W = 104;
 const PITCH_H = 64;
@@ -19,6 +80,77 @@ const PITCH_H = 64;
 function formatClock(seconds: number): string {
   const total = Math.floor(seconds);
   return `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`;
+}
+
+function installDebugConsole(): void {
+  window.dumpLiveMatchDebug = () => {
+    const debug = window.__LIVE_MATCH_DEBUG__ ?? null;
+
+    if (!debug) {
+      console.warn('Henüz canlı maç debug kaydı yok. Önce bir canlı maç tamamla.');
+      return null;
+    }
+
+    console.log('LIVE MATCH DEBUG', debug);
+    console.table(
+      debug.frames.map(frame => ({
+        time: frame.time,
+        tick: frame.tick,
+        phase: frame.phase,
+        score: `${frame.score.home}-${frame.score.away}`,
+        ballX: Number(frame.ball.x.toFixed(2)),
+        ballY: Number(frame.ball.y.toFixed(2)),
+        owner: frame.ball.ownerId,
+      }))
+    );
+
+    return debug;
+  };
+
+  window.copyLiveMatchDebug = async () => {
+    const debug = window.__LIVE_MATCH_DEBUG__;
+
+    if (!debug) {
+      console.warn('Henüz canlı maç debug kaydı yok.');
+      return;
+    }
+
+    const json = JSON.stringify(debug, null, 2);
+    await navigator.clipboard.writeText(json);
+    console.log(
+      `LIVE MATCH DEBUG panoya kopyalandı. ${debug.frames.length} frame.`
+    );
+  };
+
+  window.downloadLiveMatchDebug = () => {
+    const debug = window.__LIVE_MATCH_DEBUG__;
+
+    if (!debug) {
+      console.warn('Henüz canlı maç debug kaydı yok.');
+      return;
+    }
+
+    const blob = new Blob(
+      [JSON.stringify(debug, null, 2)],
+      { type: 'application/json' }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+
+    anchor.href = url;
+    anchor.download = `live-match-debug-${Date.now()}.json`;
+
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+
+    URL.revokeObjectURL(url);
+
+    console.log(
+      `LIVE MATCH DEBUG indirildi. ${debug.frames.length} frame.`
+    );
+  };
 }
 
 export function LiveMatchScreen() {
@@ -39,30 +171,54 @@ export function LiveMatchScreen() {
   const home = fixture ? state.clubs[fixture.homeId!] : null;
   const away = fixture ? state.clubs[fixture.awayId!] : null;
 
-  useEffect(() => () => workerRef.current?.terminate(), []);
+  useEffect(() => {
+    installDebugConsole();
+
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
 
   function startMatch() {
     if (!fixture || !home || !away || running) return;
+
     workerRef.current?.terminate();
+
     setFrame(null);
     setResult(null);
     setError(null);
     setRunning(true);
 
+    window.__LIVE_MATCH_DEBUG__ = undefined;
+
     const worker = new Worker(
       new URL('../workers/liveMatch.worker.ts', import.meta.url),
       { type: 'module' }
     );
+
     workerRef.current = worker;
 
     worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
       const message = event.data;
+
       if (message.type === 'frame') {
         setFrame(message);
-      } else if (message.type === 'complete') {
+        return;
+      }
+
+      if (message.type === 'complete') {
+        window.__LIVE_MATCH_DEBUG__ = message.debug;
+
+        console.log(
+          `LIVE MATCH DEBUG hazır: ${message.debug.frames.length} frame, ilk ${message.debug.maxSimulationSeconds} saniye.`
+        );
+
         setResult(message.result);
         setRunning(false);
-      } else if (message.type === 'error') {
+        return;
+      }
+
+      if (message.type === 'error') {
         setError(message.message);
         setRunning(false);
       }
@@ -86,6 +242,7 @@ export function LiveMatchScreen() {
 
   function saveResult() {
     if (!result) return;
+
     applyLiveMatchResult(result);
     setResult(null);
     setRunning(false);
@@ -113,14 +270,23 @@ export function LiveMatchScreen() {
             <div className="text-xs uppercase tracking-widest text-slate-500">Canlı Maç • Hafta {state.currentWeek}</div>
             <div className="text-xl font-bold text-white mt-1">{home.name} <span className="text-slate-500">vs</span> {away.name}</div>
           </div>
+
           <div className="text-center min-w-[150px]">
             <div className="text-3xl font-black text-white tabular-nums">{displayScore}</div>
             <div className="text-xs text-accent mt-1">{formatClock(frame?.time ?? 0)} • {frame?.phase ?? 'kickoff'}</div>
           </div>
+
           {!running && !result && (
-            <button onClick={startMatch} className="btn-primary px-5 py-3 font-bold">▶ MAÇI BAŞLAT</button>
+            <button onClick={startMatch} className="btn-primary px-5 py-3 font-bold">
+              ▶ MAÇI BAŞLAT
+            </button>
           )}
-          {running && <div className="px-4 py-2 rounded bg-green-500/10 border border-green-500/30 text-green-400 font-bold">● CANLI</div>}
+
+          {running && (
+            <div className="px-4 py-2 rounded bg-green-500/10 border border-green-500/30 text-green-400 font-bold">
+              ● CANLI
+            </div>
+          )}
         </div>
       </div>
 
@@ -175,16 +341,43 @@ export function LiveMatchScreen() {
             <div className="text-xs text-slate-500 uppercase">Motor</div>
             <div className="text-white font-bold mt-1">LIVE ENGINE 1.0</div>
           </div>
+
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Skor</div><div className="text-white text-lg font-bold">{displayScore}</div></div>
-            <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Top sahibi</div><div className="text-white text-lg font-bold">{frame?.ball.ownerId ? frame.ball.ownerId.slice(-2) : '—'}</div></div>
+            <div className="bg-pitch-800 rounded p-3">
+              <div className="text-slate-500">Skor</div>
+              <div className="text-white text-lg font-bold">{displayScore}</div>
+            </div>
+
+            <div className="bg-pitch-800 rounded p-3">
+              <div className="text-slate-500">Top sahibi</div>
+              <div className="text-white text-lg font-bold">
+                {frame?.ball.ownerId ? frame.ball.ownerId.slice(-2) : '—'}
+              </div>
+            </div>
           </div>
-          <div className="text-xs text-slate-500">Oyuncu noktaları gerçek motor koordinatlarından çiziliyor: 104 × 64 m.</div>
-          {error && <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-300 text-sm">{error}</div>}
+
+          <div className="text-xs text-slate-500">
+            Oyuncu noktaları gerçek motor koordinatlarından çiziliyor: 104 × 64 m.
+          </div>
+
+          {error && (
+            <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+              {error}
+            </div>
+          )}
+
           {result && (
             <div className="space-y-2">
-              <div className="p-3 rounded bg-green-500/10 border border-green-500/30 text-green-300 text-sm">Maç tamamlandı: {result.homeScore}-{result.awayScore}</div>
-              <button onClick={saveResult} className="w-full py-3 rounded bg-accent text-slate-950 font-bold">✓ SONUCU FİKSTÜRE İŞLE</button>
+              <div className="p-3 rounded bg-green-500/10 border border-green-500/30 text-green-300 text-sm">
+                Maç tamamlandı: {result.homeScore}-{result.awayScore}
+              </div>
+
+              <button
+                onClick={saveResult}
+                className="w-full py-3 rounded bg-accent text-slate-950 font-bold"
+              >
+                ✓ SONUCU FİKSTÜRE İŞLE
+              </button>
             </div>
           )}
         </div>
