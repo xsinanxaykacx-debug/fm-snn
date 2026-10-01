@@ -96,7 +96,11 @@ export function computePairPhysics(
 
   const nx = dx / distance;
   const ny = dy / distance;
-  const closingSpeedAB = relVx * nx + relVy * ny;
+  const rawClosingSpeedAB = relVx * nx + relVy * ny;
+
+  // -0 → +0 normalizasyonu.
+  // V1 invariant'ı sayısal işaret biti seviyesinde de kararlı tutar.
+  const closingSpeedAB = rawClosingSpeedAB === 0 ? 0 : rawClosingSpeedAB;
 
   return {
     distance,
