@@ -17,6 +17,7 @@ import { Settings } from './components/Settings';
 import { SeasonEndModal } from './components/SeasonEndModal';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { InboxView } from './components/InboxView';
+import { LiveMatchScreen } from './components/LiveMatchScreen';
 
 type Tab =
   | 'dashboard'
@@ -24,6 +25,7 @@ type Tab =
   | 'tactics'
   | 'table'
   | 'fixtures'
+  | 'liveMatch'
   | 'cup'
   | 'transfer'
   | 'training'
@@ -65,6 +67,7 @@ export default function App() {
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'dashboard', label: '📋 Ana Sayfa' },
     { key: 'fixtures', label: '📅 Fikstür' },
+    { key: 'liveMatch', label: '⚽ Canlı Maç' },
     { key: 'cup', label: '🏆 Kupa' },
     { key: 'squad', label: '👥 Kadro' },
     { key: 'tactics', label: '🎯 Taktik' },
@@ -133,6 +136,7 @@ export default function App() {
       <main className="p-6 max-w-7xl mx-auto">
         {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
         {tab === 'fixtures' && <Fixtures />}
+        {tab === 'liveMatch' && <LiveMatchScreen />}
         {tab === 'cup' && <Cup />}
         {tab === 'squad' && <Squad />}
         {tab === 'tactics' && <Tactics />}
