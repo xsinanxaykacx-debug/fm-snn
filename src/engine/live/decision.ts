@@ -1078,48 +1078,31 @@ function buildMarkAssignments(
     const usedDefenders = new Set<string>();
 
     for (const threat of opponentThreats) {
-      let bestDefender: {
-        player: LivePlayer;
-        distance: number;
-      } | null = null;
-
-      for (const defender of defenders) {
-        if (usedDefenders.has(defender.player.id)) continue;
-
-        const distance = computeDistance(
-          defender.position,
-          threat.opponent.position
+      const defenderCandidates = defenders
+        .filter(defender => !usedDefenders.has(defender.player.id))
+        .map(defender => ({
+          player: defender,
+          distance: computeDistance(
+            defender.position,
+            threat.opponent.position
+          ),
+        }))
+        .filter(candidate => candidate.distance <= MARK_MAX_DISTANCE)
+        .sort((a, b) =>
+          a.distance - b.distance ||
+          a.player.player.id.localeCompare(b.player.player.id)
         );
 
-        if (distance > MARK_MAX_DISTANCE) continue;
+      const assignmentCount = Math.min(
+        MARK_ASSIGNMENT_MAX_PER_OPPONENT,
+        defenderCandidates.length
+      );
 
-        if (
-          bestDefender === null ||
-          distance < bestDefender.distance ||
-          (
-            distance === bestDefender.distance &&
-            defender.player.id.localeCompare(
-              bestDefender.player.player.id
-            ) < 0
-          )
-        ) {
-          bestDefender = {
-            player: defender,
-            distance,
-          };
-        }
-      }
-
-      if (bestDefender !== null) {
-        assignments[bestDefender.player.player.id] =
+      for (let i = 0; i < assignmentCount; i++) {
+        const defender = defenderCandidates[i].player;
+        assignments[defender.player.id] =
           threat.opponent.player.id;
-        usedDefenders.add(bestDefender.player.player.id);
-
-        if (
-          MARK_ASSIGNMENT_MAX_PER_OPPONENT <= 1
-        ) {
-          continue;
-        }
+        usedDefenders.add(defender.player.id);
       }
     }
   }
