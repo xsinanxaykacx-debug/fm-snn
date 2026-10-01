@@ -59,6 +59,7 @@ import type {
   Vec2,
 } from '../types';
 
+import { DEFAULT_PITCH_DIMENSIONS } from './pitch';
 import type { TeamSide } from './pitch';
 
 import {
