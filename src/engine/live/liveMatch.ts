@@ -350,6 +350,12 @@ function runTick(
     );
   }
 
+  // ─── 8a. Boş top kontrolü ───
+  // Tackle/set-piece dışında serbest kalan topun sahibi burada belirlenir.
+  // Böylece topa koşan oyuncu fiziksel olarak top kontrol mesafesine
+  // girdiğinde ownerId tekrar oluşturulur.
+  resolveLooseBallControl(state);
+
   // ─── 8b. Ball actions ───
   if (!tackleChangedPossession) {
     applyBallActions(state, decisions);
@@ -749,6 +755,54 @@ function syncBallOwnerFlags(state: LiveMatchState): void {
   for (const id of Object.keys(state.players)) {
     state.players[id].isBallOwner = state.ball.ownerId === id;
   }
+}
+
+// ═══════════════════════════════════════════════
+// LOOSE BALL CONTROL
+// ═══════════════════════════════════════════════
+
+function resolveLooseBallControl(state: LiveMatchState): void {
+  if (state.ball.ownerId !== null) return;
+
+  // Hızlı hareket eden topu otomatik olarak ayağa yapıştırmayız.
+  // Önce topun fiziksel olarak durması/yavaşlaması gerekir.
+  if (state.ball.isMoving) return;
+
+  const controlRadius =
+    DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.ballControlRadius;
+
+  let bestPlayer: LivePlayer | null = null;
+  let bestDistanceSq = controlRadius * controlRadius;
+
+  for (const id of Object.keys(state.players).sort()) {
+    const player = state.players[id];
+
+    // Kaleciler dahil tüm oyuncular loose-ball kontrolüne adaydır.
+    const dx = state.ball.position.x - player.position.x;
+    const dy = state.ball.position.y - player.position.y;
+    const distanceSq = dx * dx + dy * dy;
+
+    if (distanceSq > bestDistanceSq) continue;
+
+    if (
+      distanceSq < bestDistanceSq ||
+      bestPlayer === null ||
+      player.player.id < bestPlayer.player.id
+    ) {
+      bestDistanceSq = distanceSq;
+      bestPlayer = player;
+    }
+  }
+
+  if (bestPlayer === null) return;
+
+  state.ball = controlBall(
+    state.ball,
+    bestPlayer.player.id,
+    bestPlayer.clubId
+  );
+
+  syncBallOwnerFlags(state);
 }
 
 // ═══════════════════════════════════════════════
