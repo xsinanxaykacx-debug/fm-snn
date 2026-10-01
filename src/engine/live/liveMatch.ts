@@ -130,6 +130,7 @@ import {
   resolveDribbleAction,
   resolveShotAction,
   resolveCrossAction,
+  resolveInterceptionAction,
 } from './actionResolution';
 
 // ═══════════════════════════════════════════════
@@ -937,6 +938,37 @@ function handlePassAction(
 
   const resolution = resolvePassAction(owner, decision, state);
   const completed = nextBool(state.rng, resolution.probability);
+
+  const interception = completed
+    ? resolveInterceptionAction(owner, decision.target, state)
+    : null;
+
+  const intercepted =
+    interception !== null &&
+    interception.defenderId !== null &&
+    nextBool(state.rng, interception.probability);
+
+  if (intercepted && interception.defenderId) {
+    state.ball = releaseBall(state.ball);
+    state.ball.position.x = state.players[interception.defenderId].position.x;
+    state.ball.position.y = state.players[interception.defenderId].position.y;
+    state.ball.position.z = DEFAULT_BALL_PHYSICS.radius;
+    state.ball.velocity = { x: 0, y: 0, z: 0 };
+    state.ball.isMoving = false;
+    state.ball.ownerId = interception.defenderId;
+    state.ball.lastTouchId = interception.defenderId;
+    state.ball.lastTouchClubId = state.players[interception.defenderId].clubId;
+    syncBallOwnerFlags(state);
+
+    state.events.push({
+      minute: Math.floor(state.time / 60),
+      type: 'pass',
+      playerId: owner.player.id,
+      clubId: owner.clubId,
+      description: `Pas kesildi: ${owner.player.name}`,
+    });
+    return;
+  }
 
   const target = completed
     ? decision.target
