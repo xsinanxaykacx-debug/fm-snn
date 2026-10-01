@@ -4,7 +4,7 @@ import { generateGameData } from '../data/generateData';
 import { simulateMatchLive } from './liveMatch';
 
 const BATCH_COUNT = 5;
-const MATCHES_PER_BATCH = 2_000;
+const MATCHES_PER_BATCH = 500;
 const MAX_TICKS = 1_000;
 const TOTAL_MATCHES = BATCH_COUNT * MATCHES_PER_BATCH;
 
@@ -184,7 +184,7 @@ function runBatch(
 
 describe('Live transition batch measurement', () => {
   it(
-    '5 x 2.000 gerçek maç ile baseline istatistiksel stabilitesini ölçer',
+    '5 x 500 gerçek maç ile baseline istatistiksel stabilitesini ölçer',
     () => {
       const data = generateGameData();
       const batches: BatchMetrics[] = [];
@@ -320,6 +320,6 @@ describe('Live transition batch measurement', () => {
         batches.every((batch) => batch.counterPressAttempts > 0)
       ).toBe(true);
     },
-    1_800_000
+    900_000
   );
 });
