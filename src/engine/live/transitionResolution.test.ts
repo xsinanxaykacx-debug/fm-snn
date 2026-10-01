@@ -236,7 +236,7 @@ describe('Live transition resolution', () => {
       )
     );
 
-    const low = resolveCounterPress(
+    const deep = resolveCounterPress(
       [p],
       { x: 52, y: 32 },
       state(
@@ -248,13 +248,13 @@ describe('Live transition resolution', () => {
           tempo: 'normal',
           width: 'normal',
           directness: 'mixed',
-          defensiveLine: 'low',
+          defensiveLine: 'deep',
         }
       )
     );
 
     expect(high.probability).toBeGreaterThan(normal.probability);
-    expect(normal.probability).toBeGreaterThan(low.probability);
+    expect(normal.probability).toBeGreaterThan(deep.probability);
   });
 
   it('break quality responds to tempo, directness, role and condition', () => {
