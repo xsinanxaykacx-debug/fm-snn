@@ -140,9 +140,10 @@ export function Dashboard({ onNavigate }: Props) {
     m => m.week === state.currentWeek && !m.played &&
       (m.homeId === state.userClubId || m.awayId === state.userClubId)
   );
-  const opponent = nextMatch
-    ? state.clubs[nextMatch.homeId === state.userClubId ? nextMatch.awayId : nextMatch.homeId]
-    : null;
+  const opponentId = nextMatch
+    ? (nextMatch.homeId === state.userClubId ? nextMatch.awayId : nextMatch.homeId)
+    : undefined;
+  const opponent = opponentId ? state.clubs[opponentId] : null;
   const isHome = nextMatch?.homeId === state.userClubId;
 
   // 🆕 KUPA BİLGİSİ
