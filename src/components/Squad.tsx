@@ -22,13 +22,6 @@ function getPositionColor(position: string): { bg: string; text: string; border:
   return { bg: 'bg-slate-500/20', text: 'text-slate-400', border: 'border-slate-500/40' };
 }
 
-function getConditionColor(value: number): string {
-  if (value >= 80) return 'bg-green-500';
-  if (value >= 60) return 'bg-yellow-500';
-  if (value >= 40) return 'bg-orange-500';
-  return 'bg-red-500';
-}
-
 function getSquadRoleLabel(role: string): { icon: string; label: string; color: string } {
   switch (role) {
     case 'first':    return { icon: '⭐', label: 'İlk 11',     color: 'bg-green-500/20 text-green-400 border-green-500/40' };
