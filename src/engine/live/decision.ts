@@ -359,6 +359,10 @@ function generateBallCarrierCandidates(
       self.player.attributes.passing
     );
 
+    const isThroughBall =
+      option.distance > THROUGH_BALL_MIN_DISTANCE &&
+      option.tacticalValue > THROUGH_BALL_MIN_TACTICAL;
+
     const score =
       successProbability * PASS_SCORE.successWeight +
       tacticalFit * PASS_SCORE.tacticalWeight * breakBoost +
@@ -370,10 +374,6 @@ function generateBallCarrierCandidates(
         : 0) +
       spaceValue * PASS_SCORE.spaceWeight -
       risk * PASS_SCORE.riskWeight;
-
-    const isThroughBall =
-      option.distance > THROUGH_BALL_MIN_DISTANCE &&
-      option.tacticalValue > THROUGH_BALL_MIN_TACTICAL;
 
     candidates.push({
       type: isThroughBall ? 'through_ball' : 'pass',
