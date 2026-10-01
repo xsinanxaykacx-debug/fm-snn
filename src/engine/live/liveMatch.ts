@@ -857,6 +857,18 @@ function handlePassAction(
 ): void {
   if (!decision.target) return;
 
+  const resolution = resolvePassAction(owner, decision, state);
+  const completed = nextBool(state.rng, resolution.probability);
+
+  const target = completed
+    ? decision.target
+    : {
+        x: owner.position.x +
+          (decision.target.x - owner.position.x) * 0.55,
+        y: owner.position.y +
+          (decision.target.y - owner.position.y) * 0.55,
+      };
+
   state.ball = applyPass(
     state.ball,
     {
@@ -864,7 +876,7 @@ function handlePassAction(
       y: owner.position.y,
       z: DEFAULT_BALL_PHYSICS.radius,
     },
-    decision.target,
+    target,
     decision.power,
     DEFAULT_BALL_PHYSICS,
     owner.player.id,
@@ -876,12 +888,18 @@ function handlePassAction(
   const side = owner.isHome ? 'home' : 'away';
   state.stats.passes[side] += 1;
 
+  if (completed) {
+    state.stats.passesCompleted[side] += 1;
+  }
+
   state.events.push({
     minute: Math.floor(state.time / 60),
     type: 'pass',
     playerId: owner.player.id,
     clubId: owner.clubId,
-    description: `Pas: ${owner.player.name}`,
+    description: completed
+      ? `Pas: ${owner.player.name}`
+      : `Hatalı pas: ${owner.player.name}`,
   });
 }
 
@@ -892,12 +910,8 @@ function handleShootAction(
 ): void {
   if (!decision.target) return;
 
-  const debug = state.decisions[owner.player.id];
-  const selected = debug?.selected;
-  const shotXG =
-    selected?.type === 'shoot'
-      ? selected.successProbability
-      : 0;
+  const resolution = resolveShotAction(owner, decision, state);
+  const shotXG = resolution.xG;
 
   state.ball = applyShot(
     state.ball,
@@ -969,15 +983,37 @@ function handleDribbleAction(
   owner: LivePlayer,
   state: LiveMatchState
 ): void {
+  const resolution = resolveDribbleAction(owner, state);
+  const success = nextBool(state.rng, resolution.probability);
+
   const side = owner.isHome ? 'home' : 'away';
   state.stats.dribbles[side] += 1;
+
+  if (success) {
+    state.stats.dribblesSuccess[side] += 1;
+  } else {
+    // Başarısız çalımda topu fizik motoruna bırakıyoruz.
+    // Bir sonraki tick'te en yakın oyuncu topu tekrar kontrol edebilir.
+    state.ball = releaseBall(state.ball);
+    state.ball.position.x = owner.position.x;
+    state.ball.position.y = owner.position.y;
+    state.ball.position.z = DEFAULT_BALL_PHYSICS.radius;
+    state.ball.velocity = { x: 0, y: 0, z: 0 };
+    state.ball.isMoving = false;
+    state.ball.lastTouchId = owner.player.id;
+    state.ball.lastTouchClubId = owner.clubId;
+  }
+
+  syncBallOwnerFlags(state);
 
   state.events.push({
     minute: Math.floor(state.time / 60),
     type: 'dribble',
     playerId: owner.player.id,
     clubId: owner.clubId,
-    description: `Çalım: ${owner.player.name}`,
+    description: success
+      ? `Çalım başarılı: ${owner.player.name}`
+      : `Çalım başarısız: ${owner.player.name}`,
   });
 }
 
