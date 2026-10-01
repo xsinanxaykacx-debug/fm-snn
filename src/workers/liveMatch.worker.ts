@@ -37,6 +37,13 @@ type Frame = {
   tick: number;
   phase: string;
   score: { home: number; away: number };
+  transition: {
+    counterPressClubId: string | null;
+    breakClubId: string | null;
+    counterPressProbability: number;
+    breakQuality: number;
+    expiresAt: number;
+  };
   ball: {
     x: number;
     y: number;
@@ -73,6 +80,13 @@ function compactFrame(state: LiveMatchState): Frame {
     tick: state.tick,
     phase: state.phase,
     score: { ...state.score },
+    transition: {
+      counterPressClubId: state.transition.counterPressClubId,
+      breakClubId: state.transition.breakClubId,
+      counterPressProbability: state.transition.counterPressProbability,
+      breakQuality: state.transition.breakQuality,
+      expiresAt: state.transition.expiresAt,
+    },
     ball: {
       x: state.ball.position.x,
       y: state.ball.position.y,
