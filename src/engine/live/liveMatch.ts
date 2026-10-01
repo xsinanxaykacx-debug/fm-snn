@@ -69,6 +69,11 @@ import {
   ADDED_TIME_SECONDS,
   DEFAULT_LIVE_ENGINE_CONFIG,
   BALL_CONTROL_MAX_SPEED,
+  FATIGUE_PER_MINUTE,
+  FATIGUE_STAMINA_FACTOR,
+  FATIGUE_FITNESS_FACTOR,
+  FATIGUE_MIN_CONDITION,
+  FATIGUE_HALFTIME_RECOVERY,
 } from './config';
 
 import {
@@ -290,6 +295,69 @@ export function simulateMatchLive(
 }
 
 // ═══════════════════════════════════════════════
+// MATCH FATIGUE
+// ═══════════════════════════════════════════════
+
+function updateMatchFatigue(state: LiveMatchState): void {
+  if (state.tick % 10 !== 0) return;
+
+  const homePressing =
+    state.home.club.tactic.pressing === 'high' ? 1.08 :
+    state.home.club.tactic.pressing === 'low' ? 0.96 : 1;
+
+  const awayPressing =
+    state.away.club.tactic.pressing === 'high' ? 1.08 :
+    state.away.club.tactic.pressing === 'low' ? 0.96 : 1;
+
+  for (const player of Object.values(state.players)) {
+    const pressingMultiplier = player.isHome
+      ? homePressing
+      : awayPressing;
+
+    const staminaFactor =
+      1 - (Math.max(0, Math.min(100, player.player.attributes.stamina)) / 100)
+        * FATIGUE_STAMINA_FACTOR;
+
+    const fitnessFactor =
+      1.3 -
+      (Math.max(0, Math.min(100, player.player.condition)) / 100)
+        * FATIGUE_FITNESS_FACTOR;
+
+    const depletion =
+      (FATIGUE_PER_MINUTE / 10) *
+      staminaFactor *
+      Math.max(0.4, fitnessFactor) *
+      pressingMultiplier;
+
+    player.player.condition = Math.max(
+      FATIGUE_MIN_CONDITION,
+      player.player.condition - depletion
+    );
+
+    player.player.fatigue = Math.min(
+      100,
+      player.player.fatigue + depletion * 2
+    );
+  }
+}
+
+function applyHalftimeRecovery(state: LiveMatchState): void {
+  if (state.time !== 45 * 60) return;
+
+  for (const player of Object.values(state.players)) {
+    player.player.condition = Math.min(
+      100,
+      player.player.condition + FATIGUE_HALFTIME_RECOVERY
+    );
+
+    player.player.fatigue = Math.max(
+      0,
+      player.player.fatigue - FATIGUE_HALFTIME_RECOVERY
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════
 // ANA TICK
 // ═══════════════════════════════════════════════
 
@@ -308,6 +376,9 @@ function runTick(
   // ─── 2. Zaman ───
   state.time += TICK_DURATION;
   state.tick += 1;
+
+  updateMatchFatigue(state);
+  applyHalftimeRecovery(state);
 
   // ─── 3. Perception cache ───
   updatePerceptionCaches(state);
