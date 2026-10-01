@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
-import type { Match, MatchEvent, Player } from '../engine/types';
+import type { Match, MatchEvent } from '../engine/types';
 import { calculateTeamUnits, compareUnits } from '../engine/units/teamUnits';
 import { TeamBadge } from './TeamBadge';
 import { getTeamColor } from '../utils/teamColors';
@@ -89,11 +89,10 @@ interface MatchCardProps {
   match: Match;
   isUserMatch: boolean;
   isActiveWeek: boolean;
-  isPast: boolean;
   onPlay?: () => void;
 }
 
-function MatchCard({ match, isUserMatch, isActiveWeek, isPast, onPlay }: MatchCardProps) {
+function MatchCard({ match, isUserMatch, isActiveWeek, onPlay }: MatchCardProps) {
   const state = useGameStore();
   const home = state.clubs[match.homeId!];
   const away = state.clubs[match.awayId!];
@@ -160,8 +159,6 @@ function WeekBlock({ week, matches, isActive, isPast, onPlay }: WeekBlockProps) 
   );
 
   const allPlayed = matches.every(m => m.played);
-  const userPlayed = userMatch?.played ?? false;
-
   return (
     <div
       className={`rounded-lg border overflow-hidden ${
@@ -206,7 +203,6 @@ function WeekBlock({ week, matches, isActive, isPast, onPlay }: WeekBlockProps) 
             match={m}
             isUserMatch={m.homeId === state.userClubId || m.awayId === state.userClubId}
             isActiveWeek={isActive}
-            isPast={isPast}
             onPlay={onPlay}
           />
         ))}
