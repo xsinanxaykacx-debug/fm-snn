@@ -116,6 +116,7 @@ import {
 
 import {
   createRng,
+  nextBool,
 } from './rng';
 
 // ═══════════════════════════════════════════════
@@ -932,7 +933,7 @@ function applyBoundaryOutcome(
   if (outcome.type === 'none') return;
 
   if (outcome.type === 'goal') {
-    if (resolveGoalkeeperSave(outcome, state)) {
+    if (resolveGoalkeeperSave(outcome, state, players)) {
       return;
     }
 
@@ -958,7 +959,8 @@ function applyBoundaryOutcome(
 
 function resolveGoalkeeperSave(
   outcome: BoundaryOutcome & { type: 'goal' },
-  state: LiveMatchState
+  state: LiveMatchState,
+  players: Record<string, Player>
 ): boolean {
   const shotEvent = [...state.events]
     .reverse()
@@ -1052,7 +1054,7 @@ function resolveGoalkeeperSave(
     state.pitch,
     state.home.club,
     state.away.club,
-    playersForSetPiece(state)
+    players
   );
 
   return true;
