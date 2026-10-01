@@ -1,6 +1,6 @@
 // src/engine/academy/academy.ts
 
-import type { Player, Position, AcademyPlayer, Club } from '../types';
+import type { Position, AcademyPlayer, Club } from '../types';
 import { createEmptyCareerStats } from '../data/generateData';
 
 // ═══════════════════════════════════════════════
@@ -74,7 +74,7 @@ const LAST_NAMES = [
 
 const NATIONALITIES = ['TR', 'EN', 'DE', 'FR', 'ES', 'IT', 'BR', 'AR', 'NL', 'PT'];
 
-const POSITIONS: Position[] = ['GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST'];
+const POSITIONS: Position[] = ['GK', 'DC', 'DL', 'DR', 'DMC', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST'];
 
 function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -190,6 +190,8 @@ export function generateAcademyPlayer(
     careerStats: createEmptyCareerStats(),
     recentRatings: [],
     overall,
+    contractYears: 3,
+    squadRole: 'u21',
 
     potential,
     potentialStars: potentialToStars(potential),
