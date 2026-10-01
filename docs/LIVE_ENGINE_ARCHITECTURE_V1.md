@@ -95,13 +95,13 @@ For every pair:
 
 - `distance >= 0`
 - `relativeSpeed >= 0`
-- `closingSpeedBA = -closingSpeedAB` structurally
+- `closingSpeedBA = closingSpeedAB` structurally
 - `abs(closingSpeedAB) <= relativeSpeed` within floating-point tolerance
 - no self-pairs
 
 `relativeSpeed` is the symmetric magnitude `|vA - vB|`.
 
-`closingSpeedAB` is the signed radial closing component from A toward B.
+`closingSpeedAB` is the signed rate at which the A-B distance is closing.
 
 The same `PairPhysics` contract is used for player-player and player-ball physics. `playerPairs` uses the symmetric `pairKey(a, b)` key; `ballPairs` uses the player ID directly because the ball is a singleton and each player has exactly one player→ball relation. Ball-specific concepts such as ownership, control quality and spin remain outside `PairPhysics`.
 
@@ -127,7 +127,7 @@ No spatial-hash or active-window optimization is introduced in V1. Correctness i
 
 The existing deterministic `calculateClosingSpeed` helper remains the source of truth for the initial closing-speed geometry.
 
-When a pair is built, `closingSpeedAB` is calculated once and `closingSpeedBA` is structurally derived as `-closingSpeedAB`; the reverse direction is not independently recalculated.
+When a pair is built, `closingSpeedAB` is calculated once and `closingSpeedBA` is structurally copied as the same physical distance-closing rate; the reverse access direction does not independently recalculate the physics.
 
 Closing speed is objective physics data. Different players may interpret the same value differently in the perception/decision layers.
 
@@ -139,7 +139,7 @@ Before connecting the new physics snapshot to tackle resolution, the physics lay
 2. 22 player-ball pairs.
 3. Non-negative distance.
 4. Non-negative relative speed.
-5. Antisymmetry of closing speed.
+5. Pair symmetry of closing speed.
 6. Closing speed magnitude cannot exceed relative speed.
 7. No self-pairs.
 8. Same input produces the same snapshot.
