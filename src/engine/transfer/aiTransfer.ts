@@ -176,6 +176,11 @@ function findTransferTarget(
       'AML': ['AML', 'ML', 'ST'],
       'AMR': ['AMR', 'MR', 'ST'],
       'ST': ['ST', 'AMC'],
+      'WBL': ['WBL', 'DL', 'ML'],
+      'WBR': ['WBR', 'DR', 'MR'],
+      'KFL': ['KFL', 'ST', 'AML'],
+      'GF': ['GF', 'ST', 'AMC'],
+      'KFR': ['KFR', 'ST', 'AMR'],
     };
 
     const related = relatedPositions[position] ?? [position];
