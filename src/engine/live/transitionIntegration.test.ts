@@ -11,6 +11,12 @@ describe('Live transition integration', () => {
     let transitionTicks = 0;
     let counterPressAttempts = 0;
     let counterPressRecoveries = 0;
+    let counterPressRollsPassed = 0;
+    let counterPressTackleWins = 0;
+    let counterPressTackleFailures = 0;
+    let counterPressTackleFouls = 0;
+    let counterPressCleanRecoveries = 0;
+    let counterPressLooseBallRecoveries = 0;
 
     for (let i = 0; i < 2; i++) {
       const home = clubs[i % clubs.length];
@@ -38,7 +44,6 @@ describe('Live transition integration', () => {
             counterPressAttempts,
             state.stats.counterPressAttempts
           );
-
           counterPressRecoveries = Math.max(
             counterPressRecoveries,
             state.stats.counterPressRecoveries
@@ -46,13 +51,20 @@ describe('Live transition integration', () => {
         },
       });
 
+      counterPressRollsPassed += match.stats.counterPressRollsPassed;
+      counterPressTackleWins += match.stats.counterPressTackleWins;
+      counterPressTackleFailures += match.stats.counterPressTackleFailures;
+      counterPressTackleFouls += match.stats.counterPressTackleFouls;
+      counterPressCleanRecoveries += match.stats.counterPressCleanRecoveries;
+      counterPressLooseBallRecoveries += match.stats.counterPressLooseBallRecoveries;
+
       console.log(
-        `seed=${1000 + i} transitionTicks=${transitionTicks} attempts=${match.stats.counterPressAttempts} recoveries=${match.stats.counterPressRecoveries}`
+        `seed=${1000 + i} transitionTicks=${transitionTicks} attempts=${match.stats.counterPressAttempts} rollPassed=${match.stats.counterPressRollsPassed} tackleWon=${match.stats.counterPressTackleWins} tackleFailed=${match.stats.counterPressTackleFailures} fouls=${match.stats.counterPressTackleFouls} cleanRecovery=${match.stats.counterPressCleanRecoveries} looseRecovery=${match.stats.counterPressLooseBallRecoveries} recoveries=${match.stats.counterPressRecoveries}`
       );
     }
 
     console.log(
-      `TOTAL transitionTicks=${transitionTicks} attempts=${counterPressAttempts} recoveries=${counterPressRecoveries}`
+      `TOTAL attempts=${counterPressAttempts} rollPassed=${counterPressRollsPassed} tackleWon=${counterPressTackleWins} tackleFailed=${counterPressTackleFailures} fouls=${counterPressTackleFouls} cleanRecovery=${counterPressCleanRecoveries} looseRecovery=${counterPressLooseBallRecoveries} recoveries=${counterPressRecoveries}`
     );
 
     expect(transitionTicks).toBeGreaterThan(0);
