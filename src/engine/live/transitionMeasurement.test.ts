@@ -4,7 +4,7 @@ import { generateGameData } from '../data/generateData';
 import { simulateMatchLive } from './liveMatch';
 
 describe('Live transition measurement', () => {
-  it('100 bounded maçta counter-press zincirinin gerçek oranlarını ölçer', () => {
+  it('500 bounded maçta counter-press zincirinin gerçek oranlarını ölçer', () => {
     const data = generateGameData();
     const clubs = Object.values(data.clubs);
 
@@ -27,7 +27,7 @@ describe('Live transition measurement', () => {
     let tackleDistanceSum = 0;
     let tackleDiagnosticSamples = 0;
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 500; i++) {
       const home = clubs[i % clubs.length];
       const away = clubs[(i + 1) % clubs.length];
 
@@ -134,8 +134,8 @@ describe('Live transition measurement', () => {
     console.log('avgTackleRelativeSpeed=' + avgTackleRelativeSpeed.toFixed(3));
     console.log('avgTackleDistance=' + avgTackleDistance.toFixed(3));
 
-    expect(matches).toBe(100);
+    expect(matches).toBe(500);
     expect(transitionStarts).toBeGreaterThan(0);
     expect(counterPressAttempts).toBeGreaterThan(0);
-  }, 120_000);
+  }, 600_000);
 });
