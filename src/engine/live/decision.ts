@@ -700,10 +700,21 @@ function decidePriorityIntent(
       ballPosition
     );
 
+    const defensiveLine =
+      self.isHome
+        ? state.home.club.tactic.defensiveLine
+        : state.away.club.tactic.defensiveLine;
+
+    const lineReachModifier =
+      defensiveLine === 'high' ? 1.15 :
+      defensiveLine === 'low' ? 0.85 :
+      1;
+
     const counterPressReach =
       Math.min(
         COUNTER_PRESS_MAX_DISTANCE,
-        8 + state.transition.counterPressProbability * 25
+        (8 + state.transition.counterPressProbability * 25) *
+          lineReachModifier
       );
 
     if (distanceToBall <= counterPressReach) {
