@@ -63,10 +63,55 @@ export interface MovementContext {
 // YARDIMCILAR
 // ═══════════════════════════════════════════════
 
-function distanceSq(a: Vec2, b: Vec2): number {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return dx * dx + dy * dy;
+// ═══════════════════════════════════════════════
+// HIZ MODELİ
+// ═══════════════════════════════════════════════
+
+function attrRatio(value: number): number {
+  return Math.max(0, Math.min(1, value / 20));
+}
+
+export function computeMaxSpeed(
+  player: LivePlayer,
+  physics: PlayerPhysicsConfig
+): number {
+  const attributes = player.player.attributes;
+  const paceRatio = attrRatio(attributes.pace);
+  const accelerationRatio = attrRatio(attributes.acceleration);
+
+  const baseSpeed =
+    4.0 +
+    paceRatio * 5.0 +
+    accelerationRatio * 1.5;
+
+  const conditionMultiplier =
+    0.7 + (player.player.condition / 100) * 0.3;
+  const moraleMultiplier =
+    0.9 + (player.player.morale / 100) * 0.1;
+  const formMultiplier =
+    0.9 + (player.player.form / 100) * 0.1;
+
+  return (
+    baseSpeed *
+    conditionMultiplier *
+    moraleMultiplier *
+    formMultiplier *
+    physics.maxSpeedMultiplier
+  );
+}
+
+export function computeAcceleration(
+  player: LivePlayer,
+  physics: PlayerPhysicsConfig
+): number {
+  const accelerationRatio = attrRatio(
+    player.player.attributes.acceleration
+  );
+
+  return (
+    (3.0 + accelerationRatio * 4.0) *
+    physics.accelerationMultiplier
+  );
 }
 
 // ═══════════════════════════════════════════════
@@ -114,8 +159,8 @@ export function movePlayer(
   const ny = dy / dist;
 
   // ─── Hız ve ivme (player'dan) ───
-  const maxSpeed = player.maxSpeed * physics.maxSpeedMultiplier;
-  const accel = player.acceleration * physics.accelerationMultiplier;
+  const maxSpeed = computeMaxSpeed(player, physics);
+  const accel = computeAcceleration(player, physics);
 
   // ─── Yaklaşım yumuşatma ───
   const approachFactor = Math.min(1, dist / PLAYER_APPROACH_RADIUS);
