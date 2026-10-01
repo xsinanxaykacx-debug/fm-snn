@@ -99,6 +99,7 @@ export const PLAYER_TURN_RATE = 0.5;
 export const PLAYER_APPROACH_RADIUS = 2.0;
 export const PLAYER_STOP_SPEED = 0.05;
 export const PLAYER_TARGET_TOLERANCE = 0.05;
+export const PLAYER_VELOCITY_EPSILON = 0.001;
 
 // ═══════════════════════════════════════════════
 // KARAR ZAMANI
@@ -123,6 +124,9 @@ export const DECISION = {
 export const MAX_CHASE_PER_TEAM = 2;
 export const CHASE_DISTANCE_WEIGHT = -0.7;
 export const CHASE_TACKLING_WEIGHT = 0.3;
+export const GK_CHASE_MAX_DISTANCE = 18.0;
+export const GK_CHASE_MAX_X = 18.0;
+export const GK_SWEEPER_DISTANCE = 10.0;
 
 // ═══════════════════════════════════════════════
 // PERCEPTION
@@ -229,6 +233,11 @@ export const MARK_MAX_DISTANCE = 25.0;
 export const MARK_OPENNESS_WEIGHT = 0.7;
 export const MARK_DISTANCE_WEIGHT = 0.3;
 export const MARKING_OFFSET_DISTANCE = 2.0;
+export const MARK_ASSIGNMENT_MAX_PER_OPPONENT = 1;
+export const MARK_THREAT_DISTANCE_WEIGHT = 0.35;
+export const MARK_THREAT_GOAL_WEIGHT = 0.30;
+export const MARK_THREAT_OPENNESS_WEIGHT = 0.20;
+export const MARK_THREAT_ROLE_WEIGHT = 0.15;
 export const MARK_BASE_SCORE = 0.4;
 export const MARK_SCORE_DIVISOR = 200;
 export const MARK_SUCCESS_PROBABILITY = 0.7;
