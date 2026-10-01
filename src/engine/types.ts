@@ -1199,6 +1199,12 @@ export interface LiveMatchStats extends MatchStats {
   /** Counter-press V1 fiziksel recovery metrikleri. */
   counterPressAttempts: number;
   counterPressRecoveries: number;
+  counterPressRollsPassed: number;
+  counterPressTackleWins: number;
+  counterPressTackleFailures: number;
+  counterPressTackleFouls: number;
+  counterPressCleanRecoveries: number;
+  counterPressLooseBallRecoveries: number;
 
   fouls: {
     home: number;
