@@ -33,7 +33,6 @@ import type {
   PlayerRole,
   SpaceMap,
   Vec2,
-  Vec3,
   ZoneType,
 } from '../types';
 
