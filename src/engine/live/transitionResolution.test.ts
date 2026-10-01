@@ -193,6 +193,70 @@ describe('Live transition resolution', () => {
     expect(near.playerId).toBe('p1');
   });
 
+  it('defensive line changes counter-press probability monotonically', () => {
+    const p = player('p1', 'HOME', true, 51, 32, 'CM', {
+      tackling: 90,
+      anticipation: 90,
+      positioning: 85,
+      workRate: 95,
+      aggression: 85,
+    });
+
+    const high = resolveCounterPress(
+      [p],
+      { x: 52, y: 32 },
+      state(
+        { p },
+        {
+          formation: '4-3-3',
+          mentality: 'balanced',
+          pressing: 'medium',
+          tempo: 'normal',
+          width: 'normal',
+          directness: 'mixed',
+          defensiveLine: 'high',
+        }
+      )
+    );
+
+    const normal = resolveCounterPress(
+      [p],
+      { x: 52, y: 32 },
+      state(
+        { p },
+        {
+          formation: '4-3-3',
+          mentality: 'balanced',
+          pressing: 'medium',
+          tempo: 'normal',
+          width: 'normal',
+          directness: 'mixed',
+          defensiveLine: 'normal',
+        }
+      )
+    );
+
+    const low = resolveCounterPress(
+      [p],
+      { x: 52, y: 32 },
+      state(
+        { p },
+        {
+          formation: '4-3-3',
+          mentality: 'balanced',
+          pressing: 'medium',
+          tempo: 'normal',
+          width: 'normal',
+          directness: 'mixed',
+          defensiveLine: 'low',
+        }
+      )
+    );
+
+    expect(high.probability).toBeGreaterThan(normal.probability);
+    expect(normal.probability).toBeGreaterThan(low.probability);
+  });
+
   it('break quality responds to tempo, directness, role and condition', () => {
     const fast = player('p1', 'HOME', true, 52, 32, 'W', {
       pace: 95,
