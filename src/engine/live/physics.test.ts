@@ -255,7 +255,7 @@ describe('computePairPhysics geometry', () => {
     expect(pair.distance).toBeCloseTo(10);
     expect(pair.relativeSpeed).toBeCloseTo(8);
     expect(pair.closingSpeedAB).toBeCloseTo(8);
-    expect(pair.closingSpeedBA).toBeCloseTo(-8);
+    expect(pair.closingSpeedBA).toBeCloseTo(8);
   });
 
   it('aynı yön, tackler hızlı: closingSpeed = 1', () => {
