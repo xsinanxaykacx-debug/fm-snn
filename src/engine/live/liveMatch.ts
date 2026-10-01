@@ -451,7 +451,12 @@ function updateTransitionState(
  // ANA TICK
  // ═══════════════════════════════════════════════
 
-function runTick(
+/**
+ * @internal
+ * Test edilebilirlik için export edilmiştir.
+ * Production akışında simulateMatchLive tarafından çağrılır.
+ */
+export function runTick(
   state: LiveMatchState,
   players: Record<string, Player>,
   onTick?: (state: LiveMatchState) => void
