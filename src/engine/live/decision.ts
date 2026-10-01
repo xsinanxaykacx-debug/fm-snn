@@ -1059,35 +1059,56 @@ function buildMarkAssignments(
   pitch: PitchDimensions
 ): MarkAssignments {
   const assignments: MarkAssignments = {};
-  const defenders = players.filter(player => player.role !== 'GK');
-  const opponentsByTeam = new Map<boolean, LivePlayer[]>();
 
-  for (const player of players) {
-    const list = opponentsByTeam.get(player.isHome);
-    if (list) list.push(player);
-    else opponentsByTeam.set(player.isHome, [player]);
-  }
+  for (const defendingHome of [true, false]) {
+    const defenders = players.filter(
+      player => player.isHome === defendingHome && player.role !== 'GK'
+    );
 
-  for (const defender of defenders) {
-    const opponents = opponentsByTeam.get(!defender.isHome) ?? [];
-    const candidates = opponents
-      .filter(opponent =>
-        computeDistance(defender.position, opponent.position) <= MARK_MAX_DISTANCE
-      )
+    const opponents = players.filter(
+      player => player.isHome !== defendingHome
+    );
+
+    const opponentThreats = opponents
       .map(opponent => {
-        const distanceToBall = computeDistance(opponent.position, ballPosition);
-        const distanceToGoal = defender.isHome
-          ? computeDistance(opponent.position, { x: 0, y: pitch.width / 2 })
-          : computeDistance(opponent.position, { x: pitch.length, y: pitch.width / 2 });
+        const distanceToBall = computeDistance(
+          opponent.position,
+          ballPosition
+        );
+
+        const defendingGoal = defendingHome
+          ? { x: 0, y: pitch.width / 2 }
+          : { x: pitch.length, y: pitch.width / 2 };
+
+        const distanceToGoal = computeDistance(
+          opponent.position,
+          defendingGoal
+        );
+
+        const nearbyTeammates = opponents.filter(
+          teammate =>
+            teammate.player.id !== opponent.player.id &&
+            computeDistance(
+              teammate.position,
+              opponent.position
+            ) <= 8
+        ).length;
+
+        const openness = clamp01(
+          1 - nearbyTeammates / 3
+        );
 
         const ballThreat = clamp01(
           1 - distanceToBall / MARK_MAX_DISTANCE
         );
+
         const goalThreat = clamp01(
           1 - distanceToGoal / pitch.length
         );
-        const openness = 0.5;
-        const roleThreat = markRoleThreat(opponent.player.position);
+
+        const roleThreat = markRoleThreat(
+          opponent.player.position
+        );
 
         const score =
           ballThreat * MARK_THREAT_DISTANCE_WEIGHT +
@@ -1098,22 +1119,60 @@ function buildMarkAssignments(
         return {
           opponent,
           score,
-          distance: computeDistance(defender.position, opponent.position),
         };
       })
       .sort((a, b) =>
         b.score - a.score ||
-        a.distance - b.distance ||
-        a.opponent.player.id.localeCompare(b.opponent.player.id)
+        a.opponent.player.id.localeCompare(
+          b.opponent.player.id
+        )
       );
 
-    for (const candidate of candidates) {
-      const alreadyAssigned = Object.values(assignments)
-        .filter(id => id === candidate.opponent.player.id).length;
+    const usedDefenders = new Set<string>();
 
-      if (alreadyAssigned < MARK_ASSIGNMENT_MAX_PER_OPPONENT) {
-        assignments[defender.player.id] = candidate.opponent.player.id;
-        break;
+    for (const threat of opponentThreats) {
+      let bestDefender: {
+        player: LivePlayer;
+        distance: number;
+      } | null = null;
+
+      for (const defender of defenders) {
+        if (usedDefenders.has(defender.player.id)) continue;
+
+        const distance = computeDistance(
+          defender.position,
+          threat.opponent.position
+        );
+
+        if (distance > MARK_MAX_DISTANCE) continue;
+
+        if (
+          bestDefender === null ||
+          distance < bestDefender.distance ||
+          (
+            distance === bestDefender.distance &&
+            defender.player.id.localeCompare(
+              bestDefender.player.player.id
+            ) < 0
+          )
+        ) {
+          bestDefender = {
+            player: defender,
+            distance,
+          };
+        }
+      }
+
+      if (bestDefender !== null) {
+        assignments[bestDefender.player.player.id] =
+          threat.opponent.player.id;
+        usedDefenders.add(bestDefender.player.player.id);
+
+        if (
+          MARK_ASSIGNMENT_MAX_PER_OPPONENT <= 1
+        ) {
+          continue;
+        }
       }
     }
   }
