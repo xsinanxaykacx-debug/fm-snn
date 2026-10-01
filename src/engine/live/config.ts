@@ -62,6 +62,13 @@ export const CLEARANCE_VZ_RATIO = 0.4;
 export const BALL_CONTROL_MAX_HEIGHT = 1.0;
 export const BALL_AIRBORNE_HEIGHT = 0.5;
 export const BALL_STOPPED_SPEED = 0.1;
+
+/**
+ * Loose-ball kontrol eşiği.
+ * Top bu hızın altındaysa, fiziksel olarak hâlâ isMoving olsa bile
+ * kontrol mesafesine giren oyuncu topu alabilir.
+ */
+export const BALL_CONTROL_MAX_SPEED = 1.5;
 export const BALL_BOUNCE_STOP_SPEED = 0.5;
 export const BALL_ATTACH_FOOT_DISTANCE = 0.5;
 
