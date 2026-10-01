@@ -252,6 +252,8 @@ export function simulateMatchLive(
       breakQuality: 0,
       hasAttemptedCounterPress: false,
       isRecoveryContestActive: false,
+      pendingLooseBallRecoveryClubId: null,
+      pendingLooseBallRecoveryPlayerId: null,
     },
 
     isStopped: false,
@@ -401,6 +403,8 @@ function updateTransitionState(
     state.transition.breakQuality = 0;
     state.transition.hasAttemptedCounterPress = false;
     state.transition.isRecoveryContestActive = false;
+    state.transition.pendingLooseBallRecoveryClubId = null;
+    state.transition.pendingLooseBallRecoveryPlayerId = null;
   }
 
   const currentOwnerId = state.ball.ownerId;
@@ -444,6 +448,8 @@ function updateTransitionState(
     breakQuality: breakResolution.quality,
     hasAttemptedCounterPress: false,
     isRecoveryContestActive: false,
+    pendingLooseBallRecoveryClubId: null,
+    pendingLooseBallRecoveryPlayerId: null,
   };
 }
 
@@ -535,6 +541,7 @@ export function runTick(
   // Böylece topa koşan oyuncu fiziksel olarak top kontrol mesafesine
   // girdiğinde ownerId tekrar oluşturulur.
   resolveLooseBallControl(state);
+  resolvePendingLooseBallRecovery(state);
 
   // ─── 8b. Transition state ───
   // Possession değişimi bu tick içinde tackle/loose-ball sonucunda
@@ -1065,6 +1072,37 @@ function resolveLooseBallControl(state: LiveMatchState): void {
   );
 
   syncBallOwnerFlags(state);
+  resolvePendingLooseBallRecovery(state);
+}
+
+function resolvePendingLooseBallRecovery(state: LiveMatchState): void {
+  const transition = state.transition;
+
+  if (transition.pendingLooseBallRecoveryClubId === null) {
+    return;
+  }
+
+  if (state.time >= transition.expiresAt) {
+    transition.pendingLooseBallRecoveryClubId = null;
+    transition.pendingLooseBallRecoveryPlayerId = null;
+    return;
+  }
+
+  const ownerId = state.ball.ownerId;
+  if (ownerId === null) {
+    return;
+  }
+
+  const owner = state.players[ownerId];
+  if (!owner) return;
+
+  if (owner.clubId === transition.pendingLooseBallRecoveryClubId) {
+    state.stats.counterPressRecoveries += 1;
+    state.stats.counterPressLooseBallRecoveries += 1;
+  }
+
+  transition.pendingLooseBallRecoveryClubId = null;
+  transition.pendingLooseBallRecoveryPlayerId = null;
 }
 
 // ═══════════════════════════════════════════════
@@ -1244,16 +1282,13 @@ export function resolveCounterPressContest(
       state.stats.counterPressRecoveries += 1;
       state.stats.counterPressCleanRecoveries += 1;
     } else if (state.ball.ownerId === null) {
-      resolveLooseBallControl(state);
+      transition.pendingLooseBallRecoveryClubId =
+        transition.counterPressClubId;
+      transition.pendingLooseBallRecoveryPlayerId =
+        pressingPlayer.player.id;
 
-      if (
-        state.ball.ownerId !== null &&
-        state.players[state.ball.ownerId]?.clubId ===
-          transition.counterPressClubId
-      ) {
-        state.stats.counterPressRecoveries += 1;
-        state.stats.counterPressLooseBallRecoveries += 1;
-      }
+      resolveLooseBallControl(state);
+      resolvePendingLooseBallRecovery(state);
     }
   } else if (outcome.type === 'foul') {
     state.stats.counterPressTackleFouls += 1;
