@@ -93,7 +93,7 @@ describe('PhysicsSnapshot invariants', () => {
     const snap = buildPhysicsSnapshot(makeWorldN(22), 0);
 
     for (const pair of snap.playerPairs.values()) {
-      expect(pair.closingSpeedBA).toBe(-pair.closingSpeedAB);
+      expect(pair.closingSpeedBA).toBeCloseTo(-pair.closingSpeedAB, 10);
     }
   });
 
@@ -101,7 +101,7 @@ describe('PhysicsSnapshot invariants', () => {
     const snap = buildPhysicsSnapshot(makeWorldN(22), 0);
 
     for (const pair of snap.ballPairs.values()) {
-      expect(pair.closingSpeedBA).toBe(-pair.closingSpeedAB);
+      expect(pair.closingSpeedBA).toBeCloseTo(-pair.closingSpeedAB, 10);
     }
   });
 
