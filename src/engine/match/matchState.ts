@@ -1,4 +1,4 @@
-import type { Club, Player } from '../types';
+import type { Club } from '../types';
 import type { TeamAnalysis } from './teamAnalysis';
 
 export interface TeamMatchState {
