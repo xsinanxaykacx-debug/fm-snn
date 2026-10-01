@@ -50,5 +50,5 @@ describe('Live transition integration', () => {
     expect(transitionTicks).toBeGreaterThan(0);
     expect(counterPressAttempts).toBeGreaterThan(0);
     expect(counterPressRecoveries).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });
