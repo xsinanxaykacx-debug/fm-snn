@@ -1800,9 +1800,7 @@ function processInjuriesInMatch(
     injuryType: type,
   };
 
-  teamState.injuredPlayers.push(
-    player.id
-  );
+  (teamState.injuredPlayers ??= []).push(player.id);
 
   pendingEvents.push({
     minute: injMinute,
