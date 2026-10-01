@@ -21,12 +21,28 @@
  *  - requiredPlayerIds yalnızca TAKER TAKIMININ oyuncularından türetilir.
  *  - Taker seçimi deterministiktir (RNG yok).
  *  - goal_kick'te GK yoksa selectTaker() null döner.
- *  - goalHeight / physics bu dosyada kullanılmaz.
+ *  - goalHeight / physics bu dosyada KULLANILMAZ.
  *  - Yeni attribute eklenmez; mevcut Attributes kullanılır.
+ *  - Sabit sayı gömülmez; config.ts'ten import edilir.
  */
 
-import type { Player, PitchDimensions, Tactic, Vec2 } from '../types';
-import type { TeamSide } from './events';
+import type {
+  Player,
+  PitchDimensions,
+  Tactic,
+  Vec2,
+} from '../types';
+
+import type { TeamSide } from './pitch';
+
+import {
+  SET_PIECE_POSITION_TOLERANCE,
+  SET_PIECE_MAX_POSITIONING_SECONDS,
+  SET_PIECE_REQUIRED_COUNT,
+  THROW_IN_DISTANCE_FROM_LINE,
+  WALL_DISTANCE,
+  WALL_PLAYER_SPACING,
+} from './config';
 
 // ═══════════════════════════════════════════════
 // TİPLER
@@ -49,27 +65,16 @@ export interface SetPieceState {
   type: SetPieceType;
   teamSide: TeamSide;
 
-  /** Topu kullanacak oyuncu */
   takerId: string | null;
 
-  /** Topun başlangıç noktası (2D) */
   ballPosition: Vec2;
 
-  /**
-   * Her oyuncu için hedef pozisyon. Anahtar = player.id
-   *
-   * Hem taker takımının hem de savunan takımın hedeflerini içerir.
-   * Ancak requiredPlayerIds YALNIZCA taker takımından türetilir.
-   */
   targetPositions: Record<string, Vec2>;
 
-  /** `ready` kararı için beklenen oyuncu id'leri (yalnızca taker takımı) */
   requiredPlayerIds: string[];
 
-  /** Set-piece yaşam döngüsü */
   status: SetPieceStatus;
 
-  /** `positioning` başlangıcından bu yana geçen süre (güvenlik valfi) */
   elapsed: number;
 }
 
@@ -79,38 +84,23 @@ export interface SetPieceContext {
   type: SetPieceType;
   teamSide: TeamSide;
 
-  /** Topun sahaya giriş noktası (korner köşesi, taç noktası vb.) */
   ballPosition: Vec2;
 
-  /** Set-piece'i kullanan takımın oyuncuları */
   takerTeamPlayers: Record<string, Player>;
-
-  /** Rakip takımın oyuncuları */
   defenderTeamPlayers: Record<string, Player>;
 
-  /** Kullanan takımın taktiği */
   takerTactic: Tactic;
-
-  /** Savunan takımın taktiği */
   defenderTactic: Tactic;
 }
-
-// ═══════════════════════════════════════════════
-// SABİTLER
-// ═══════════════════════════════════════════════
-
-export const SET_PIECE_POSITION_TOLERANCE = 0.5;
-export const SET_PIECE_MAX_POSITIONING_SECONDS = 8.0;
-export const THROW_IN_DISTANCE_FROM_LINE = 0.5;
 
 // ═══════════════════════════════════════════════
 // TAKER SEÇİMİ
 // ═══════════════════════════════════════════════
 
-/**
- * Taker uygunluk skoru — deterministik, RNG yok.
- */
-export function takerScore(type: SetPieceType, player: Player): number {
+export function takerScore(
+  type: SetPieceType,
+  player: Player
+): number {
   const a = player.attributes;
 
   switch (type) {
@@ -138,7 +128,6 @@ export function takerScore(type: SetPieceType, player: Player): number {
       );
 
     case 'goal_kick':
-      // Kaleci zorunlu
       if (player.position !== 'GK') return -1;
       return (
         a.gkPositioning * 0.4 +
@@ -162,15 +151,6 @@ export function takerScore(type: SetPieceType, player: Player): number {
   }
 }
 
-/**
- * Taker'ı deterministik olarak seçer.
- *
- * KONTRAT:
- *  • RNG yok.
- *  • Aynı girdi → aynı çıktı.
- *  • Eşitlikte id'ye göre artan sıralama (deterministik tie-break).
- *  • goal_kick'te GK yoksa null döner.
- */
 export function selectTaker(
   type: SetPieceType,
   players: Record<string, Player>
@@ -197,7 +177,6 @@ export function selectTaker(
     return bestId;
   }
 
-  // Diğer türler: tüm oyuncular arasından en yüksek skor
   const ids = Object.keys(players).sort();
   let bestId: string | null = null;
   let bestScore = -Infinity;
@@ -244,10 +223,6 @@ function byDistanceFrom(
   });
 }
 
-/**
- * Saha dışına bakan normal (2D).
- * Taç taker pozisyonu için kullanılır.
- */
 function outwardNormalFromTouchline(
   pitch: PitchDimensions,
   point: Vec2
@@ -338,8 +313,8 @@ function attackingHalfSlot(
 /**
  * Baraj pozisyonu.
  *
- * Top ile kale arasında, 9.15 m mesafede.
- * Oyuncular y ekseninde 0.6 m aralıkla dizilir.
+ * Top ile kale arasında, WALL_DISTANCE mesafede.
+ * Oyuncular y ekseninde WALL_PLAYER_SPACING aralıkla dizilir.
  */
 function wallPosition(
   pitch: PitchDimensions,
@@ -355,8 +330,7 @@ function wallPosition(
   const dy = goalY - ballPos.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
 
-  const wallDistance = 9.15;
-  const ratio = dist > 0 ? wallDistance / dist : 0;
+  const ratio = dist > 0 ? WALL_DISTANCE / dist : 0;
 
   const wallCenter: Vec2 = {
     x: ballPos.x + dx * ratio,
@@ -368,7 +342,7 @@ function wallPosition(
 
   return clampToPitch(pitch, {
     x: wallCenter.x,
-    y: wallCenter.y + offset * 0.6,
+    y: wallCenter.y + offset * WALL_PLAYER_SPACING,
   });
 }
 
@@ -376,15 +350,6 @@ function wallPosition(
 // HEDEF POZİSYONLAR
 // ═══════════════════════════════════════════════
 
-/**
- * Hedef pozisyonları üretir.
- *
- * KONTRAT:
- *  • Oyuncu hareket ettirmez; yalnızca hedef koordinat döner.
- *  • targetPositions hem taker hem savunan takımın hedeflerini içerir.
- *  • Saha dışına taşabilir (taç taker'ı için bilinçli istisna).
- *  • Taktik, hedef pozisyon üretiminde kullanılır.
- */
 export function computeTargetPositions(
   context: SetPieceContext
 ): Record<string, Vec2> {
@@ -608,15 +573,6 @@ export function computeTargetPositions(
 // REQUIRED PLAYERS
 // ═══════════════════════════════════════════════
 
-/**
- * `ready` kararı için gerekli oyuncu id'lerini üretir.
- *
- * KONTRAT:
- *  • YALNIZCA taker takımının oyuncularından seçilir.
- *  • Sert kural gömülmez; targetPositions ve tür üzerinden türetilir.
- *  • Taker her zaman gereklidir (varsa).
- *  • Deterministik sıralama (mesafe + id).
- */
 export function computeRequiredPlayers(
   type: SetPieceType,
   takerId: string | null,
@@ -628,7 +584,6 @@ export function computeRequiredPlayers(
 
   if (takerId) required.push(takerId);
 
-  // Yalnızca taker takımının oyuncuları
   const candidates: Record<string, Vec2> = {};
   for (const id of takerTeamPlayerIds) {
     if (id === takerId) continue;
@@ -639,16 +594,8 @@ export function computeRequiredPlayers(
 
   const ordered = byDistanceFrom(ballPosition, candidates);
 
-  const countByType: Record<SetPieceType, number> = {
-    kickoff: 2,
-    goal_kick: 4,
-    corner: 5,
-    throw_in: 2,
-    free_kick: 4,
-    penalty: 5,
-  };
+  const n = SET_PIECE_REQUIRED_COUNT[type];
 
-  const n = countByType[type];
   for (let i = 0; i < ordered.length && required.length < n + 1; i++) {
     required.push(ordered[i]);
   }
@@ -660,17 +607,6 @@ export function computeRequiredPlayers(
 // ANA FONKSİYON
 // ═══════════════════════════════════════════════
 
-/**
- * Yeni bir set-piece oluşturur.
- *
- * KONTRAT:
- *  • Hedef pozisyonları ve taker'ı belirler.
- *  • RNG kullanmaz.
- *  • Oyuncuları hareket ettirmez.
- *  • status = 'positioning' ile başlar.
- *  • elapsed = 0 ile başlar.
- *  • goal_kick'te GK yoksa takerId = null olur.
- */
 export function createSetPiece(
   context: SetPieceContext
 ): SetPieceState {
@@ -704,16 +640,6 @@ export function createSetPiece(
 // TICK GÜNCELLEMESİ
 // ═══════════════════════════════════════════════
 
-/**
- * Her tick çağrılır.
- *
- * KONTRAT:
- *  • Immutable — yeni state döner.
- *  • requiredPlayerIds hedefe ulaştıysa status = 'ready'.
- *  • elapsed >= SET_PIECE_MAX_POSITIONING_SECONDS ise status = 'ready'.
- *  • status 'ready' veya 'played' ise dokunulmaz.
- *  • RNG yok.
- */
 export function updateSetPiece(
   state: SetPieceState,
   playerPositions: Record<string, Vec2>,
@@ -751,15 +677,6 @@ export function updateSetPiece(
 // DURUM GEÇİŞLERİ
 // ═══════════════════════════════════════════════
 
-/**
- * Taker topa vurduğunda çağrılır.
- * status = 'played' ile yeni state döner.
- *
- * KONTRAT:
- *  • Yalnızca 'ready' durumundan çağrılmalı.
- *  • Diğer durumlarda state aynen döner.
- *  • Immutable.
- */
 export function markSetPiecePlayed(
   state: SetPieceState
 ): SetPieceState {

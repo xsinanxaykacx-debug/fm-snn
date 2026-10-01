@@ -58,40 +58,21 @@ export interface CustomFormation {
 // ═══════════════════════════════════════════════
 
 export interface PitchDimensions {
-  /** Saha uzunluğu — X ekseni: 0 → length */
   length: number;
-
-  /** Saha genişliği — Y ekseni: 0 → width */
   width: number;
 
-  /** Kale ağzı genişliği (direk içleri arası) */
   goalWidth: number;
-
-  /** Kale yüksekliği (çapraz çubuk alt kenarı) */
   goalHeight: number;
-
-  /** Direk yarıçapı */
   postRadius: number;
 
-  /** Ceza sahası derinliği (kale çizgisinden içeri) */
   penaltyAreaDepth: number;
-
-  /** Ceza sahası genişliği */
   penaltyAreaWidth: number;
 
-  /** Kale alanı derinliği (kale çizgisinden içeri) */
   goalAreaDepth: number;
-
-  /** Kale alanı genişliği */
   goalAreaWidth: number;
 
-  /** Penaltı noktasının kale çizgisine uzaklığı */
   penaltySpotDistance: number;
-
-  /** Orta yuvarlak yarıçapı */
   centerCircleRadius: number;
-
-  /** Korner yayı yarıçapı */
   cornerArcRadius: number;
 }
 
@@ -444,10 +425,6 @@ export interface Match {
 
   events: MatchEvent[];
 
-  /**
-   * Match.stats artık any değildir.
-   * Frozen ve Live motor aynı temel istatistik sözleşmesini kullanır.
-   */
   stats: MatchStats;
 
   played?: boolean;
@@ -797,56 +774,58 @@ export type Intent =
   | 'return_to_position';
 
 /**
- * DecisionCandidateType:
+ * Bir Decision'ın nedeni ve bir candidate'ın tipi.
  *
- * Ball Action:
- *   pass
- *   through_ball
- *   cross
- *   dribble
- *   shoot
- *   hold
+ * KONTRAT:
+ *  • Ball Action candidate'ları:
+ *      pass, through_ball, cross, shoot, dribble, hold, clear.
+ *  • Priority Layer davranışları:
+ *      tackle, intercept, mark, chase, support, return, move.
+ *  • Set-piece / formasyon:
+ *      set_piece, formation.
  *
- * Priority / movement:
- *   move
- *   chase
- *   return
- *   tackle
- *   intercept
- *   mark
- *
- * clear:
- *   Topu uzaklaştırma / clearance adayı.
- *
- * `chase` özellikle Decision.reason için bulunur.
+ * intent ve reason AYRI kavramlardır:
+ *  • intent → hangi fiziksel eylem
+ *  • reason → neden bu eylem
  */
 export type DecisionCandidateType =
+  // Ball Action
   | 'pass'
   | 'through_ball'
   | 'cross'
   | 'dribble'
   | 'shoot'
   | 'hold'
+  | 'clear'
+
+  // Priority Layer
   | 'move'
   | 'chase'
+  | 'support'
   | 'return'
-  | 'clear'
   | 'tackle'
   | 'intercept'
-  | 'mark';
+  | 'mark'
+
+  // Set-piece / formasyon
+  | 'set_piece'
+  | 'formation';
 
 export interface Decision {
   intent: Intent;
 
   /**
-   * Kararın nedenini taşır.
+   * Kararın nedeni.
    *
    * Örnek:
+   *   intent = 'move'
    *   reason = 'chase'
    *   intent = 'move'
-   *
-   * Böylece movement katmanı intent ile davranış
-   * nedenini birbirinden ayırabilir.
+   *   reason = 'support'
+   *   intent = 'return_to_position'
+   *   reason = 'formation'
+   *   intent = 'move'
+   *   reason = 'set_piece'
    */
   reason: DecisionCandidateType;
 
@@ -1286,21 +1265,6 @@ export interface LiveMatchState {
 
   events: MatchEvent[];
 
-  /**
-   * Aktif set-piece.
-   *
-   * null:
-   *   Normal oyun.
-   *
-   * positioning:
-   *   Oyuncular hedeflerine hareket eder.
-   *
-   * ready:
-   *   Oyuncular yerleşmiştir fakat set-piece henüz oynanmamıştır.
-   *
-   * played:
-   *   Set-piece oynanmıştır; liveMatch normal oyuna döndürür.
-   */
   setPiece: SetPieceState | null;
 
   decisions: Record<string, DecisionDebug>;

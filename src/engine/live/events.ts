@@ -18,13 +18,19 @@
  * KONTRAT:
  *  - detectBoundaryCrossing() saf 2D'dir; z kontrolü burada yapılır.
  *  - Topun sınırı geçtiği andaki z, lineer interpolasyonla hesaplanır.
- *  - goalHeight, pitch geometrisinin parçasıdır (pitch.goalHeight).
- *  - BallPhysicsConfig bu dosyada kullanılmaz.
- *  - minute / maç zamanı kullanılmaz; MatchEvent üretilmiyor.
+ *  - goalHeight pitch geometrisinin parçasıdır (pitch.goalHeight).
+ *  - BallPhysicsConfig bu dosyada KULLANILMAZ.
+ *  - minute / maç zamanı KULLANILMAZ.
  *  - Own goal ayrı bayrakla işaretlenir.
+ *  - RNG yok.
+ *  - Sabit sayı gömülmez; config.ts'ten import edilir.
  */
 
-import type { PitchDimensions, Vec2, Vec3 } from '../types';
+import type {
+  PitchDimensions,
+  Vec2,
+  Vec3,
+} from '../types';
 
 import {
   detectBoundaryCrossing,
@@ -157,7 +163,12 @@ export function detectBoundaryOutcome(
       );
 
     case 'GOAL_LINE':
-      return handleGoalLine(pitch, crossing, crossingPoint, lastTouchSide);
+      return handleGoalLine(
+        pitch,
+        crossing,
+        crossingPoint,
+        lastTouchSide
+      );
 
     case 'NONE':
     default:
@@ -219,10 +230,10 @@ function handleGoalMouth(
 
     const scorerSide: TeamSide =
       lastTouchSide === null
-        ? opposite(goalSide)   // bilinmiyor → rakibin attığını varsay
+        ? opposite(goalSide)
         : ownGoal
-          ? opposite(goalSide) // kendi kalesine attı → rakip lehine
-          : lastTouchSide;     // rakibin kalesine attı → kendi lehine
+          ? opposite(goalSide)
+          : lastTouchSide;
 
     return {
       type: 'goal',
@@ -353,11 +364,6 @@ export type OffsideOutcome =
 
 /**
  * Ofsayt tespiti — HENÜZ İMPLEMENTE EDİLMEDİ.
- *
- * Sözleşme (gelecek):
- *   - Pas anındaki hücum eden oyuncunun topa dokunduğu an
- *   - Ofsayt çizgisi hesaplanır
- *   - İhlal varsa OffsideOutcome döner
  */
 export function detectOffside(
   _pitch: PitchDimensions,
@@ -371,11 +377,6 @@ export function detectOffside(
 
 /**
  * Topun bir oyuncunun kontrolüne girip girmediği — HENÜZ İMPLEMENTE EDİLMEDİ.
- *
- * Sözleşme (gelecek):
- *   - Top yerdeyse ve oyuncu menzilindeyse → o oyuncu kontrol eder
- *   - Havadaysa aerialReach kontrolü
- *   - RNG kullanmaz (sadece mesafe + yükseklik)
  */
 export function detectBallControl(
   _ballPosition: Vec3,
@@ -387,10 +388,6 @@ export function detectBallControl(
 
 /**
  * Ölü top tespiti — HENÜZ İMPLEMENTE EDİLMEDİ.
- *
- * Sözleşme (gelecek):
- *   - Top durmuşsa ve kimse yakınında değilse → ölü top
- *   - Ölü topta set-piece hazırlığı tetiklenir
  */
 export function detectDeadBall(
   _ballPosition: Vec3,

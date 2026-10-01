@@ -22,6 +22,7 @@ import { generateGameData, replaceRetiredPlayers } from '../engine/data/generate
 import { generateFixtures } from '../engine/league/fixtures';
 import { initTable, updateTable } from '../engine/league/table';
 import { simulateMatch } from '../engine/match/simulate';
+import { simulateMatchLive } from '../engine/live';
 import { developPlayers } from '../engine/progression/training';
 import { applyTrainingToSquad } from '../engine/progression/trainingSystem';
 import { decrementContracts, evaluateContractOffer, applyContractRenewal } from '../engine/progression/contract';
@@ -98,6 +99,9 @@ function createEmptyCup(): CupState {
 // ═══════════════════════════════════════════════
 
 interface Store extends GameState {
+  useLiveEngine: boolean;
+  setUseLiveEngine: (value: boolean) => void;
+
   newGame: () => void;
   playWeek: () => void;
   setTactic: (tactic: Partial<Club['tactic']>) => void;
@@ -154,7 +158,7 @@ interface Store extends GameState {
 // INITIAL STATE
 // ═══════════════════════════════════════════════
 
-function createInitialState(): GameState {
+function createInitialState(): GameState & { useLiveEngine: boolean } {
   const { clubs, players } = generateGameData();
   const userClubId = Object.keys(clubs)[0];
   clubs[userClubId].isUser = true;
@@ -179,6 +183,7 @@ function createInitialState(): GameState {
     assistant: { ...DEFAULT_ASSISTANT },
     academy: { ...DEFAULT_ACADEMY },
     cup,
+    useLiveEngine: false,
   };
 }
 
@@ -341,6 +346,14 @@ export const useGameStore = create<Store>()(
       ...createInitialState(),
       pendingPressMatch: null,
 
+      // ═══════════════════════════════════════════════
+      // LIVE ENGINE FLAG
+      // ═══════════════════════════════════════════════
+
+      setUseLiveEngine: (value) => {
+        set({ useLiveEngine: value });
+      },
+
       newGame: () => {
         useInboxStore.getState().clearAll();
         set({ ...createInitialState(), pendingPressMatch: null });
@@ -461,11 +474,13 @@ export const useGameStore = create<Store>()(
       clearPendingPress: () => set({ pendingPressMatch: null }),
 
       // ═══════════════════════════════════════════════
-      // HAFTA OYNA (Lig + Kupa birlikte)
+      // HAFTA OYNA
       // ═══════════════════════════════════════════════
       playWeek: () => {
         const state = get();
         if (state.seasonOver) return;
+
+        const useLive = state.useLiveEngine;
 
         const isCupWeek = Object.values(CUP_WEEKS).includes(state.currentWeek);
 
@@ -477,7 +492,7 @@ export const useGameStore = create<Store>()(
 
         let userMatch: any = null;
 
-        // ═══ LİG MAÇLARI (HER HAFTA oynanır) ═══
+        // ═══ LİG MAÇLARI ═══
         const weekMatches = state.fixtures.filter(
           m => m.week === state.currentWeek && !m.played
         );
@@ -491,13 +506,20 @@ export const useGameStore = create<Store>()(
               ? state.userLineup
               : undefined;
 
-          const result = simulateMatch(
-            home,
-            away,
-            newPlayers,
-            m.week!,
-            lineup
-          );
+          const result = useLive
+            ? simulateMatchLive(home, away, newPlayers, {
+                week: m.week,
+                userLineup: lineup,
+                seed: null,
+              })
+            : simulateMatch(
+                home,
+                away,
+                newPlayers,
+                m.week!,
+                lineup
+              );
+
           const idx = newFixtures.findIndex(x => x.id === m.id);
           newFixtures[idx] = result;
           updateTable(newTable, result);
@@ -560,7 +582,7 @@ export const useGameStore = create<Store>()(
           }
         }
 
-        // ═══ KUPA MAÇLARI (sadece kupa haftalarında, lig maçlarıyla BİRLİKTE) ═══
+        // ═══ KUPA MAÇLARI ═══
         if (isCupWeek && newCup.currentRound) {
           const round = newCup.currentRound;
           const roundMatchIds = newCup.rounds[round];
@@ -579,13 +601,19 @@ export const useGameStore = create<Store>()(
 
             const lineup = isUserMatch ? state.userLineup : undefined;
 
-            const result = simulateMatch(
-              home,
-              away,
-              newPlayers,
-              state.currentWeek,
-              lineup
-            );
+            const result = useLive
+              ? simulateMatchLive(home, away, newPlayers, {
+                  week: state.currentWeek,
+                  userLineup: lineup,
+                  seed: null,
+                })
+              : simulateMatch(
+                  home,
+                  away,
+                  newPlayers,
+                  state.currentWeek,
+                  lineup
+                );
 
             if (result.homeScore === result.awayScore) {
               const homeUnits = home.reputation;
@@ -849,6 +877,7 @@ export const useGameStore = create<Store>()(
           news: news.slice(0, 30),
           academy: newAcademy,
           cup,
+          pendingPressMatch: null,
         });
 
         useInboxStore.getState().addMessage({
@@ -1507,7 +1536,26 @@ export const useGameStore = create<Store>()(
         if (!home || !away) return null;
 
         const playersCopy = { ...state.players };
-        const result = simulateMatch(home, away, playersCopy, state.currentWeek);
+
+        const isUserMatch =
+          cupMatch.homeId === state.userClubId ||
+          cupMatch.awayId === state.userClubId;
+
+        const lineup = isUserMatch ? state.userLineup : undefined;
+
+        const result = state.useLiveEngine
+          ? simulateMatchLive(home, away, playersCopy, {
+              week: state.currentWeek,
+              userLineup: lineup,
+              seed: null,
+            })
+          : simulateMatch(
+              home,
+              away,
+              playersCopy,
+              state.currentWeek,
+              lineup
+            );
 
         if (result.homeScore === result.awayScore) {
           const homeUnits = home.reputation;
@@ -1528,14 +1576,12 @@ export const useGameStore = create<Store>()(
     {
       name: 'fm-clone-save',
 
-      // 🎯 KRİTİK: Sadece gerekli alanları kaydet, sequences HARİÇ
       partialize: (state) => ({
         season: state.season,
         currentWeek: state.currentWeek,
         userClubId: state.userClubId,
         clubs: state.clubs,
         players: state.players,
-        // 🎯 fixtures'dan sequences'ı çıkar (save boyutunu küçültür)
         fixtures: state.fixtures.map(f => ({
           id: f.id,
           week: f.week,
@@ -1543,7 +1589,7 @@ export const useGameStore = create<Store>()(
           awayId: f.awayId,
           homeScore: f.homeScore,
           awayScore: f.awayScore,
-          events: f.events,  // Event'ler kalabilir (küçük)
+          events: f.events,
           stats: f.stats,
           played: f.played,
           possession: f.possession,
@@ -1551,7 +1597,6 @@ export const useGameStore = create<Store>()(
           cupRound: f.cupRound,
           penalties: f.penalties,
           winnerId: f.winnerId,
-          // sequences: f.sequences,  // ❌ DAHİL DEĞİL
         })),
         table: state.table,
         transferList: state.transferList,
@@ -1562,6 +1607,7 @@ export const useGameStore = create<Store>()(
         assistant: state.assistant,
         academy: state.academy,
         cup: state.cup,
+        useLiveEngine: state.useLiveEngine,
       }),
 
       merge: (persistedState: any, currentState: Store) => {
@@ -1585,6 +1631,10 @@ export const useGameStore = create<Store>()(
 
         if (!merged.cup) {
           merged.cup = createEmptyCup();
+        }
+
+        if (merged.useLiveEngine === undefined) {
+          merged.useLiveEngine = false;
         }
 
         for (const id in merged.players) {

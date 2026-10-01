@@ -3,58 +3,98 @@
 /**
  * TACKLE ÇÖZÜMLEMESİ
  * -------------------
- * Bu dosya bir tackle'ın başarı/başarısızlık/faul sonucunu hesaplar.
+ * Bu dosya bir tackle'ın başarı / başarısızlık / faul sonucunu hesaplar.
  *
  * YASAK:
- *  - Kart değerlendirmesi (events.ts / match rules)
+ *  - Kart değerlendirmesi (events.ts / match rules katmanı)
  *  - State mutasyonu (ball.ownerId, player.position vb.)
- *  - MatchEvent üretme
+ *  - MatchEvent üretimi
  *  - Math.random()
+ *  - Foul severity → kart kararı
  *
  * KONTRAT:
- *  - RNG kullanır ama SEEDED (replay + test mümkün).
+ *  - Seeded RNG kullanır (replay + test mümkün).
  *  - Sadece sonuç döner (TackleOutcome).
- *  - State uygulaması dış katmanda (movement / liveMatch).
- *  - ball.ts controlBall/releaseBall çağrıları dışarıda.
+ *  - State uygulaması dış katmanda (liveMatch.ts).
+ *  - Faul kararı verir, KART kararı vermez.
+ *  - ball.ts controlBall/releaseBall çağrıları liveMatch.ts'te.
+ *  - Sabit sayı gömülmez; config.ts'ten import edilir.
  */
 
-import type { LivePlayer, Vec2 } from '../types';
-import { nextBool, nextFloat, type RngState } from './rng';
+import type {
+  Decision,
+  LivePlayer,
+  RngState,
+  TackleOutcome,
+} from '../types';
+
+import {
+  // Attack ağırlıkları
+  TACKLE_ATTACK_TACKLING_WEIGHT,
+  TACKLE_ATTACK_AGGRESSION_WEIGHT,
+  TACKLE_ATTACK_BRAVERY_WEIGHT,
+
+  // Defense ağırlıkları
+  TACKLE_DEFENSE_DRIBBLING_WEIGHT,
+  TACKLE_DEFENSE_AGILITY_WEIGHT,
+  TACKLE_DEFENSE_BALANCE_WEIGHT,
+  TACKLE_DEFENSE_RELATIVE_SPEED_WEIGHT,
+  TACKLE_RELATIVE_SPEED_SCALE,
+
+  // Clean chance
+  TACKLE_CLEAN_MIN,
+  TACKLE_CLEAN_MAX,
+  TACKLE_CLEAN_CHANCE_BASE,
+  TACKLE_CLEAN_CHANCE_TACKLING,
+
+  // Kazanma sınırları
+  TACKLE_WIN_MIN,
+  TACKLE_WIN_MAX,
+
+  // Sigmoid + mesafe
+  TACKLE_SIGMOID_SCALE,
+  TACKLE_DISTANCE_PENALTY_SCALE,
+
+  // Faul
+  FOUL_BASE_PROBABILITY,
+  FOUL_AGGRESSION_WEIGHT,
+  FOUL_DISTANCE_WEIGHT,
+  FOUL_PROBABILITY_MIN,
+  FOUL_PROBABILITY_MAX,
+
+  // Faul şiddeti
+  FOUL_SEVERITY_LIGHT,
+  FOUL_SEVERITY_MEDIUM,
+  FOUL_SEVERITY_AGGRESSION,
+  FOUL_SEVERITY_BRAVERY,
+  FOUL_SEVERITY_DISTANCE,
+} from './config';
+
+import { nextBool } from './rng';
 
 // ═══════════════════════════════════════════════
-// TİPLER
+// TACKLE CONTEXT
 // ═══════════════════════════════════════════════
-
-export type TackleOutcome =
-  | {
-      type: 'won';
-      tacklerId: string;
-      ballCarrierId: string;
-      /** Temiz kazanım → tacklerId, loose ball → null */
-      newOwnerId: string | null;
-      point: Vec2;
-    }
-  | {
-      type: 'failed';
-      tacklerId: string;
-      ballCarrierId: string;
-      /** Top hâlâ aynı oyuncuda */
-    }
-  | {
-      type: 'foul';
-      tacklerId: string;
-      ballCarrierId: string;
-      /** Faul şiddeti — kart değerlendirmesi events.ts'te */
-      severity: 'light' | 'medium' | 'severe';
-      point: Vec2;
-    };
 
 export interface TackleContext {
   tackler: LivePlayer;
   ballCarrier: LivePlayer;
+
+  /** Tackler ile carrier arası mesafe (m). */
   distance: number;
+
+  /**
+   * Tackler → carrier arası açı (radyan).
+   *
+   * V1'de kullanılmıyor.
+   * İleride "arkadan müdahale" gibi faktörler için ayrılmıştır.
+   */
   angle: number;
+
+  /** İki oyuncunun göreli hızı (m/s). */
   relativeSpeed: number;
+
+  /** Seeded RNG. */
   rng: RngState;
 }
 
@@ -86,45 +126,72 @@ function clamp(v: number, min: number, max: number): number {
  *  • Kart değerlendirmesi yapmaz.
  *  • Faul kararı verir, şiddetini belirler.
  *  • State mutate etmez.
+ *  • Deterministik DEĞİL (RNG var), ama replay için tekrarlanabilir.
  */
-export function resolveTackle(context: TackleContext): TackleOutcome {
-  const { tackler, ballCarrier, distance, relativeSpeed, rng } = context;
+export function resolveTackle(
+  context: TackleContext
+): TackleOutcome {
+  const {
+    tackler,
+    ballCarrier,
+    distance,
+    relativeSpeed,
+    rng,
+  } = context;
 
   const ta = tackler.player.attributes;
   const ca = ballCarrier.player.attributes;
 
-  // Attack (tackler) gücü
+  // ─── Attack (tackler) gücü ───
   const attackPower =
-    attrRatio(ta.tackling) * 1.0 +
-    attrRatio(ta.aggression) * 0.5 +
-    attrRatio(ta.bravery) * 0.3;
+    attrRatio(ta.tackling) * TACKLE_ATTACK_TACKLING_WEIGHT +
+    attrRatio(ta.aggression) * TACKLE_ATTACK_AGGRESSION_WEIGHT +
+    attrRatio(ta.bravery) * TACKLE_ATTACK_BRAVERY_WEIGHT;
 
-  // Defense (carrier) gücü
+  // ─── Defense (carrier) gücü ───
+  // ÖNEMLİ: relativeSpeed doğrudan normalize edilir (attrRatio değil).
+  const relativeSpeedFactor = clamp(
+    relativeSpeed / TACKLE_RELATIVE_SPEED_SCALE,
+    0,
+    1
+  );
+
   const defensePower =
-    attrRatio(ca.dribbling) * 1.0 +
-    attrRatio(ca.agility) * 0.5 +
-    attrRatio(ca.balance) * 0.3 +
-    attrRatio(relativeSpeed / 10) * 0.5;
+    attrRatio(ca.dribbling) * TACKLE_DEFENSE_DRIBBLING_WEIGHT +
+    attrRatio(ca.agility) * TACKLE_DEFENSE_AGILITY_WEIGHT +
+    attrRatio(ca.balance) * TACKLE_DEFENSE_BALANCE_WEIGHT +
+    relativeSpeedFactor * TACKLE_DEFENSE_RELATIVE_SPEED_WEIGHT;
 
-  // Mesafe cezası — uzaktan tackle zor
-  const distancePenalty = clamp(distance / 1.5, 0, 0.5);
+  // ─── Mesafe cezası ───
+  const distancePenalty = clamp(
+    distance / TACKLE_DISTANCE_PENALTY_SCALE,
+    0,
+    0.5
+  );
 
-  // Net güç
-  const netPower = (attackPower - defensePower) - distancePenalty;
+  // ─── Net güç ───
+  const netPower =
+    attackPower - defensePower - distancePenalty;
 
-  // Kazanma olasılığı
-  const winChance = clamp(sigmoid(netPower * 2.5), 0.05, 0.95);
+  // ─── Kazanma olasılığı ───
+  const winChance = clamp(
+    sigmoid(netPower * TACKLE_SIGMOID_SCALE),
+    TACKLE_WIN_MIN,
+    TACKLE_WIN_MAX
+  );
 
-  // Roll
+  // ─── Roll ───
   const won = nextBool(rng, winChance);
 
   if (won) {
     // Loose ball olasılığı — tackling'e göre
     const cleanChance = clamp(
-      0.6 + attrRatio(ta.tackling) * 0.3,
-      0.5,
-      0.95
+      TACKLE_CLEAN_CHANCE_BASE +
+        attrRatio(ta.tackling) * TACKLE_CLEAN_CHANCE_TACKLING,
+      TACKLE_CLEAN_MIN,
+      TACKLE_CLEAN_MAX
     );
+
     const clean = nextBool(rng, cleanChance);
 
     return {
@@ -136,16 +203,18 @@ export function resolveTackle(context: TackleContext): TackleOutcome {
     };
   }
 
-  // Kazanamadı — faul mü?
+  // ─── Kazanamadı — faul mü? ───
   const foulProb = computeFoulProbability(
-    tackler.player.id,
     tackler,
-    ballCarrier,
     distance
   );
 
   if (nextBool(rng, foulProb)) {
-    const severity = computeFoulSeverity(tackler, distance);
+    const severity = computeFoulSeverity(
+      tackler,
+      distance
+    );
+
     return {
       type: 'foul',
       tacklerId: tackler.player.id,
@@ -163,32 +232,49 @@ export function resolveTackle(context: TackleContext): TackleOutcome {
 }
 
 // ═══════════════════════════════════════════════
-// FAUL OLASILIĞI VE ŞİDDETİ
+// FAUL OLASILIĞI
 // ═══════════════════════════════════════════════
 
 /**
  * Başarısız tackle sonrası faul olasılığını hesaplar.
- * Deterministik. RNG kullanmaz (yalnızca olasılık üretir).
+ *
+ * KONTRAT:
+ *  • Deterministik. RNG kullanmaz.
+ *  • Yalnızca olasılık üretir, karar vermez.
  */
 export function computeFoulProbability(
-  _tacklerId: string,
   tackler: LivePlayer,
-  _ballCarrier: LivePlayer,
   distance: number
 ): number {
   const a = tackler.player.attributes;
 
-  // Agresif + uzak mesafe → daha çok faul
-  const base = 0.15;
-  const aggBonus = attrRatio(a.aggression) * 0.2;
-  const distBonus = clamp(distance / 1.5, 0, 0.25);
+  const base = FOUL_BASE_PROBABILITY;
+  const aggBonus =
+    attrRatio(a.aggression) * FOUL_AGGRESSION_WEIGHT;
+  const distBonus = clamp(
+    distance / TACKLE_DISTANCE_PENALTY_SCALE,
+    0,
+    FOUL_DISTANCE_WEIGHT
+  );
 
-  return clamp(base + aggBonus + distBonus, 0.05, 0.6);
+  return clamp(
+    base + aggBonus + distBonus,
+    FOUL_PROBABILITY_MIN,
+    FOUL_PROBABILITY_MAX
+  );
 }
+
+// ═══════════════════════════════════════════════
+// FAUL ŞİDDETİ
+// ═══════════════════════════════════════════════
 
 /**
  * Faul şiddetini belirler.
- * Deterministik. RNG kullanmaz.
+ *
+ * KONTRAT:
+ *  • Deterministik. RNG kullanmaz.
+ *  • Kart değerlendirmesi YAPMAZ — events.ts'in işi.
+ *  • Yalnızca 'light' | 'medium' | 'severe' döner.
  */
 export function computeFoulSeverity(
   tackler: LivePlayer,
@@ -198,11 +284,98 @@ export function computeFoulSeverity(
 
   const agg = attrRatio(a.aggression);
   const bravery = attrRatio(a.bravery);
-  const dist = clamp(distance / 1.5, 0, 1);
+  const dist = clamp(
+    distance / TACKLE_DISTANCE_PENALTY_SCALE,
+    0,
+    1
+  );
 
-  const severityScore = agg * 0.5 + bravery * 0.3 + dist * 0.2;
+  const severityScore =
+    agg * FOUL_SEVERITY_AGGRESSION +
+    bravery * FOUL_SEVERITY_BRAVERY +
+    dist * FOUL_SEVERITY_DISTANCE;
 
-  if (severityScore < 0.35) return 'light';
-  if (severityScore < 0.65) return 'medium';
+  if (severityScore < FOUL_SEVERITY_LIGHT) return 'light';
+  if (severityScore < FOUL_SEVERITY_MEDIUM) return 'medium';
   return 'severe';
+}
+
+// ═══════════════════════════════════════════════
+// RESOLVE ALL TACKLES
+// ═══════════════════════════════════════════════
+
+/**
+ * Bir tick'te tackle intent'i olan tüm oyuncular için tackle çözer.
+ *
+ * KONTRAT:
+ *  • Deterministik iterasyon sırası (player.id ASC).
+ *  • Her tackle bağımsız seeded RNG ile çözülür.
+ *  • State mutate ETMEZ; sadece outcome listesi döner.
+ *  • Mesafe tackle.ts'e parametre olarak geçirilir; çağıran hesap eder.
+ *  • Ball-owner kontrolü: hem tackler hem carrier gerçekten
+ *    o tick'teki rollerini taşımalıdır.
+ *  • Karar eski olabilir → gerçek pozisyon sonrası doğrula.
+ *
+ * NOT: Bu fonksiyon moveAllPlayers() SONRASI çağrılmalıdır.
+ *      Oyuncular gerçek pozisyonlarına ulaştıktan sonra tackle
+ *      mesafesi gerçek koordinattan hesaplanır.
+ */
+export function resolveAllTackles(
+  players: Record<string, LivePlayer>,
+  decisions: Record<string, Decision>,
+  tackleRadius: number,
+  rng: RngState
+): TackleOutcome[] {
+  const outcomes: TackleOutcome[] = [];
+
+  for (const id of Object.keys(players).sort()) {
+    const player = players[id];
+    const decision = decisions[id];
+
+    if (!decision) continue;
+    if (decision.intent !== 'tackle') continue;
+    if (decision.targetPlayerId === null) continue;
+
+    // Tackler top sahibi olmamalı
+    if (player.isBallOwner) continue;
+
+    const carrier = players[decision.targetPlayerId];
+    if (!carrier) continue;
+
+    // Rakip mi?
+    if (carrier.clubId === player.clubId) continue;
+
+    // Carrier gerçekten top sahibi mi?
+    if (!carrier.isBallOwner) continue;
+
+    // Mesafe
+    const dx = carrier.position.x - player.position.x;
+    const dy = carrier.position.y - player.position.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > tackleRadius) continue;
+
+    // Açı
+    const angle = Math.atan2(dy, dx);
+
+    // Göreli hız
+    const relVx = player.velocity.x - carrier.velocity.x;
+    const relVy = player.velocity.y - carrier.velocity.y;
+    const relativeSpeed = Math.sqrt(
+      relVx * relVx + relVy * relVy
+    );
+
+    const outcome = resolveTackle({
+      tackler: player,
+      ballCarrier: carrier,
+      distance: dist,
+      angle,
+      relativeSpeed,
+      rng,
+    });
+
+    outcomes.push(outcome);
+  }
+
+  return outcomes;
 }
