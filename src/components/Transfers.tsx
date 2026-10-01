@@ -14,7 +14,7 @@ import { PlayerDetailModal } from './PlayerDetailModal';
 function getPosColor(position: string): { bg: string; text: string; border: string } {
   if (position === 'GK') return { bg: 'bg-yellow-500/30', text: 'text-yellow-300', border: 'border-yellow-500/60' };
   if (['DC', 'DL', 'DR'].includes(position)) return { bg: 'bg-blue-500/30', text: 'text-blue-300', border: 'border-blue-500/60' };
-  if (['DM', 'MC', 'ML', 'MR'].includes(position)) return { bg: 'bg-green-500/30', text: 'text-green-300', border: 'border-green-500/60' };
+  if (['DMC', 'MC', 'ML', 'MR'].includes(position)) return { bg: 'bg-green-500/30', text: 'text-green-300', border: 'border-green-500/60' };
   if (['AMC', 'AML', 'AMR'].includes(position)) return { bg: 'bg-purple-500/30', text: 'text-purple-300', border: 'border-purple-500/60' };
   if (position === 'ST') return { bg: 'bg-red-500/30', text: 'text-red-300', border: 'border-red-500/60' };
   return { bg: 'bg-slate-500/30', text: 'text-slate-300', border: 'border-slate-500/60' };
@@ -29,7 +29,7 @@ function getRatingColor(rating: number): string {
 }
 
 const POSITIONS: (Position | 'ALL')[] = [
-  'ALL', 'GK', 'DC', 'DL', 'DR', 'DM', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST',
+  'ALL', 'GK', 'DC', 'DL', 'DR', 'DMC', 'MC', 'ML', 'MR', 'AMC', 'AML', 'AMR', 'ST',
 ];
 
 const SORT_OPTIONS = [
