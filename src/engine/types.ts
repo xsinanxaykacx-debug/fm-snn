@@ -1239,6 +1239,15 @@ export interface LiveMatchStats extends MatchStats {
 // LIVE MAÇ STATE
 // ═══════════════════════════════════════════════
 
+export interface TransitionState {
+  counterPressClubId: string | null;
+  breakClubId: string | null;
+  startedAt: number;
+  expiresAt: number;
+  counterPressProbability: number;
+  breakQuality: number;
+}
+
 export interface LiveMatchState {
   time: number;
   tick: number;
@@ -1276,6 +1285,7 @@ export interface LiveMatchState {
   perceptionCache: Record<string, PerceptionCacheEntry>;
 
   lastBallOwnerId: string | null;
+  transition: TransitionState;
 
   isStopped: boolean;
   isFinished: boolean;
