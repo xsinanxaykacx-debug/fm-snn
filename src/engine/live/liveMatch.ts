@@ -1088,6 +1088,20 @@ function resolveCounterPressContest(
     rng: state.rng,
   });
 
+  if (outcome.debug) {
+    state.stats.counterPressTackleWinChanceSum += outcome.debug.winChance;
+    state.stats.counterPressTackleWinChanceMin = Math.min(
+      state.stats.counterPressTackleWinChanceMin,
+      outcome.debug.winChance
+    );
+    state.stats.counterPressTackleWinChanceMax = Math.max(
+      state.stats.counterPressTackleWinChanceMax,
+      outcome.debug.winChance
+    );
+    state.stats.counterPressTackleRelativeSpeedSum += outcome.debug.relativeSpeed;
+    state.stats.counterPressTackleDistanceSum += outcome.debug.distance;
+  }
+
   if (outcome.type === 'won') {
     state.stats.counterPressTackleWins += 1;
     applyTackleWon(outcome, state);
@@ -1922,6 +1936,11 @@ function createEmptyStats(): LiveMatchStats {
     counterPressTackleFouls: 0,
     counterPressCleanRecoveries: 0,
     counterPressLooseBallRecoveries: 0,
+    counterPressTackleWinChanceSum: 0,
+    counterPressTackleWinChanceMin: 1,
+    counterPressTackleWinChanceMax: 0,
+    counterPressTackleRelativeSpeedSum: 0,
+    counterPressTackleDistanceSum: 0,
     fouls: { home: 0, away: 0 },
     yellowCards: { home: 0, away: 0 },
     redCards: { home: 0, away: 0 },
