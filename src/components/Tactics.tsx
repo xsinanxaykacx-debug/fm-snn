@@ -7,7 +7,6 @@ import type {
   Player,
   Position,
   SlotPosition,
-  PitchZone,
 } from '../engine/types';
 import { getStartingXI, scorePlayer } from '../engine/data/generateData';
 import { getFormationZoneMapping } from '../engine/formation/zones';
@@ -429,29 +428,6 @@ export function Tactics() {
   };
 
   const handleDragEnd = () => {
-    setDraggingId(null);
-  };
-
-  const handleFixedDrop = (fromSlot: number | null, toSlot: number, fromPlayerId: string) => {
-    const currentLineup = [...effectiveLineup];
-
-    if (fromSlot === null) {
-      const existingIdx = currentLineup.indexOf(fromPlayerId);
-      if (existingIdx !== -1) {
-        const temp = currentLineup[toSlot];
-        currentLineup[toSlot] = fromPlayerId;
-        currentLineup[existingIdx] = temp;
-      } else {
-        currentLineup[toSlot] = fromPlayerId;
-      }
-    } else {
-      if (fromSlot === toSlot) return;
-      const temp = currentLineup[toSlot];
-      currentLineup[toSlot] = fromPlayerId;
-      currentLineup[fromSlot] = temp;
-    }
-
-    setLineup(currentLineup);
     setDraggingId(null);
   };
 
