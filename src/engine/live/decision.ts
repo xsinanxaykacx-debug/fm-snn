@@ -1292,7 +1292,8 @@ export interface DecisionState {
 export function decideForPlayer(
   self: LivePlayer,
   state: DecisionState,
-  chaseSet: Set<string>
+  chaseSet: Set<string>,
+  markAssignments: MarkAssignments = {}
 ): {
   decision: Decision;
   debug: DecisionDebug;
@@ -1358,7 +1359,8 @@ export function decideForPlayer(
     state,
     chaseSet,
     ballCarrier,
-    attackingDirection
+    attackingDirection,
+    markAssignments
   );
 
   return {
@@ -1435,7 +1437,12 @@ export function computeAllDecisions(
       ? homeChase
       : awayChase;
 
-    const result = decideForPlayer(player, state, chaseSet);
+    const result = decideForPlayer(
+      player,
+      state,
+      chaseSet,
+      markAssignments
+    );
 
     decisions[id] = result.decision;
     debugs[id] = result.debug;
