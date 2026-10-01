@@ -290,10 +290,6 @@ export function resolveDribbleAction(
   }
 
   const d = defender.player.attributes;
-  const defense =
-    avg(d.tackling, d.marking, d.defensivePositioning, d.anticipation) *
-    conditionFactor(defender);
-
   const strength =
     avg(a.dribbling, a.agility, a.balance) * conditionFactor(owner);
 
@@ -633,15 +629,24 @@ export function resolveBreakAction(
     mentality *
     role;
 
+  // Probability ve quality aynı ham değeri paylaşır ama aynı ölçeği kullanmaz.
+  // Quality'nin sürekli 1.00'a doymasını engelleyerek tempo, directness,
+  // rol ve kondisyon farklarının transition sonucunda görünür kalmasını sağlarız.
   const probability = clamp(
     0.10 + breakBase * 0.48,
     0.10,
     0.72
   );
 
+  const quality = clamp(
+    0.15 + breakBase * 0.68,
+    0.05,
+    0.95
+  );
+
   return {
     probability,
-    quality: clamp(breakBase, 0.05, 1),
+    quality,
     playerId: ballWinner.player.id,
   };
 }
