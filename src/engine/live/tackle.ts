@@ -71,6 +71,8 @@ import {
 } from './config';
 
 import { nextBool } from './rng';
+import { getClosingSpeed, type PhysicsSnapshot } from './physics';
+import { recordShadow, recordShadowMiss } from './shadow';
 
 // ═══════════════════════════════════════════════
 // TACKLE CONTEXT
@@ -220,9 +222,9 @@ export function resolveTackle(
 
     return {
       type: 'won',
-      tacklerId: tackler.player.id,
-      ballCarrierId: ballCarrier.player.id,
-      newOwnerId: clean ? tackler.player.id : null,
+      tacklerId: tackler.player.player.id,
+      ballCarrierId: ballCarrier.player.player.id,
+      newOwnerId: clean ? tackler.player.player.id : null,
       point: { ...ballCarrier.position },
       debug: { winChance, cleanChance, relativeSpeed, distance },
     };
@@ -242,8 +244,8 @@ export function resolveTackle(
 
     return {
       type: 'foul',
-      tacklerId: tackler.player.id,
-      ballCarrierId: ballCarrier.player.id,
+      tacklerId: tackler.player.player.id,
+      ballCarrierId: ballCarrier.player.player.id,
       severity,
       debug: { winChance, relativeSpeed, distance },
       point: { ...ballCarrier.position },
@@ -252,8 +254,8 @@ export function resolveTackle(
 
   return {
     type: 'failed',
-    tacklerId: tackler.player.id,
-    ballCarrierId: ballCarrier.player.id,
+    tacklerId: tackler.player.player.id,
+    ballCarrierId: ballCarrier.player.player.id,
     debug: { winChance, relativeSpeed, distance },
   };
 }
@@ -335,7 +337,7 @@ export function computeFoulSeverity(
  * Bir tick'te tackle intent'i olan tüm oyuncular için tackle çözer.
  *
  * KONTRAT:
- *  • Deterministik iterasyon sırası (player.id ASC).
+ *  • Deterministik iterasyon sırası (player.player.id ASC).
  *  • Her tackle bağımsız seeded RNG ile çözülür.
  *  • State mutate ETMEZ; sadece outcome listesi döner.
  *  • Mesafe tackle.ts'e parametre olarak geçirilir; çağıran hesap eder.
@@ -351,7 +353,8 @@ export function resolveAllTackles(
   players: Record<string, LivePlayer>,
   decisions: Record<string, Decision>,
   tackleRadius: number,
-  rng: RngState
+  rng: RngState,
+  physics: PhysicsSnapshot
 ): TackleOutcome[] {
   const outcomes: TackleOutcome[] = [];
 
@@ -391,6 +394,30 @@ export function resolveAllTackles(
     const relativeSpeed = Math.sqrt(
       relVx * relVx + relVy * relVy
     );
+
+    // ── Shadow comparison (DEV only) ──
+    if (import.meta.env.DEV) {
+      const legacyClosing = calculateClosingSpeed(
+        player.position,
+        carrier.position,
+        player.velocity,
+        carrier.velocity,
+      );
+      const newClosing = getClosingSpeed(physics, player.player.id, carrier.player.id);
+
+      if (newClosing === undefined) {
+        recordShadowMiss(physics.tick, player.player.id, carrier.player.id);
+      } else {
+        recordShadow({
+          tick: physics.tick,
+          tacklerId: player.player.id,
+          carrierId: carrier.player.id,
+          legacyRelativeSpeed: relativeSpeed,
+          legacyClosingSpeed: legacyClosing,
+          newClosingSpeed: newClosing,
+        });
+      }
+    }
 
     const outcome = resolveTackle({
       tackler: player,
