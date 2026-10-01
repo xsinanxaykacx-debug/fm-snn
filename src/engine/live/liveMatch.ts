@@ -932,6 +932,10 @@ function applyBoundaryOutcome(
   if (outcome.type === 'none') return;
 
   if (outcome.type === 'goal') {
+    if (resolveGoalkeeperSave(outcome, state)) {
+      return;
+    }
+
     handleGoal(outcome, state, players);
     return;
   }
@@ -950,6 +954,108 @@ function applyBoundaryOutcome(
     handleGoalKick(outcome, state, players);
     return;
   }
+}
+
+function resolveGoalkeeperSave(
+  outcome: BoundaryOutcome & { type: 'goal' },
+  state: LiveMatchState
+): boolean {
+  const shotEvent = [...state.events]
+    .reverse()
+    .find(event =>
+      event.type === 'shot' &&
+      event.playerId === state.ball.lastTouchId
+    );
+
+  if (!shotEvent) {
+    return false;
+  }
+
+  const defendingSide = outcome.scorerSide === 'HOME' ? 'AWAY' : 'HOME';
+  const goalkeeper = Object.values(state.players).find(
+    player =>
+      player.role === 'GK' &&
+      ((defendingSide === 'HOME' && player.isHome) ||
+        (defendingSide === 'AWAY' && !player.isHome))
+  );
+
+  if (!goalkeeper) {
+    return false;
+  }
+
+  const shotXG = typeof shotEvent.xG === 'number'
+    ? Math.max(0.02, Math.min(0.7, shotEvent.xG))
+    : 0.2;
+
+  const gkSkill = Math.max(
+    0,
+    Math.min(
+      1,
+      (
+        goalkeeper.player.attributes.goalkeeper +
+        goalkeeper.player.attributes.reflexes +
+        goalkeeper.player.attributes.gkPositioning +
+        goalkeeper.player.attributes.handling +
+        goalkeeper.player.attributes.oneOnOne
+      ) / 100
+    )
+  );
+
+  const saveChance = Math.max(
+    0.25,
+    Math.min(
+      0.80,
+      0.65 + gkSkill * 0.15 - shotXG * 0.35
+    )
+  );
+
+  if (!nextBool(state.rng, saveChance)) {
+    return false;
+  }
+
+  const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
+  state.stats.onTarget[side] += 1;
+
+  state.events.push({
+    minute: Math.floor(state.time / 60),
+    type: 'goal_kick',
+    clubId: defendingSide === 'HOME'
+      ? state.home.club.id
+      : state.away.club.id,
+    description: `Kurtarış: ${goalkeeper.player.name}`,
+  });
+
+  state.ball = releaseBall(state.ball);
+
+  const goalLineX = defendingSide === 'HOME'
+    ? 0.5
+    : state.pitch.length - 0.5;
+
+  state.ball.position.x = goalLineX;
+  state.ball.position.y = Math.max(
+    8,
+    Math.min(
+      state.pitch.width - 8,
+      state.ball.position.y
+    )
+  );
+  state.ball.position.z = DEFAULT_BALL_PHYSICS.radius;
+  state.ball.velocity = { x: 0, y: 0, z: 0 };
+  state.ball.isMoving = false;
+
+  syncBallOwnerFlags(state);
+
+  state.setPiece = createSetPieceForMatch(
+    'goal_kick',
+    defendingSide,
+    { x: goalLineX, y: state.ball.position.y },
+    state.pitch,
+    state.home.club,
+    state.away.club,
+    playersForSetPiece(state)
+  );
+
+  return true;
 }
 
 /**
