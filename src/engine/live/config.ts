@@ -142,6 +142,8 @@ export const MAX_CHASE_PER_TEAM = 2;
 export const CHASE_DISTANCE_WEIGHT = -0.7;
 export const CHASE_TACKLING_WEIGHT = 0.3;
 export const GK_CHASE_MAX_DISTANCE = 18.0;
+export const COUNTER_PRESS_MAX_DISTANCE = 22;
+
 export const GK_CHASE_MAX_X = 18.0;
 export const GK_SWEEPER_DISTANCE = 10.0;
 
