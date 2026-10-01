@@ -527,13 +527,12 @@ function runTick(
   // girdiğinde ownerId tekrar oluşturulur.
   resolveLooseBallControl(state);
 
-  // ─── 8b. Ball actions ───
-  if (!tackleChangedPossession) {
-    applyBallActions(state, decisions, players);
-  }
-
-  // ─── 8c. Transition teşhis ───
-  // Yalnızca gerçek possession değişimini logla; her tick'i spamlemiyoruz.
+  // ─── 8b. Transition state ───
+  // Possession değişimi bu tick içinde tackle/loose-ball sonucunda
+  // oluşmuşsa counter-press contest normal ball-action'dan ÖNCE
+  // kurulmalıdır. Aksi halde yeni sahip aynı tick'te aksiyonunu tüketir
+  // ve transition bir sonraki tick'e sarkarak fiziksel contest penceresini
+  // kaçırabilir.
   if (import.meta.env.DEV && previousOwnerId !== state.ball.ownerId) {
     const previousOwner = previousOwnerId ? state.players[previousOwnerId] : null;
     const currentOwner = state.ball.ownerId ? state.players[state.ball.ownerId] : null;
@@ -547,6 +546,11 @@ function runTick(
   }
 
   updateTransitionState(state, previousOwnerId);
+
+  // ─── 8c. Ball actions ───
+  if (!tackleChangedPossession) {
+    applyBallActions(state, decisions, players);
+  }
 
   // ─── 9. Sınır geçişi ───
   const boundaryOutcome = detectBoundaryOutcome({
