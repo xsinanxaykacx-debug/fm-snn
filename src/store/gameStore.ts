@@ -14,7 +14,6 @@ import type {
   PitchZone,
   SlotPosition,
   CupState,
-  CupRound,
   Match,
   Formation,
 } from '../engine/types';
@@ -27,7 +26,7 @@ import { developPlayers } from '../engine/progression/training';
 import { applyTrainingToSquad } from '../engine/progression/trainingSystem';
 import { decrementContracts, evaluateContractOffer, applyContractRenewal } from '../engine/progression/contract';
 import { aiTransferWindow } from '../engine/transfer/aiTransfer';
-import { suggestTrainingFocus, analyzeMatch } from '../engine/assistant/assistantAI';
+import { suggestTrainingFocus, analyzeMatch } from '../engine/Assistant/assistantAI';
 import { generateAllIntakes } from '../engine/academy/academy';
 import { createEmptyZones, getFormationZoneMapping, findZoneByPosition } from '../engine/formation/zones';
 import {
@@ -824,10 +823,6 @@ export const useGameStore = create<Store>()(
           }
         }
 
-        const userAcademyReleased = academyToRelease.filter(
-          p => p.clubId === state.userClubId
-        );
-
         const season = state.season + 1;
         const fixtures = generateFixtures(newClubs, season);
         const table = initTable(Object.keys(newClubs));
@@ -1089,7 +1084,7 @@ export const useGameStore = create<Store>()(
           week: state.currentWeek,
           sender: '🎓 Akademi',
           title: `${promoted.name} A takıma yükseltildi`,
-          content: `${promoted.name} (${promoted.age} yaş, ${promoted.position}) akademiden A takıma yükseltildi. Potansiyel: ${promoted.potentialStars}⭐`,
+          content: `${promoted.name} (${promoted.age} yaş, ${promoted.position}) akademiden A takıma yükseltildi. Potansiyel: ${academyPlayer.potentialStars}⭐`,
           category: 'BOARD',
         });
       },
@@ -1411,7 +1406,7 @@ export const useGameStore = create<Store>()(
 
         const custom = userClub.customFormation ?? createEmptyCustomFormation();
 
-        let zones = custom.zones.map(z => ({ ...z, playerId: null }));
+        let zones: PitchZone[] = custom.zones.map(z => ({ ...z, playerId: null }));
 
         const squad = Object.values(state.players).filter(
           p =>
