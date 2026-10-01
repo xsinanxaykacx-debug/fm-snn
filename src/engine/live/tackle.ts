@@ -403,17 +403,6 @@ export function resolveAllTackles(
         player.velocity,
         carrier.velocity,
       );
-      const snapPlayer = physics.players.find(p => p.id === player.player.id);
-      const snapCarrier = physics.players.find(p => p.id === carrier.player.id);
-      const snapshotClosing = snapPlayer && snapCarrier
-        ? calculateClosingSpeed(
-            snapPlayer.position,
-            snapCarrier.position,
-            snapPlayer.velocity,
-            snapCarrier.velocity,
-          )
-        : legacyClosing;
-
       const newClosing = getClosingSpeed(physics, player.player.id, carrier.player.id);
 
       if (newClosing === undefined) {
@@ -426,7 +415,6 @@ export function resolveAllTackles(
           legacyRelativeSpeed: relativeSpeed,
           legacyClosingSpeed: legacyClosing,
           newClosingSpeed: newClosing,
-          snapshotClosingSpeed: snapshotClosing,
         });
       }
     }
