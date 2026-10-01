@@ -471,7 +471,7 @@ function createLivePlayer(
 ): LivePlayer {
   const homePosition = computeHomePosition(player, team, pitch);
 
-  return {
+  const livePlayer: LivePlayer = {
     player,
     position: { ...homePosition },
     velocity: { x: 0, y: 0 },
@@ -492,9 +492,20 @@ function createLivePlayer(
 
     homePosition,
 
-    maxSpeed: computeMaxSpeed(player, DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics),
-    acceleration: computeAcceleration(player, DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics),
+    maxSpeed: 0,
+    acceleration: 0,
   };
+
+  livePlayer.maxSpeed = computeMaxSpeed(
+    livePlayer,
+    DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics
+  );
+  livePlayer.acceleration = computeAcceleration(
+    livePlayer,
+    DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics
+  );
+
+  return livePlayer;
 }
 
 function normalizeRole(position: string): LivePlayer['role'] {
