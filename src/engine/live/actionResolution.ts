@@ -287,6 +287,66 @@ export function resolveDribbleAction(
   };
 }
 
+export function resolveCrossAction(
+  owner: LivePlayer,
+  decision: Decision,
+  state: LiveMatchState
+): ActionResolution {
+  if (!decision.target) {
+    return {
+      probability: 0.20,
+      quality: 0.20,
+      pressure: 1,
+      defenderId: null,
+    };
+  }
+
+  const a = owner.player.attributes;
+  const pressure = pressureAtOwner(owner, state);
+  const lane = laneClarity(owner, decision.target, state);
+  const targetDistance = distance(owner.position, decision.target);
+
+  const crossingSkill =
+    avg(a.crossing, a.technique, a.vision, a.decisions) *
+    conditionFactor(owner);
+
+  const tactic = state.home.club.id === owner.clubId
+    ? state.home.club.tactic
+    : state.away.club.tactic;
+
+  const widthModifier =
+    tactic.width === 'wide'
+      ? 1.08
+      : tactic.width === 'narrow'
+        ? 0.92
+        : 1;
+
+  const distancePenalty =
+    targetDistance <= 18
+      ? 1
+      : clamp(1 - (targetDistance - 18) / 45, 0.60, 1);
+
+  const raw =
+    (crossingSkill / 100) *
+    (0.50 + lane * 0.50) *
+    (1 - pressure * 0.18) *
+    distancePenalty *
+    widthModifier;
+
+  return {
+    probability: clamp(raw, 0.20, 0.90),
+    quality: clamp(
+      (crossingSkill / 100) *
+      lane *
+      (1 - pressure * 0.25),
+      0.05,
+      1
+    ),
+    pressure,
+    defenderId: nearestOpponent(owner, state)?.player.id ?? null,
+  };
+}
+
 export function resolveShotAction(
   owner: LivePlayer,
   decision: Decision,
