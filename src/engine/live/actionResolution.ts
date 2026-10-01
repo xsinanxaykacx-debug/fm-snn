@@ -567,7 +567,7 @@ export function resolveCounterPress(
     // düşük çizgi ilk baskı penceresinde mesafeyi büyütür.
     const lineModifier =
       tactic.defensiveLine === 'high' ? 1.15 :
-      tactic.defensiveLine === 'low' ? 0.85 :
+      tactic.defensiveLine === 'deep' ? 0.85 :
       1;
 
     const score =
