@@ -45,7 +45,6 @@
  */
 
 import type {
-  Ball,
   Club,
   Decision,
   LiveMatchState,
@@ -68,7 +67,6 @@ import {
   HALF_DURATION_SECONDS,
   ADDED_TIME_SECONDS,
   DEFAULT_LIVE_ENGINE_CONFIG,
-  DEFAULT_PITCH_DIMENSIONS,
 } from './config';
 
 import {
