@@ -1392,12 +1392,14 @@ export type TackleOutcome =
       newOwnerId: string | null;
 
       point: Vec2;
+      debug?: { winChance: number; cleanChance: number; relativeSpeed: number; distance: number; };
     }
   | {
       type: 'failed';
 
       tacklerId: string;
       ballCarrierId: string;
+      debug?: { winChance: number; relativeSpeed: number; distance: number; };
     }
   | {
       type: 'foul';
@@ -1411,6 +1413,7 @@ export type TackleOutcome =
         | 'severe';
 
       point: Vec2;
+      debug?: { winChance: number; relativeSpeed: number; distance: number; };
     };
 
 // ═══════════════════════════════════════════════
