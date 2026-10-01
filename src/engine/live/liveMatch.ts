@@ -1050,7 +1050,12 @@ function applyBallActions(
   }
 }
 
-function resolveCounterPressContest(
+/**
+ * @internal
+ * Test edilebilirlik için export edilmiştir.
+ * Production akışında runTick/applyBallActions üzerinden çağrılır.
+ */
+export function resolveCounterPressContest(
   state: LiveMatchState,
   owner: LivePlayer,
   players: Record<string, Player>
