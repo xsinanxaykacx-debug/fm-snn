@@ -109,6 +109,16 @@ export const PLAYER_TARGET_TOLERANCE = 0.05;
 export const PLAYER_VELOCITY_EPSILON = 0.001;
 
 // ═══════════════════════════════════════════════
+// MAÇ İÇİ YORGUNLUK
+// ═══════════════════════════════════════════════
+
+export const FATIGUE_PER_MINUTE = 0.12;
+export const FATIGUE_STAMINA_FACTOR = 0.5;
+export const FATIGUE_FITNESS_FACTOR = 0.6;
+export const FATIGUE_MIN_CONDITION = 5;
+export const FATIGUE_HALFTIME_RECOVERY = 2.5;
+
+// ═══════════════════════════════════════════════
 // KARAR ZAMANI
 // ═══════════════════════════════════════════════
 
