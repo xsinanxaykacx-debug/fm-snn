@@ -1032,11 +1032,11 @@ function resolveGoalkeeperSave(
 
   state.ball = releaseBall(state.ball);
 
-  const goalLineX = defendingSide === 'HOME'
-    ? 0.5
-    : state.pitch.length - 0.5;
+  const goalKickX = defendingSide === 'HOME'
+    ? state.pitch.goalAreaDepth / 2
+    : state.pitch.length - state.pitch.goalAreaDepth / 2;
 
-  state.ball.position.x = goalLineX;
+  state.ball.position.x = goalKickX;
   state.ball.position.y = Math.max(
     8,
     Math.min(
@@ -1053,7 +1053,7 @@ function resolveGoalkeeperSave(
   state.setPiece = createSetPieceForMatch(
     'goal_kick',
     defendingSide,
-    { x: goalLineX, y: state.ball.position.y },
+    { x: goalKickX, y: state.ball.position.y },
     state.pitch,
     state.home.club,
     state.away.club,
