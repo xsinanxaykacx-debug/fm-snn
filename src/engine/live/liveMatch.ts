@@ -120,6 +120,12 @@ import {
   nextBool,
 } from './rng';
 
+import {
+  resolvePassAction,
+  resolveDribbleAction,
+  resolveShotAction,
+} from './actionResolution';
+
 // ═══════════════════════════════════════════════
 // SIMULATE MATCH LIVE
 // ═══════════════════════════════════════════════
