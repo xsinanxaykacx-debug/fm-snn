@@ -1018,14 +1018,6 @@ function resolveGoalkeeperSave(
     return false;
   }
 
-  const saveChance = Math.max(
-    0.25,
-    Math.min(
-      0.85,
-      0.55 + gkSkill * 0.20
-    )
-  );
-
   const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
   state.stats.onTarget[side] += 1;
 
