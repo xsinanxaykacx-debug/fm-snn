@@ -147,7 +147,6 @@ function CupMatchCard({ cupMatch, isUserMatch, isActiveWeek, onPlay }: CupMatchC
 export function Cup() {
   const state = useGameStore();
   const playWeek = useGameStore(s => s.playWeek);
-  const userClub = state.clubs[state.userClubId];
   const cup = state.cup;
 
   const summary = getCupSummary(cup, state.userClubId);
