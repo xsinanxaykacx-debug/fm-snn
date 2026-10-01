@@ -27,12 +27,6 @@ describe('Live transition measurement', () => {
     let tackleDistanceSum = 0;
     let tackleDiagnosticSamples = 0;
 
-    // Measurement-only telemetry: production stats/state remain untouched.
-    let looseBallAfterTackleWins = 0;
-    let looseBallRecoveredBySameClub = 0;
-    let looseBallRecoveredByOpponent = 0;
-    let looseBallUnresolved = 0;
-    let delayedCounterPressRunnerRecoveries = 0;
 
     for (let i = 0; i < 500; i++) {
       const home = clubs[i % clubs.length];
@@ -49,65 +43,6 @@ describe('Live transition measurement', () => {
       }
 
       let lastTransitionStartedAt = -1;
-      let observedTackleWins = 0;
-      let pendingLooseTackle: {
-        clubId: string;
-        playerId: string | null;
-        expiresAt: number;
-      } | null = null;
-
-      const match = simulateMatchLive(home, away, data.players, {
-        seed: 50000 + i,
-        maxTicks: 1000,
-        onTick: (state) => {
-          if (
-            state.transition.counterPressClubId !== null &&
-            state.transition.startedAt !== lastTransitionStartedAt
-          ) {
-            transitionStarts += 1;
-            transitionProbabilitySum += state.transition.counterPressProbability;
-            transitionProbabilitySamples += 1;
-            lastTransitionStartedAt = state.transition.startedAt;
-          }
-
-          // First resolve any previously observed loose-ball tackle win.
-          if (pendingLooseTackle !== null) {
-            const ownerId = state.ball.ownerId;
-
-            if (ownerId !== null) {
-              const owner = state.players[ownerId];
-
-              if (owner) {
-                if (owner.clubId === pendingLooseTackle.clubId) {
-                  looseBallRecoveredBySameClub += 1;
-                  if (owner.player.id === pendingLooseTackle.playerId) {
-                    delayedCounterPressRunnerRecoveries += 1;
-                  }
-                } else {
-                  looseBallRecoveredByOpponent += 1;
-                }
-                pendingLooseTackle = null;
-              }
-            } else if (state.time >= pendingLooseTackle.expiresAt) {
-              looseBallUnresolved += 1;
-              pendingLooseTackle = null;
-            }
-          }
-
-          // Detect tackle wins independently from the production recovery counters.
-          if (state.stats.counterPressTackleWins > observedTackleWins) {
-            const newWins = state.stats.counterPressTackleWins - observedTackleWins;
-            observedTackleWins = state.stats.counterPressTackleWins;
-
-            for (let win = 0; win < newWins; win += 1) {
-              if (state.ball.ownerId !== null) continue;
-
-              looseBallAfterTackleWins += 1;
-              pendingLooseTackle = {
-                clubId: state.transition.counterPressClubId ?? '',
-                playerId: state.transition.counterPressPlayerId,
-                expiresAt: state.time + 6,
-              };
             }
           }
         },
@@ -183,11 +118,6 @@ describe('Live transition measurement', () => {
     console.log('cleanRecoveries=' + counterPressCleanRecoveries);
     console.log('looseBallRecoveries=' + counterPressLooseBallRecoveries);
     console.log('recoveries=' + counterPressRecoveries);
-    console.log('looseBallAfterTackleWins=' + looseBallAfterTackleWins);
-    console.log('looseBallRecoveredBySameClub=' + looseBallRecoveredBySameClub);
-    console.log('looseBallRecoveredByOpponent=' + looseBallRecoveredByOpponent);
-    console.log('delayedCounterPressRunnerRecoveries=' + delayedCounterPressRunnerRecoveries);
-    console.log('looseBallUnresolved=' + looseBallUnresolved);
     console.log('rollPassRate=' + (rollPassRate * 100).toFixed(2) + '%');
     console.log('tackleWinRateAfterRoll=' + (tackleWinRate * 100).toFixed(2) + '%');
     console.log('recoveryRatePerAttempt=' + (recoveryRate * 100).toFixed(2) + '%');
