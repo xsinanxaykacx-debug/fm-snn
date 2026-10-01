@@ -4,6 +4,62 @@ import { generateGameData } from '../data/generateData';
 import { simulateMatchLive } from './liveMatch';
 import { calculateClosingSpeed } from './tackle';
 
+describe('calculateClosingSpeed', () => {
+  it('approaching players are positive', () => {
+    expect(calculateClosingSpeed(
+      { x: 0, y: 0 }, { x: 10, y: 0 },
+      { x: 5, y: 0 }, { x: -3, y: 0 }
+    )).toBeCloseTo(8, 10);
+  });
+
+  it('same direction chase uses the speed difference', () => {
+    expect(calculateClosingSpeed(
+      { x: 0, y: 0 }, { x: 10, y: 0 },
+      { x: 5, y: 0 }, { x: 4, y: 0 }
+    )).toBeCloseTo(1, 10);
+  });
+
+  it('same velocity gives zero', () => {
+    expect(calculateClosingSpeed(
+      { x: 0, y: 0 }, { x: 10, y: 0 },
+      { x: 5, y: 0 }, { x: 5, y: 0 }
+    )).toBeCloseTo(0, 10);
+  });
+
+  it('perpendicular movement has zero radial closing speed', () => {
+    expect(calculateClosingSpeed(
+      { x: 0, y: 0 }, { x: 5, y: 0 },
+      { x: 5, y: 0 }, { x: 0, y: 5 }
+    )).toBeCloseTo(0, 10);
+  });
+
+  it('separating players are negative', () => {
+    expect(calculateClosingSpeed(
+      { x: 0, y: 0 }, { x: 10, y: 0 },
+      { x: -3, y: 0 }, { x: 5, y: 0 }
+    )).toBeCloseTo(-8, 10);
+  });
+
+  it('offset tangent movement has small closing speed but large relative speed', () => {
+    const closingSpeed = calculateClosingSpeed(
+      { x: 0, y: 0 }, { x: 5, y: 1 },
+      { x: 5, y: 0 }, { x: 0, y: 5 }
+    );
+
+    const relativeSpeed = Math.hypot(5, -5);
+
+    expect(Math.abs(closingSpeed)).toBeLessThan(1);
+    expect(relativeSpeed).toBeCloseTo(Math.sqrt(50), 10);
+  });
+
+  it('coincident positions return zero', () => {
+    expect(calculateClosingSpeed(
+      { x: 10, y: 20 }, { x: 10, y: 20 },
+      { x: 5, y: 0 }, { x: -5, y: 0 }
+    )).toBe(0);
+  });
+});
+
 describe('Tackle physics measurement', () => {
   it('transition tackle penceresinde closing speed ile ham relative speed farkını ölçer', () => {
     const data = generateGameData();
