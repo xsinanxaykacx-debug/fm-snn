@@ -8,6 +8,7 @@ import {
 import type {
   LiveMatchState,
   LivePlayer,
+  Tactic,
 } from '../types';
 
 function attributes(overrides: Partial<LivePlayer['player']['attributes']> = {}) {
@@ -132,8 +133,8 @@ function player(
 
 function state(
   players: Record<string, LivePlayer>,
-  homeTactic: LivePlayer['isHome'] extends boolean ? any : never = undefined,
-  awayTactic: any = undefined
+  homeTactic?: Tactic,
+  awayTactic?: Tactic
 ): LiveMatchState {
   return {
     players,
