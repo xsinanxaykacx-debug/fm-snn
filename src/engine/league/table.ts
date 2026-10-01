@@ -9,6 +9,8 @@ export function initTable(clubIds: string[]): Record<string, TableRow> {
 }
 
 export function updateTable(table: Record<string, TableRow>, match: Match): void {
+  if (!match.homeId || !match.awayId) return;
+
   const home = table[match.homeId];
   const away = table[match.awayId];
   if (!home || !away) return;
