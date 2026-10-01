@@ -532,7 +532,20 @@ function runTick(
     applyBallActions(state, decisions, players);
   }
 
-  // ─── 8c. Transition ───
+  // ─── 8c. Transition teşhis ───
+  // Yalnızca gerçek possession değişimini logla; her tick'i spamlemiyoruz.
+  if (import.meta.env.DEV && previousOwnerId !== state.ball.ownerId) {
+    const previousOwner = previousOwnerId ? state.players[previousOwnerId] : null;
+    const currentOwner = state.ball.ownerId ? state.players[state.ball.ownerId] : null;
+    console.log(
+      '[ownership-change] tick=' + state.tick +
+      ' prev=' + (previousOwnerId ?? 'null') +
+      ' prevClub=' + (previousOwner?.clubId ?? 'null') +
+      ' owner=' + (state.ball.ownerId ?? 'null') +
+      ' ownerClub=' + (currentOwner?.clubId ?? 'null'),
+    );
+  }
+
   updateTransitionState(state, previousOwnerId);
 
   // ─── 9. Sınır geçişi ───
