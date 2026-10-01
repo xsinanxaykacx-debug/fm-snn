@@ -562,11 +562,20 @@ export function resolveCounterPress(
     const press = pressingModifier(tactic.pressing);
     const mentality = mentalityModifier(tactic.mentality, false);
 
+    // Defensive line, top kaybından sonraki fiziksel mesafeyi etkiler:
+    // yüksek çizgi counter-press runner'ı oyuna daha yakın tutar;
+    // düşük çizgi ilk baskı penceresinde mesafeyi büyütür.
+    const lineModifier =
+      tactic.defensiveLine === 'high' ? 1.15 :
+      tactic.defensiveLine === 'low' ? 0.85 :
+      1;
+
     const score =
       (defensiveSkill / 100) *
       (0.35 + proximity * 0.65) *
       role *
       press *
+      lineModifier *
       (0.92 + a.aggression / 1250) *
       mentality;
 
