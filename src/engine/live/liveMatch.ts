@@ -131,6 +131,8 @@ import {
   resolveShotAction,
   resolveCrossAction,
   resolveInterceptionAction,
+  resolveCounterPress,
+  resolveBreakAction,
 } from './actionResolution';
 
 // ═══════════════════════════════════════════════
@@ -231,6 +233,15 @@ export function simulateMatchLive(
     perceptionCache: {},
 
     lastBallOwnerId: null,
+
+    transition: {
+      counterPressClubId: null,
+      breakClubId: null,
+      startedAt: 0,
+      expiresAt: 0,
+      counterPressProbability: 0,
+      breakQuality: 0,
+    },
 
     isStopped: false,
     isFinished: false,
@@ -359,8 +370,64 @@ function applyHalftimeRecovery(state: LiveMatchState): void {
 }
 
 // ═══════════════════════════════════════════════
-// ANA TICK
+ // TRANSITION
+ // ═══════════════════════════════════════════════
+
+function updateTransitionState(
+  state: LiveMatchState,
+  previousOwnerId: string | null
+): void {
+  if (state.time >= state.transition.expiresAt) {
+    state.transition.counterPressClubId = null;
+    state.transition.breakClubId = null;
+    state.transition.counterPressProbability = 0;
+    state.transition.breakQuality = 0;
+  }
+
+  const currentOwnerId = state.ball.ownerId;
+
+  if (
+    previousOwnerId === null ||
+    currentOwnerId === null ||
+    previousOwnerId === currentOwnerId
+  ) {
+    return;
+  }
+
+  const previousOwner = state.players[previousOwnerId];
+  const currentOwner = state.players[currentOwnerId];
+
+  if (!previousOwner || !currentOwner) return;
+  if (previousOwner.clubId === currentOwner.clubId) return;
+
+  const losingPlayers = Object.values(state.players).filter(
+    player => player.clubId === previousOwner.clubId
+  );
+
+  const pressing = resolveCounterPress(
+    losingPlayers,
+    currentOwner.position,
+    state
+  );
+
+  const breakResolution = resolveBreakAction(
+    currentOwner,
+    state
+  );
+
+  state.transition = {
+    counterPressClubId: previousOwner.clubId,
+    breakClubId: currentOwner.clubId,
+    startedAt: state.time,
+    expiresAt: state.time + 6,
+    counterPressProbability: pressing.probability,
+    breakQuality: breakResolution.quality,
+  };
+}
+
 // ═══════════════════════════════════════════════
+ // ANA TICK
+ // ═══════════════════════════════════════════════
 
 function runTick(
   state: LiveMatchState,
@@ -368,6 +435,8 @@ function runTick(
   onTick?: (state: LiveMatchState) => void
 ): void {
   // ─── 1. prevBallPos ───
+  const previousOwnerId = state.lastBallOwnerId;
+
   const prevBallPos = {
     x: state.ball.position.x,
     y: state.ball.position.y,
@@ -440,6 +509,9 @@ function runTick(
   if (!tackleChangedPossession) {
     applyBallActions(state, decisions);
   }
+
+  // ─── 8c. Transition ───
+  updateTransitionState(state, previousOwnerId);
 
   // ─── 9. Sınır geçişi ───
   const boundaryOutcome = detectBoundaryOutcome({
@@ -732,6 +804,7 @@ function buildDecisionState(state: LiveMatchState): DecisionState {
       tackleRadius: DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.tackleRadius,
     },
     setPiece: state.setPiece,
+    transition: state.transition,
   };
 }
 
