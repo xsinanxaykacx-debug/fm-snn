@@ -40,6 +40,8 @@ import {
   PLAYER_STOP_SPEED,
   PLAYER_TARGET_TOLERANCE,
   DEFAULT_PLAYER_PHYSICS,
+  PLAYER_SPEED,
+  PLAYER_MULTIPLIERS,
 } from './config';
 
 import { projectPointToPitch } from './pitch';
@@ -80,16 +82,19 @@ export function computeMaxSpeed(
   const accelerationRatio = attrRatio(attributes.acceleration);
 
   const baseSpeed =
-    4.0 +
-    paceRatio * 5.0 +
-    accelerationRatio * 1.5;
+    PLAYER_SPEED.base +
+    paceRatio * PLAYER_SPEED.paceWeight +
+    accelerationRatio * PLAYER_SPEED.accelWeight;
 
   const conditionMultiplier =
-    0.7 + (player.player.condition / 100) * 0.3;
+    PLAYER_MULTIPLIERS.conditionBase +
+    (player.player.condition / 100) * PLAYER_MULTIPLIERS.conditionWeight;
   const moraleMultiplier =
-    0.9 + (player.player.morale / 100) * 0.1;
+    PLAYER_MULTIPLIERS.moraleBase +
+    (player.player.morale / 100) * PLAYER_MULTIPLIERS.moraleWeight;
   const formMultiplier =
-    0.9 + (player.player.form / 100) * 0.1;
+    PLAYER_MULTIPLIERS.formBase +
+    (player.player.form / 100) * PLAYER_MULTIPLIERS.formWeight;
 
   return (
     baseSpeed *
@@ -109,7 +114,8 @@ export function computeAcceleration(
   );
 
   return (
-    (3.0 + accelerationRatio * 4.0) *
+    (PLAYER_SPEED.accelBase +
+      accelerationRatio * PLAYER_SPEED.accelWeightAccel) *
     physics.accelerationMultiplier
   );
 }
