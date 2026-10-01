@@ -41,7 +41,7 @@ export function suggestTrainingFocus(
     ['ST', 'AMC', 'AML', 'AMR', 'ML', 'MR'].includes(p.position)
   );
   const defensePlayers = squad.filter(p =>
-    ['DC', 'DL', 'DR', 'DM'].includes(p.position)
+    ['DC', 'DL', 'DR', 'DMC'].includes(p.position)
   );
 
   // Hücumda daha çok genç varsa → hücum
@@ -107,7 +107,7 @@ export function suggestTransfers(
     { name: 'Kaleci', positions: ['GK'], idealCount: 2 },
     { name: 'Stoper', positions: ['DC'], idealCount: 3 },
     { name: 'Bek', positions: ['DL', 'DR'], idealCount: 4 },
-    { name: 'Defansif Orta Saha', positions: ['DM'], idealCount: 2 },
+    { name: 'Defansif Orta Saha', positions: ['DMC'], idealCount: 2 },
     { name: 'Merkez Orta Saha', positions: ['MC'], idealCount: 3 },
     {
       name: 'Kanat',
@@ -169,7 +169,7 @@ export interface MatchAnalysis {
 export function analyzeMatch(
   match: any,
   userClubId: string,
-  players: Record<string, Player>
+  _players: Record<string, Player>
 ): MatchAnalysis {
   const isHome = match.homeId === userClubId;
   const ourScore = isHome ? match.homeScore : match.awayScore;
