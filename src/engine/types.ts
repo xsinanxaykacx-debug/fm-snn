@@ -1196,6 +1196,10 @@ export interface LiveMatchStats extends MatchStats {
     away: number;
   };
 
+  /** Counter-press V1 fiziksel recovery metrikleri. */
+  counterPressAttempts: number;
+  counterPressRecoveries: number;
+
   fouls: {
     home: number;
     away: number;
@@ -1241,11 +1245,16 @@ export interface LiveMatchStats extends MatchStats {
 
 export interface TransitionState {
   counterPressClubId: string | null;
+  counterPressPlayerId: string | null;
   breakClubId: string | null;
   startedAt: number;
   expiresAt: number;
   counterPressProbability: number;
   breakQuality: number;
+
+  /** İlk rakip aksiyon penceresinde en fazla bir fiziksel contest. */
+  hasAttemptedCounterPress: boolean;
+  isRecoveryContestActive: boolean;
 }
 
 export interface LiveMatchState {
