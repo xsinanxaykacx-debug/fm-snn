@@ -26,11 +26,11 @@ describe('calculateClosingSpeed', () => {
     )).toBeCloseTo(0, 10);
   });
 
-  it('perpendicular movement has zero radial closing speed', () => {
+  it('perpendicular carrier movement can still have positive radial closing', () => {
     expect(calculateClosingSpeed(
       { x: 0, y: 0 }, { x: 5, y: 0 },
       { x: 5, y: 0 }, { x: 0, y: 5 }
-    )).toBeCloseTo(0, 10);
+    )).toBeCloseTo(5, 10);
   });
 
   it('separating players are negative', () => {
@@ -40,7 +40,7 @@ describe('calculateClosingSpeed', () => {
     )).toBeCloseTo(-8, 10);
   });
 
-  it('offset tangent movement has small closing speed but large relative speed', () => {
+  it('offset movement measures the radial component, not total relative speed', () => {
     const closingSpeed = calculateClosingSpeed(
       { x: 0, y: 0 }, { x: 5, y: 1 },
       { x: 5, y: 0 }, { x: 0, y: 5 }
@@ -48,7 +48,8 @@ describe('calculateClosingSpeed', () => {
 
     const relativeSpeed = Math.hypot(5, -5);
 
-    expect(Math.abs(closingSpeed)).toBeLessThan(1);
+    expect(closingSpeed).toBeCloseTo(35 / Math.sqrt(26), 10);
+    expect(Math.abs(closingSpeed)).toBeLessThan(relativeSpeed);
     expect(relativeSpeed).toBeCloseTo(Math.sqrt(50), 10);
   });
 
@@ -57,6 +58,38 @@ describe('calculateClosingSpeed', () => {
       { x: 10, y: 20 }, { x: 10, y: 20 },
       { x: 5, y: 0 }, { x: -5, y: 0 }
     )).toBe(0);
+  });
+
+  it('closing speed predicts the next distance change', () => {
+    const tacklerPosition = { x: 0, y: 0 };
+    const carrierPosition = { x: 10, y: 0 };
+    const tacklerVelocity = { x: 2, y: 0 };
+    const carrierVelocity = { x: -1, y: 0 };
+    const dt = 0.01;
+
+    const closingSpeed = calculateClosingSpeed(
+      tacklerPosition,
+      carrierPosition,
+      tacklerVelocity,
+      carrierVelocity
+    );
+
+    const currentDistance = Math.hypot(
+      carrierPosition.x - tacklerPosition.x,
+      carrierPosition.y - tacklerPosition.y
+    );
+
+    const nextDistance = Math.hypot(
+      (carrierPosition.x + carrierVelocity.x * dt) -
+        (tacklerPosition.x + tacklerVelocity.x * dt),
+      (carrierPosition.y + carrierVelocity.y * dt) -
+        (tacklerPosition.y + tacklerVelocity.y * dt)
+    );
+
+    const measuredClosingSpeed =
+      (currentDistance - nextDistance) / dt;
+
+    expect(closingSpeed).toBeCloseTo(measuredClosingSpeed, 6);
   });
 });
 
@@ -83,6 +116,7 @@ describe('Tackle physics measurement', () => {
         player.suspensionWeeks = 0;
         player.sentOff = false;
         player.injured = false;
+        player.redCard = false;
         player.redCard = false;
       }
 
