@@ -98,9 +98,6 @@ import {
   MARK_OPENNESS_WEIGHT,
   MARK_DISTANCE_WEIGHT,
 
-  TACKLE_BASE_SCORE,
-  TACKLE_SCORE_TACKLING_WEIGHT,
-  TACKLE_SCORE_AGGRESSION_WEIGHT,
 
   SUPPORT_FORWARD_OFFSET,
   SUPPORT_MIN_SPACE,
@@ -281,7 +278,7 @@ export function allocateChase(
 function generateBallCarrierCandidates(
   self: LivePlayer,
   perception: Perception,
-  state: DecisionState,
+  _state: DecisionState,
   attackingGoalPos: Vec2,
   attackingDirection: 1 | -1
 ): DecisionCandidate[] {
