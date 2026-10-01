@@ -39,6 +39,7 @@ import {
   PLAYER_APPROACH_RADIUS,
   PLAYER_STOP_SPEED,
   PLAYER_TARGET_TOLERANCE,
+  PLAYER_VELOCITY_EPSILON,
   DEFAULT_PLAYER_PHYSICS,
   PLAYER_SPEED,
   PLAYER_MULTIPLIERS,
@@ -146,6 +147,9 @@ export function movePlayer(
     if (speed < PLAYER_STOP_SPEED) {
       player.velocity.x = 0;
       player.velocity.y = 0;
+    } else if (speed < PLAYER_VELOCITY_EPSILON) {
+      player.velocity.x = 0;
+      player.velocity.y = 0;
     }
     return;
   }
@@ -213,10 +217,16 @@ export function movePlayer(
   player.position.y = clamped.y;
 
   // ─── Facing güncelle ───
-  const finalSpeed = Math.sqrt(
+  let finalSpeed = Math.sqrt(
     player.velocity.x * player.velocity.x +
       player.velocity.y * player.velocity.y
   );
+
+  if (finalSpeed < PLAYER_VELOCITY_EPSILON) {
+    player.velocity.x = 0;
+    player.velocity.y = 0;
+    finalSpeed = 0;
+  }
 
   if (finalSpeed > PLAYER_STOP_SPEED) {
     player.facing =
