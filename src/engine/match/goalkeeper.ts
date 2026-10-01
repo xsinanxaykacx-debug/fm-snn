@@ -15,7 +15,7 @@ export interface ShotResult {
 export function resolveShot(
   chance: Chance,
   goalkeeper: Player | null,
-  defendingTeam: any
+  _defendingTeam: any
 ): ShotResult {
   const shooter = chance.shooter;
 
