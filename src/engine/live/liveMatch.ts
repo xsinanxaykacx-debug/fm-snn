@@ -124,6 +124,7 @@ import {
   resolvePassAction,
   resolveDribbleAction,
   resolveShotAction,
+  resolveCrossAction,
 } from './actionResolution';
 
 // ═══════════════════════════════════════════════
@@ -957,6 +958,18 @@ function handleCrossAction(
 ): void {
   if (!decision.target) return;
 
+  const resolution = resolveCrossAction(owner, decision, state);
+  const completed = nextBool(state.rng, resolution.probability);
+
+  const target = completed
+    ? decision.target
+    : {
+        x: owner.position.x +
+          (decision.target.x - owner.position.x) * 0.60,
+        y: owner.position.y +
+          (decision.target.y - owner.position.y) * 0.60,
+      };
+
   state.ball = applyCross(
     state.ball,
     {
@@ -964,7 +977,7 @@ function handleCrossAction(
       y: owner.position.y,
       z: DEFAULT_BALL_PHYSICS.radius,
     },
-    decision.target,
+    target,
     decision.power,
     DEFAULT_BALL_PHYSICS,
     owner.player.id,
@@ -981,7 +994,9 @@ function handleCrossAction(
     type: 'cross',
     playerId: owner.player.id,
     clubId: owner.clubId,
-    description: `Orta: ${owner.player.name}`,
+    description: completed
+      ? `Orta: ${owner.player.name}`
+      : `Hatalı orta: ${owner.player.name}`,
   });
 }
 
