@@ -1079,7 +1079,7 @@ function resolveCounterPressContest(
         '[CP-CHECK] tick=' + state.tick +
         ' reason=NO_RUNNER' +
         ' runner=' + (transition.counterPressPlayerId ?? 'null') +
-        ' owner=' + owner.id +
+        ' owner=' + owner.player.id +
         ' probability=' + transition.counterPressProbability.toFixed(3),
       );
     }
@@ -1095,8 +1095,8 @@ function resolveCounterPressContest(
   if (import.meta.env.DEV) {
     console.log(
       '[CP-CHECK] tick=' + state.tick +
-      ' runner=' + pressingPlayer.id +
-      ' owner=' + owner.id +
+      ' runner=' + pressingPlayer.player.id +
+      ' owner=' + owner.player.id +
       ' distance=' + distance.toFixed(3) +
       ' tackleRadius=' + tackleRadius.toFixed(3) +
       ' probability=' + transition.counterPressProbability.toFixed(3),
