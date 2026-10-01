@@ -200,6 +200,7 @@ export function resolveTackle(
       ballCarrierId: ballCarrier.player.id,
       newOwnerId: clean ? tackler.player.id : null,
       point: { ...ballCarrier.position },
+      debug: { winChance, cleanChance, relativeSpeed, distance },
     };
   }
 
@@ -220,6 +221,7 @@ export function resolveTackle(
       tacklerId: tackler.player.id,
       ballCarrierId: ballCarrier.player.id,
       severity,
+      debug: { winChance, relativeSpeed, distance },
       point: { ...ballCarrier.position },
     };
   }
@@ -228,6 +230,7 @@ export function resolveTackle(
     type: 'failed',
     tacklerId: tackler.player.id,
     ballCarrierId: ballCarrier.player.id,
+    debug: { winChance, relativeSpeed, distance },
   };
 }
 
