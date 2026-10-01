@@ -228,6 +228,7 @@ export const HOLD_TACTICAL_FIT = 0.4;
 export const MARK_MAX_DISTANCE = 25.0;
 export const MARK_OPENNESS_WEIGHT = 0.7;
 export const MARK_DISTANCE_WEIGHT = 0.3;
+export const MARKING_OFFSET_DISTANCE = 2.0;
 export const MARK_BASE_SCORE = 0.4;
 export const MARK_SCORE_DIVISOR = 200;
 export const MARK_SUCCESS_PROBABILITY = 0.7;
