@@ -222,9 +222,9 @@ export function resolveTackle(
 
     return {
       type: 'won',
-      tacklerId: tackler.player.player.id,
-      ballCarrierId: ballCarrier.player.player.id,
-      newOwnerId: clean ? tackler.player.player.id : null,
+      tacklerId: tackler.player.id,
+      ballCarrierId: ballCarrier.player.id,
+      newOwnerId: clean ? tackler.player.id : null,
       point: { ...ballCarrier.position },
       debug: { winChance, cleanChance, relativeSpeed, distance },
     };
@@ -244,8 +244,8 @@ export function resolveTackle(
 
     return {
       type: 'foul',
-      tacklerId: tackler.player.player.id,
-      ballCarrierId: ballCarrier.player.player.id,
+      tacklerId: tackler.player.id,
+      ballCarrierId: ballCarrier.player.id,
       severity,
       debug: { winChance, relativeSpeed, distance },
       point: { ...ballCarrier.position },
@@ -254,8 +254,8 @@ export function resolveTackle(
 
   return {
     type: 'failed',
-    tacklerId: tackler.player.player.id,
-    ballCarrierId: ballCarrier.player.player.id,
+    tacklerId: tackler.player.id,
+    ballCarrierId: ballCarrier.player.id,
     debug: { winChance, relativeSpeed, distance },
   };
 }
