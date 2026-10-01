@@ -1266,6 +1266,14 @@ export interface TransitionState {
   /** İlk rakip aksiyon penceresinde en fazla bir fiziksel contest. */
   hasAttemptedCounterPress: boolean;
   isRecoveryContestActive: boolean;
+
+  /**
+   * Counter-press tackle sonrası top hemen kontrol edilemezse,
+   * sonraki loose-ball kontrolünü recovery olarak ilişkilendirmek için
+   * bekleyen bağlam.
+   */
+  pendingLooseBallRecoveryClubId: string | null;
+  pendingLooseBallRecoveryPlayerId: string | null;
 }
 
 export interface LiveMatchState {
