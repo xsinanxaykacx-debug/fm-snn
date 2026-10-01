@@ -329,6 +329,14 @@ function generateBallCarrierCandidates(
 ): DecisionCandidate[] {
   const candidates: DecisionCandidate[] = [];
 
+  const transitionActive =
+    _state.transition.breakClubId === self.clubId &&
+    _state.time < _state.transition.expiresAt;
+
+  const breakBoost = transitionActive
+    ? 1 + _state.transition.breakQuality * 0.18
+    : 1;
+
   // ─── PASS ───
   for (const option of perception.passOptions) {
     const successProbability = clamp01(
@@ -350,7 +358,7 @@ function generateBallCarrierCandidates(
 
     const score =
       successProbability * PASS_SCORE.successWeight +
-      tacticalFit * PASS_SCORE.tacticalWeight +
+      tacticalFit * PASS_SCORE.tacticalWeight * breakBoost +
       spaceValue * PASS_SCORE.spaceWeight -
       risk * PASS_SCORE.riskWeight;
 
@@ -458,7 +466,7 @@ function generateBallCarrierCandidates(
     );
 
     const score =
-      xG * SHOOT_SCORE.xGWeight +
+      xG * SHOOT_SCORE.xGWeight * breakBoost +
       finishing * SHOOT_SCORE.finishingWeight +
       composure * SHOOT_SCORE.composureWeight;
 
@@ -530,9 +538,9 @@ function generateBallCarrierCandidates(
     );
 
     const score =
-      DRIBBLE_BASE_SCORE +
+      (DRIBBLE_BASE_SCORE +
       spaceAhead *
-        (100 / DRIBBLE_SPACE_SCORE_DIVISOR);
+        (100 / DRIBBLE_SPACE_SCORE_DIVISOR)) * breakBoost;
 
     candidates.push({
       type: 'dribble',
@@ -669,7 +677,32 @@ function decidePriorityIntent(
     );
   }
 
-  // ─── 2. RAKİP TOP SAHİBİ ───
+  // ─── 2. TRANSITION / COUNTER-PRESS ───
+  if (
+    ballCarrier !== null &&
+    ballCarrier.clubId !== self.clubId &&
+    state.transition.counterPressClubId === self.clubId &&
+    state.time < state.transition.expiresAt &&
+    isCounterPressRole(self)
+  ) {
+    const distanceToBall = computeDistance(
+      self.position,
+      ballPosition
+    );
+
+    if (distanceToBall <= COUNTER_PRESS_MAX_DISTANCE) {
+      return {
+        intent: 'move',
+        reason: 'chase',
+        target: ballPosition,
+        targetPlayerId: ballCarrier.player.id,
+        power: DECISION_POWER.move,
+        timestamp: state.time,
+      };
+    }
+  }
+
+  // ─── 3. RAKİP TOP SAHİBİ ───
   if (
     ballCarrier !== null &&
     ballCarrier.clubId !== self.clubId
@@ -867,6 +900,18 @@ function makeReturnDecision(
 // ============================================================
 // SUPPORT / MARKING GEOMETRY
 // ============================================================
+
+function isCounterPressRole(self: LivePlayer): boolean {
+  return (
+    self.role === 'DM' ||
+    self.role === 'CM' ||
+    self.role === 'W' ||
+    self.role === 'AM' ||
+    self.role === 'ST' ||
+    self.role === 'FB' ||
+    self.role === 'WB'
+  );
+}
 
 function isSupportRole(self: LivePlayer): boolean {
   return (
@@ -1308,6 +1353,7 @@ export interface DecisionState {
   rng: RngState;
   playerPhysics: Pick<PlayerPhysicsConfig, 'tackleRadius'>;
   setPiece: SetPieceState | null;
+  transition: TransitionState;
 }
 
 // ============================================================
