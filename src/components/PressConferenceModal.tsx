@@ -31,6 +31,7 @@ interface Props {
 export function PressConferenceModal({ matchResult, onComplete, onClose }: Props) {
   const state = useGameStore();
   const userClub = state.clubs[state.userClubId];
+  void onClose;
 
   const [currentStep, setCurrentStep] = useState(0);
   const [totalMorale, setTotalMorale] = useState(0);
