@@ -1066,9 +1066,6 @@ function resolveCounterPressContest(
     return false;
   }
 
-  // Bu transition penceresinde yalnızca ilk aksiyon için bir contest hakkı var.
-  transition.hasAttemptedCounterPress = true;
-
   const pressingPlayer = transition.counterPressPlayerId
     ? state.players[transition.counterPressPlayerId]
     : null;
@@ -1077,6 +1074,15 @@ function resolveCounterPressContest(
     !pressingPlayer ||
     pressingPlayer.clubId !== transition.counterPressClubId
   ) {
+    if (import.meta.env.DEV) {
+      console.log(
+        '[CP-CHECK] tick=' + state.tick +
+        ' reason=NO_RUNNER' +
+        ' runner=' + (transition.counterPressPlayerId ?? 'null') +
+        ' owner=' + owner.id +
+        ' probability=' + transition.counterPressProbability.toFixed(3),
+      );
+    }
     return false;
   }
 
@@ -1086,12 +1092,38 @@ function resolveCounterPressContest(
   const tackleRadius =
     DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.tackleRadius;
 
-  // Yakın değilse fiziksel mücadele yoktur. Sahte recovery yapılmaz.
+  if (import.meta.env.DEV) {
+    console.log(
+      '[CP-CHECK] tick=' + state.tick +
+      ' runner=' + pressingPlayer.id +
+      ' owner=' + owner.id +
+      ' distance=' + distance.toFixed(3) +
+      ' tackleRadius=' + tackleRadius.toFixed(3) +
+      ' probability=' + transition.counterPressProbability.toFixed(3),
+    );
+  }
+
+  // Bu transition penceresinde yalnızca ilk fiziksel contest için bir hak var.
+  // Ancak runner henüz fiziksel erişim mesafesinde değilse bu hakkı tüketmeyiz.
   if (distance > tackleRadius) {
+    if (import.meta.env.DEV) {
+      console.log('[CP-CHECK] tick=' + state.tick + ' reason=TOO_FAR');
+    }
     return false;
   }
 
+  transition.hasAttemptedCounterPress = true;
   state.stats.counterPressAttempts += 1;
+
+  if (import.meta.env.DEV) {
+    console.log(
+      '[CP-CHECK] tick=' + state.tick +
+      ' reason=ATTEMPT' +
+      ' runner=' + pressingPlayer.id +
+      ' owner=' + owner.id +
+      ' distance=' + distance.toFixed(3),
+    );
+  }
 
   // Counter-press zarı yalnızca fiziksel olarak erişilebilir runner
   // için atılır. Başarısızsa rakibin normal aksiyonu devam eder.
