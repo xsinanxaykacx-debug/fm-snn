@@ -45,6 +45,7 @@ import type {
   Perception,
   PitchDimensions,
   PlayerPhysicsConfig,
+  TransitionState,
   RngState,
   SetPieceState,
   Vec2,
@@ -92,6 +93,8 @@ import {
   DRIBBLE_SPACE_SCORE_DIVISOR,
   DRIBBLE_RISK,
   DRIBBLE_TACTICAL_FIT,
+
+  COUNTER_PRESS_MAX_DISTANCE,
 
   HOLD_BASE_SCORE,
   HOLD_TACTICAL_FIT,
@@ -540,7 +543,8 @@ function generateBallCarrierCandidates(
     const score =
       (DRIBBLE_BASE_SCORE +
       spaceAhead *
-        (100 / DRIBBLE_SPACE_SCORE_DIVISOR)) * breakBoost;
+        (100 / DRIBBLE_SPACE_SCORE_DIVISOR)) *
+      breakBoost;
 
     candidates.push({
       type: 'dribble',
@@ -677,7 +681,7 @@ function decidePriorityIntent(
     );
   }
 
-  // ─── 2. TRANSITION / COUNTER-PRESS ───
+  // ─── 2. COUNTER-PRESS ───
   if (
     ballCarrier !== null &&
     ballCarrier.clubId !== self.clubId &&
