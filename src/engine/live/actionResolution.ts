@@ -92,6 +92,31 @@ function defensiveLineModifier(line: Tactic['defensiveLine']): number {
   }
 }
 
+function roleModifier(role: LivePlayer['role'], phase: 'attack' | 'defense' | 'midfield' | 'press'): number {
+  switch (role) {
+    case 'GK':
+      return phase === 'defense' ? 1.04 : 1;
+    case 'CB':
+      return phase === 'defense' ? 1.08 : phase === 'midfield' ? 1.02 : 0.96;
+    case 'FB':
+      return phase === 'defense' ? 1.05 : phase === 'attack' ? 1.02 : 1;
+    case 'WB':
+      return phase === 'attack' ? 1.08 : phase === 'defense' ? 0.98 : 1.02;
+    case 'DM':
+      return phase === 'defense' ? 1.08 : phase === 'midfield' ? 1.06 : 0.94;
+    case 'CM':
+      return phase === 'midfield' ? 1.06 : 1.02;
+    case 'AM':
+      return phase === 'attack' ? 1.08 : phase === 'midfield' ? 1.04 : 0.96;
+    case 'W':
+      return phase === 'attack' ? 1.07 : phase === 'press' ? 1.05 : 1;
+    case 'ST':
+      return phase === 'attack' ? 1.10 : phase === 'press' ? 1.04 : 0.96;
+    default:
+      return 1;
+  }
+}
+
 function nearestOpponent(
   owner: LivePlayer,
   state: LiveMatchState,
@@ -211,6 +236,8 @@ export function resolvePassAction(
   );
 
   const tempo = tempoModifier(tactic.tempo);
+  const role = roleModifier(owner.role, 'midfield');
+  const pressing = pressingModifier(tactic.pressing);
 
   const raw =
     (passingSkill / 100) *
@@ -218,7 +245,9 @@ export function resolvePassAction(
     pressureSkill *
     distancePenalty *
     attackingModifier *
-    tempo;
+    tempo *
+    role *
+    (0.94 + pressing * 0.06);
 
   return {
     probability: clamp(raw, 0.10, 0.96),
@@ -344,6 +373,62 @@ export function resolveCrossAction(
     ),
     pressure,
     defenderId: nearestOpponent(owner, state)?.player.id ?? null,
+  };
+}
+
+
+export function resolveInterceptionAction(
+  passer: LivePlayer,
+  target: Vec2,
+  state: LiveMatchState
+): ActionResolution {
+  const interceptor = nearestOpponent(passer, state, 18);
+
+  if (!interceptor) {
+    return {
+      probability: 0.02,
+      quality: 0.02,
+      pressure: 0,
+      defenderId: null,
+    };
+  }
+
+  const lane = laneClarity(passer, target, state);
+  const distanceToLane = distance(interceptor.position, target);
+  const pressure = pressureAtOwner(passer, state);
+
+  const a = interceptor.player.attributes;
+  const interceptionSkill =
+    avg(
+      a.anticipation,
+      a.positioning,
+      a.marking,
+      a.tackling
+    ) * conditionFactor(interceptor);
+
+  const role = roleModifier(interceptor.role, 'defense');
+  const pressing =
+    pressingModifier(
+      interceptor.isHome
+        ? state.home.club.tactic.pressing
+        : state.away.club.tactic.pressing
+    );
+
+  const proximity = clamp(1 - distanceToLane / 18, 0, 1);
+
+  const raw =
+    (interceptionSkill / 100) *
+    (0.25 + proximity * 0.75) *
+    (0.55 + (1 - lane) * 0.45) *
+    role *
+    (0.92 + pressing * 0.08) *
+    (1 - pressure * 0.08);
+
+  return {
+    probability: clamp(raw, 0.02, 0.65),
+    quality: clamp(raw, 0.05, 1),
+    pressure,
+    defenderId: interceptor.player.id,
   };
 }
 
