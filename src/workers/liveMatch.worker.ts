@@ -137,7 +137,7 @@ scope.onmessage = (event) => {
 
   try {
     const debug: DebugRecording = {
-      version: 1,
+      version: 2,
       sampleEveryTicks: DEBUG_SAMPLE_TICKS,
       maxSimulationSeconds: DEBUG_MAX_SECONDS,
       startedAt: Date.now(),
