@@ -23,6 +23,7 @@ export interface ShadowSample {
   legacyClosingSpeed: number;
   /** PhysicsSnapshot'tan okunan, tackler → carrier yönünde kapanma. */
   newClosingSpeed: number;
+  snapshotClosingSpeed: number;
 }
 
 export interface ShadowMissSample {
