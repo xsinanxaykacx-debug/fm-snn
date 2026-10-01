@@ -60,6 +60,8 @@ import type {
 } from '../types';
 
 import { DEFAULT_PITCH_DIMENSIONS } from './pitch';
+import { buildPhysicsSnapshot } from './physics';
+import { printShadowReport } from './shadow';
 import type { TeamSide } from './pitch';
 
 import {
@@ -304,6 +306,11 @@ export function simulateMatchLive(
     state.stats.possession.away = 100 - homePct;
   }
 
+  // ─── Physics shadow report ───
+  if (import.meta.env.DEV) {
+    printShadowReport();
+  }
+
   // ─── CareerStats ───
   updateCareerStatsAfterMatch(state, players);
 
@@ -485,12 +492,16 @@ function runTick(
     TICK_DURATION
   );
 
+  // ─── 5b. Physics snapshot ───
+  const physics = buildPhysicsSnapshot(state, state.tick);
+
   // ─── 6. Tackle çözümlemesi ───
   const tackleOutcomes = resolveAllTackles(
     state.players,
     decisions,
     DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.tackleRadius,
-    state.rng
+    state.rng,
+    physics
   );
 
   // ─── 7. Tackle outcome'ları ───
