@@ -110,12 +110,12 @@ export function LiveMatchScreen() {
       <div className="glass-panel rounded-xl p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <div className="text-xs uppercase tracking-widest text-slate-500">Canlı Maç • Hafta ${state.currentWeek}</div>
-            <div className="text-xl font-bold text-white mt-1">${home.name} <span className="text-slate-500">vs</span> ${away.name}</div>
+            <div className="text-xs uppercase tracking-widest text-slate-500">Canlı Maç • Hafta {state.currentWeek}</div>
+            <div className="text-xl font-bold text-white mt-1">{home.name} <span className="text-slate-500">vs</span> {away.name}</div>
           </div>
           <div className="text-center min-w-[150px]">
-            <div className="text-3xl font-black text-white tabular-nums">${displayScore}</div>
-            <div className="text-xs text-accent mt-1">${formatClock(frame?.time ?? 0)} • ${frame?.phase ?? 'kickoff'}</div>
+            <div className="text-3xl font-black text-white tabular-nums">{displayScore}</div>
+            <div className="text-xs text-accent mt-1">{formatClock(frame?.time ?? 0)} • {frame?.phase ?? 'kickoff'}</div>
           </div>
           {!running && !result && (
             <button onClick={startMatch} className="btn-primary px-5 py-3 font-bold">▶ MAÇI BAŞLAT</button>
@@ -149,9 +149,9 @@ export function LiveMatchScreen() {
                   background: p.isHome ? '#2563eb' : '#dc2626',
                   transition: 'left 80ms linear, top 80ms linear',
                 }}
-                title={`${state.players[p.id]?.name ?? p.id} • ${p.intent}`}
+                title={`{state.players[p.id]?.name ?? p.id} • {p.intent}`}
               >
-                ${state.players[p.id]?.id ? p.id.slice(-2) : ''}
+                {state.players[p.id]?.id ? p.id.slice(-2) : ''}
               </div>
             ))}
 
@@ -176,14 +176,14 @@ export function LiveMatchScreen() {
             <div className="text-white font-bold mt-1">LIVE ENGINE 1.0</div>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Skor</div><div className="text-white text-lg font-bold">${displayScore}</div></div>
+            <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Skor</div><div className="text-white text-lg font-bold">{displayScore}</div></div>
             <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Top sahibi</div><div className="text-white text-lg font-bold">${frame?.ball.ownerId ? frame.ball.ownerId.slice(-2) : '—'}</div></div>
           </div>
           <div className="text-xs text-slate-500">Oyuncu noktaları gerçek motor koordinatlarından çiziliyor: 104 × 64 m.</div>
-          {error && <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-300 text-sm">${error}</div>}
+          {error && <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-300 text-sm">{error}</div>}
           {result && (
             <div className="space-y-2">
-              <div className="p-3 rounded bg-green-500/10 border border-green-500/30 text-green-300 text-sm">Maç tamamlandı: ${result.homeScore}-${result.awayScore}</div>
+              <div className="p-3 rounded bg-green-500/10 border border-green-500/30 text-green-300 text-sm">Maç tamamlandı: {result.homeScore}-{result.awayScore}</div>
               <button onClick={saveResult} className="w-full py-3 rounded bg-accent text-slate-950 font-bold">✓ SONUCU FİKSTÜRE İŞLE</button>
             </div>
           )}
