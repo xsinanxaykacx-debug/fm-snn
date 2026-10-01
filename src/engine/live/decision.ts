@@ -97,7 +97,7 @@ import {
   MARK_MAX_DISTANCE,
   MARK_OPENNESS_WEIGHT,
   MARK_DISTANCE_WEIGHT,
-
+  MARKING_OFFSET_DISTANCE,
 
   SUPPORT_FORWARD_OFFSET,
   SUPPORT_MIN_SPACE,
@@ -663,10 +663,15 @@ function decidePriorityIntent(
     // MARK
     const markTarget = findMarkTarget(perception);
     if (markTarget !== null) {
+      const markTargetPoint = computeMarkingPoint(
+        self,
+        markTarget.position
+      );
+
       return {
         intent: 'mark',
         reason: 'mark',
-        target: markTarget.position,
+        target: markTargetPoint,
         targetPlayerId: markTarget.id,
         power: DECISION_POWER.mark,
         timestamp: state.time,
@@ -679,7 +684,8 @@ function decidePriorityIntent(
   // ─── 3. TAKIM ARKADAŞI TOP SAHİBİ ───
   if (
     ballCarrier !== null &&
-    ballCarrier.clubId === self.clubId
+    ballCarrier.clubId === self.clubId &&
+    isSupportRole(self)
   ) {
     const supportPosition = computeSupportPosition(
       self,
@@ -801,6 +807,38 @@ function makeReturnDecision(
     targetPlayerId: null,
     power: DECISION_POWER.return,
     timestamp: time,
+  };
+}
+
+// ============================================================
+// SUPPORT / MARKING GEOMETRY
+// ============================================================
+
+function isSupportRole(self: LivePlayer): boolean {
+  return (
+    self.role === 'DM' ||
+    self.role === 'CM' ||
+    self.role === 'W' ||
+    self.role === 'AM' ||
+    self.role === 'ST'
+  );
+}
+
+function computeMarkingPoint(
+  self: LivePlayer,
+  target: Vec2
+): Vec2 {
+  const dx = self.position.x - target.x;
+  const dy = self.position.y - target.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+
+  if (distance < 0.001) {
+    return { x: target.x, y: target.y };
+  }
+
+  return {
+    x: target.x + (dx / distance) * MARKING_OFFSET_DISTANCE,
+    y: target.y + (dy / distance) * MARKING_OFFSET_DISTANCE,
   };
 }
 
