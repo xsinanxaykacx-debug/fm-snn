@@ -103,6 +103,7 @@ interface Store extends GameState {
 
   newGame: () => void;
   playWeek: () => void;
+  applyLiveMatchResult: (match: Match) => void;
   setTactic: (tactic: Partial<Club['tactic']>) => void;
   advanceSeason: () => void;
   transferBuy: (playerId: string) => void;
@@ -471,6 +472,44 @@ export const useGameStore = create<Store>()(
       },
 
       clearPendingPress: () => set({ pendingPressMatch: null }),
+
+      applyLiveMatchResult: (match) => {
+        const state = get();
+        if (match.played !== true) return;
+
+        const fixtureIndex = state.fixtures.findIndex(m => m.id === match.id);
+        if (fixtureIndex === -1) return;
+        if (state.fixtures[fixtureIndex].played) return;
+
+        const fixtures = [...state.fixtures];
+        fixtures[fixtureIndex] = match;
+
+        const table = { ...state.table };
+        updateTable(table, match);
+
+        const isUserMatch =
+          match.homeId === state.userClubId ||
+          match.awayId === state.userClubId;
+
+        const news = [...state.news];
+        if (isUserMatch) {
+          const isHome = match.homeId === state.userClubId;
+          const our = isHome ? match.homeScore : match.awayScore;
+          const their = isHome ? match.awayScore : match.homeScore;
+          const opponentId = isHome ? match.awayId : match.homeId;
+          const opponent = opponentId ? state.clubs[opponentId] : undefined;
+          const verdict = our > their ? 'Kazandık' : our < their ? 'Kaybettik' : 'Berabere';
+          news.unshift(
+            `Hafta ${match.week}: ${opponent?.shortName ?? 'Rakip'} karşısında ${our}-${their} — ${verdict}`
+          );
+        }
+
+        set({
+          fixtures,
+          table,
+          news: news.slice(0, 30),
+        });
+      },
 
       // ═══════════════════════════════════════════════
       // HAFTA OYNA
