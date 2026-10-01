@@ -114,6 +114,30 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
+/**
+ * Tackler'ın carrier'a doğru olan göreli hız bileşenini hesaplar.
+ * Pozitif: iki oyuncu birbirine kapanıyor.
+ * Negatif: tackler carrier'dan uzaklaşıyor.
+ * Sıfıra yakın: doğrultusal kapanma yok.
+ */
+export function calculateClosingSpeed(
+  tacklerPosition: { x: number; y: number },
+  carrierPosition: { x: number; y: number },
+  tacklerVelocity: { x: number; y: number },
+  carrierVelocity: { x: number; y: number }
+): number {
+  const dx = carrierPosition.x - tacklerPosition.x;
+  const dy = carrierPosition.y - tacklerPosition.y;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance < 0.000001) return 0;
+
+  const relativeVx = tacklerVelocity.x - carrierVelocity.x;
+  const relativeVy = tacklerVelocity.y - carrierVelocity.y;
+
+  return (relativeVx * dx + relativeVy * dy) / distance;
+}
+
 // ═══════════════════════════════════════════════
 // ANA FONKSİYON
 // ═══════════════════════════════════════════════
