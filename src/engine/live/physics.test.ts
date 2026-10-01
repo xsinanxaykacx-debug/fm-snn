@@ -65,11 +65,11 @@ describe('getClosingSpeed', () => {
     expect(getClosingSpeed(snapshot, 'P1', 'P2')).toBeCloseTo(8, 10);
   });
 
-  it('B → A erişiminde aynı fiziksel kapanma değeri döner', () => {
-    expect(getClosingSpeed(snapshot, 'P2', 'P1')).toBeCloseTo(8, 10);
+  it('B → A yönünde negatif kapanma döner', () => {
+    expect(getClosingSpeed(snapshot, 'P2', 'P1')).toBeCloseTo(-8, 10);
   });
 
-  it('invariant: getClosingSpeed(s, A, B) === getClosingSpeed(s, B, A)', () => {
+  it('invariant: getClosingSpeed(s, A, B) === -getClosingSpeed(s, B, A)', () => {
     const ids = ['P1', 'P2', 'P3'];
 
     for (const a of ids) {
@@ -81,7 +81,7 @@ describe('getClosingSpeed', () => {
 
         expect(ab).not.toBeUndefined();
         expect(ba).not.toBeUndefined();
-        expect(ab!).toBeCloseTo(ba!, 10);
+        expect(ab!).toBeCloseTo(-ba!, 10);
       }
     }
   });
@@ -102,7 +102,7 @@ describe('getClosingSpeed', () => {
 
     expect(p1ToP3).not.toBeUndefined();
     expect(p3ToP1).not.toBeUndefined();
-    expect(p1ToP3!).toBeCloseTo(p3ToP1!, 10);
+    expect(p1ToP3!).toBeCloseTo(-p3ToP1!, 10);
   });
 });
 
@@ -147,7 +147,7 @@ describe('PhysicsSnapshot invariants', () => {
     }
   });
 
-  it('dizi sırası ID sırasından farklı olsa da pair değeri erişim sırasına göre değişmez', () => {
+  it('dizi sırası ID sırasından farklı olsa da pair yönü ID sırasına göre', () => {
     const world = makeWorld([
       makePlayer('Z', 0, 0, 5, 0),
       makePlayer('A', 10, 0, -3, 0),
@@ -158,26 +158,26 @@ describe('PhysicsSnapshot invariants', () => {
     expect(pair).toBeDefined();
 
     expect(pair!.closingSpeedAB).toBeCloseTo(8, 10);
-    expect(pair!.closingSpeedBA).toBeCloseTo(8, 10);
+    expect(pair!.closingSpeedBA).toBeCloseTo(-8, 10);
 
     expect(getClosingSpeed(snapshot, 'A', 'Z')).toBeCloseTo(8, 10);
-    expect(getClosingSpeed(snapshot, 'Z', 'A')).toBeCloseTo(8, 10);
+    expect(getClosingSpeed(snapshot, 'Z', 'A')).toBeCloseTo(-8, 10);
   });
 
 
-  it('her player pair için closingSpeedBA === closingSpeedAB', () => {
+  it('her player pair için closingSpeedBA === -closingSpeedAB', () => {
     const snap = buildPhysicsSnapshot(makeWorldN(22), 0);
 
     for (const pair of snap.playerPairs.values()) {
-      expect(pair.closingSpeedBA).toBeCloseTo(pair.closingSpeedAB, 10);
+      expect(pair.closingSpeedBA).toBeCloseTo(-pair.closingSpeedAB, 10);
     }
   });
 
-  it('her ball pair için closingSpeedBA === closingSpeedAB', () => {
+  it('her ball pair için closingSpeedBA === -closingSpeedAB', () => {
     const snap = buildPhysicsSnapshot(makeWorldN(22), 0);
 
     for (const pair of snap.ballPairs.values()) {
-      expect(pair.closingSpeedBA).toBeCloseTo(pair.closingSpeedAB, 10);
+      expect(pair.closingSpeedBA).toBeCloseTo(-pair.closingSpeedAB, 10);
     }
   });
 
