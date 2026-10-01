@@ -33,14 +33,47 @@ describe('Live transition integration', () => {
       }
 
       let lastAttemptCount = 0;
+      let lastTransitionStartedAt = -1;
 
       const match = simulateMatchLive(home, away, data.players, {
         seed: 1000 + i,
         maxTicks: 1000,
         onTick: (state) => {
+          if (
+            state.transition.counterPressClubId !== null &&
+            state.transition.startedAt !== lastTransitionStartedAt
+          ) {
+            const runner = state.transition.counterPressPlayerId
+              ? state.players[state.transition.counterPressPlayerId]
+              : null;
+            const owner = state.ball.ownerId
+              ? state.players[state.ball.ownerId]
+              : null;
+            const activationDistance =
+              runner && owner
+                ? Math.hypot(
+                    runner.position.x - owner.position.x,
+                    runner.position.y - owner.position.y
+                  )
+                : -1;
+
+            console.log(
+              '  transition start=' +
+              state.transition.startedAt.toFixed(1) +
+              ' probability=' +
+              state.transition.counterPressProbability.toFixed(3) +
+              ' runner=' +
+              (runner?.player.id ?? 'none') +
+              ' activationDistance=' +
+              activationDistance.toFixed(2)
+            );
+
+            lastTransitionStartedAt = state.transition.startedAt;
+          }
+
           if (state.stats.counterPressAttempts > lastAttemptCount) {
             console.log(
-              `  counterPress attempt #${state.stats.counterPressAttempts}: probability=${state.transition.counterPressProbability.toFixed(3)} quality=${state.transition.counterPressProbability > 0 ? state.transition.breakQuality.toFixed(3) : '0.000'}`
+              `  counterPress attempt #${state.stats.counterPressAttempts}: probability=${state.transition.counterPressProbability.toFixed(3)} currentDistance=${state.transition.counterPressPlayerId && state.ball.ownerId ? Math.hypot(state.players[state.transition.counterPressPlayerId].position.x - state.players[state.ball.ownerId].position.x, state.players[state.transition.counterPressPlayerId].position.y - state.players[state.ball.ownerId].position.y).toFixed(2) : 'n/a'}`
             );
             lastAttemptCount = state.stats.counterPressAttempts;
           }
