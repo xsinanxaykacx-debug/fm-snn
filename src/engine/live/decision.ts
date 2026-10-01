@@ -97,8 +97,6 @@ import {
   HOLD_TACTICAL_FIT,
 
   MARK_MAX_DISTANCE,
-  MARK_OPENNESS_WEIGHT,
-  MARK_DISTANCE_WEIGHT,
   MARKING_OFFSET_DISTANCE,
   MARK_ASSIGNMENT_MAX_PER_OPPONENT,
   MARK_THREAT_DISTANCE_WEIGHT,
@@ -961,57 +959,6 @@ function findCrossTarget(
         id: teammate.id,
         position: teammate.position,
         distance: distanceToGoal,
-      };
-    }
-  }
-
-  if (best === null) return null;
-
-  return {
-    id: best.id,
-    position: best.position,
-  };
-}
-
-// ============================================================
-// MARK TARGET
-// ============================================================
-
-function findMarkTarget(
-  perception: Perception
-): { id: string; position: Vec2 } | null {
-  let best: {
-    id: string;
-    position: Vec2;
-    score: number;
-  } | null = null;
-
-  for (const opponent of perception.opponents) {
-    if (opponent.distance > MARK_MAX_DISTANCE) continue;
-
-    const opennessThreat = clamp01(
-      1 - opponent.openness / 100
-    );
-
-    const distanceScore = clamp01(
-      (MARK_MAX_DISTANCE - opponent.distance) /
-        MARK_MAX_DISTANCE
-    );
-
-    const score =
-      opennessThreat * MARK_OPENNESS_WEIGHT +
-      distanceScore * MARK_DISTANCE_WEIGHT;
-
-    if (
-      best === null ||
-      score > best.score ||
-      (score === best.score &&
-        opponent.id.localeCompare(best.id) < 0)
-    ) {
-      best = {
-        id: opponent.id,
-        position: opponent.position,
-        score,
       };
     }
   }
