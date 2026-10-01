@@ -147,6 +147,24 @@ describe('PhysicsSnapshot invariants', () => {
     }
   });
 
+  it('dizi sırası ID sırasından farklı olsa da pair yönü ID sırasına göre', () => {
+    const world = makeWorld([
+      makePlayer('Z', 0, 0, 5, 0),
+      makePlayer('A', 10, 0, -3, 0),
+    ]);
+    const snapshot = buildPhysicsSnapshot(world, 0);
+
+    const pair = snapshot.playerPairs.get(pairKey('A', 'Z'));
+    expect(pair).toBeDefined();
+
+    expect(pair!.closingSpeedAB).toBeCloseTo(8, 10);
+    expect(pair!.closingSpeedBA).toBeCloseTo(-8, 10);
+
+    expect(getClosingSpeed(snapshot, 'A', 'Z')).toBeCloseTo(8, 10);
+    expect(getClosingSpeed(snapshot, 'Z', 'A')).toBeCloseTo(-8, 10);
+  });
+
+
   it('her player pair için closingSpeedBA === -closingSpeedAB', () => {
     const snap = buildPhysicsSnapshot(makeWorldN(22), 0);
 

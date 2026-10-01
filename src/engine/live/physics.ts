@@ -198,8 +198,10 @@ export function buildPhysicsSnapshot(
   const playerPairs = new Map<string, PairPhysics>();
   for (let i = 0; i < players.length; i++) {
     for (let j = i + 1; j < players.length; j++) {
-      const a = players[i];
-      const b = players[j];
+      const p1 = players[i];
+      const p2 = players[j];
+      const a = p1.id < p2.id ? p1 : p2;
+      const b = p1.id < p2.id ? p2 : p1;
 
       playerPairs.set(
         pairKey(a.id, b.id),
