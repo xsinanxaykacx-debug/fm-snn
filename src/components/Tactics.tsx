@@ -5,11 +5,11 @@ import { useGameStore } from '../store/gameStore';
 import type {
   Formation,
   Player,
+  PitchZone,
   Position,
   SlotPosition,
 } from '../engine/types';
 import { getStartingXI, scorePlayer } from '../engine/data/generateData';
-import { getFormationZoneMapping } from '../engine/formation/zones';
 import { PlayerDetailModal } from './PlayerDetailModal';
 
 // ═══════════════════════════════════════════════
