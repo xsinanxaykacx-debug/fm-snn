@@ -1107,6 +1107,48 @@ function buildMarkAssignments(
     }
   }
 
+  // Karşılıklı markajı kır:
+  // A -> B ve B -> A oluşmuşsa daha yakın olan savunmacı markajı korur.
+  // Böylece iki oyuncu birbirine kilitlenmez.
+  for (const defenderId of Object.keys(assignments).sort()) {
+    const targetId = assignments[defenderId];
+    if (assignments[targetId] !== defenderId) continue;
+
+    const defender = allPlayers[defenderId];
+    const reciprocalDefender = allPlayers[targetId];
+    const target = allPlayers[targetId];
+    const reciprocalTarget = allPlayers[defenderId];
+
+    if (
+      !defender ||
+      !reciprocalDefender ||
+      !target ||
+      !reciprocalTarget
+    ) {
+      continue;
+    }
+
+    const ownDistance = computeDistance(
+      defender.position,
+      target.position
+    );
+
+    const reciprocalDistance = computeDistance(
+      reciprocalDefender.position,
+      reciprocalTarget.position
+    );
+
+    if (
+      ownDistance > reciprocalDistance ||
+      (
+        ownDistance === reciprocalDistance &&
+        defenderId > targetId
+      )
+    ) {
+      delete assignments[defenderId];
+    }
+  }
+
   return assignments;
 }
 
