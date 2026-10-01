@@ -1003,17 +1003,28 @@ function resolveGoalkeeperSave(
     )
   );
 
-  const saveChance = Math.max(
-    0.25,
+  // xG artık sadece istatistik değil, gerçek gol çözümlemesinin de
+  // girdisidir. Goal-mouth'a ulaşan her şut otomatik gol olamaz.
+  const goalChance = Math.max(
+    0.01,
     Math.min(
-      0.80,
-      0.65 + gkSkill * 0.15 - shotXG * 0.35
+      0.45,
+      shotXG *
+        (0.65 + gkSkill * 0.15)
     )
   );
 
-  if (!nextBool(state.rng, saveChance)) {
+  if (nextBool(state.rng, goalChance)) {
     return false;
   }
+
+  const saveChance = Math.max(
+    0.25,
+    Math.min(
+      0.85,
+      0.55 + gkSkill * 0.20
+    )
+  );
 
   const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
   state.stats.onTarget[side] += 1;
