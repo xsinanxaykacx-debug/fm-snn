@@ -1,3 +1,4 @@
+
 // src/engine/match/attackSequence.ts
 
 import type { Player, AttackSequence, AttackSequenceAction, ActionDebugInfo } from '../types';
@@ -65,16 +66,22 @@ export function createAttackSequence(
     spaceCreated: 0,
     description: `${currentPlayer.name} topu aldi`,
   });
+
   attackingTeam.dribbles++;
   attackingTeam.dribblesSuccess++;
 
   for (let i = 0; i < maxActions; i++) {
     const defender = pickDefender(defendXI, currentZone);
     const pressure = calculateDefenderPressure(defender, defendingTeam);
+
     totalPressure += pressure;
     actionCount++;
 
-    const actionType = chooseSequenceAction(currentPlayer, currentZone, attackingTeam);
+    const actionType = chooseSequenceAction(
+      currentPlayer,
+      currentZone,
+      attackingTeam
+    );
 
     const resolved = resolveSequenceAction(
       actionType,
@@ -106,20 +113,49 @@ export function createAttackSequence(
       });
     }
 
-    if (actionType === 'pass' || actionType === 'throughBall' || actionType === 'recycle') {
+    // ───────────────────────────────────────────
+    // AKSİYON İSTATİSTİKLERİ
+    // ───────────────────────────────────────────
+
+    if (
+      actionType === 'pass' ||
+      actionType === 'throughBall' ||
+      actionType === 'recycle'
+    ) {
       attackingTeam.passes++;
-      if (success) attackingTeam.passesCompleted++;
-    }
-    if (actionType === 'dribble' || actionType === 'carry') {
-      attackingTeam.dribbles++;
-      if (success) attackingTeam.dribblesSuccess++;
-    }
-    if (actionType === 'cross') {
-      attackingTeam.crosses++;
-      if (success) attackingTeam.crossesSuccess++;
+
+      if (success) {
+        attackingTeam.passesCompleted++;
+      }
     }
 
-    const space = success ? calculateSpaceCreated(pressure, attackingTeam) : 0;
+    if (
+      actionType === 'dribble' ||
+      actionType === 'carry'
+    ) {
+      attackingTeam.dribbles++;
+
+      if (success) {
+        attackingTeam.dribblesSuccess++;
+      }
+    }
+
+    if (actionType === 'cross') {
+      attackingTeam.crosses++;
+
+      if (success) {
+        attackingTeam.crossesSuccess++;
+      }
+    }
+
+    // ───────────────────────────────────────────
+    // ALAN
+    // ───────────────────────────────────────────
+
+    const space = success
+      ? calculateSpaceCreated(pressure, attackingTeam)
+      : 0;
+
     totalSpace += space;
 
     actions.push({
@@ -129,33 +165,61 @@ export function createAttackSequence(
       playerName: currentPlayer.name,
       playerPosition: currentPlayer.position,
       fromZone: currentZone,
-      toZone: success ? getNextZone(currentZone, actionType) : currentZone,
+      toZone: success
+        ? getNextZone(currentZone, actionType)
+        : currentZone,
       success,
       defensePressure: Math.round(pressure),
       spaceCreated: Math.round(space),
-      description: `${currentPlayer.name} ${getActionLabel(actionType)} (${Math.round(pressure)}% baski, ${Math.round(space)}% alan)`,
+      description:
+        `${currentPlayer.name} ${getActionLabel(actionType)} ` +
+        `(${Math.round(pressure)}% baski, ${Math.round(space)}% alan)`,
     });
 
+    // Başarısız aksiyon hücumu bitirir.
     if (!success) {
       break;
     }
 
     currentZone = getNextZone(currentZone, actionType);
 
-    let nextPlayer = pickPlayerForZone(attackXI, currentZone);
+    let nextPlayer = pickPlayerForZone(
+      attackXI,
+      currentZone
+    );
+
     let tries = 0;
-    while (nextPlayer && nextPlayer.id === currentPlayer.id && tries < 5) {
-      nextPlayer = pickPlayerForZone(attackXI, currentZone);
+
+    while (
+      nextPlayer &&
+      nextPlayer.id === currentPlayer.id &&
+      tries < 5
+    ) {
+      nextPlayer = pickPlayerForZone(
+        attackXI,
+        currentZone
+      );
+
       tries++;
     }
+
     if (nextPlayer) {
       currentPlayer = nextPlayer;
     }
   }
 
+  // İlk otomatik carry istatistiğe dahil,
+  // fakat pressure/space ortalamasına dahil edilmez.
   const denom = Math.max(1, actionCount - 1);
-  const finalPressure = Math.round(totalPressure / denom);
-  const avgSpace = Math.round(totalSpace / denom);
+
+  const finalPressure = Math.round(
+    totalPressure / denom
+  );
+
+  const avgSpace = Math.round(
+    totalSpace / denom
+  );
+
   const inAttackZone = currentZone.includes('Attack');
 
   const playerQuality =
@@ -165,7 +229,11 @@ export function createAttackSequence(
     eff(currentPlayer, 'composure') * 0.2;
 
   const chanceQuality = inAttackZone
-    ? Math.round(avgSpace * 0.4 + (100 - finalPressure) * 0.3 + playerQuality * 0.4)
+    ? Math.round(
+        avgSpace * 0.4 +
+        (100 - finalPressure) * 0.3 +
+        playerQuality * 0.4
+      )
     : 0;
 
   return {
@@ -185,40 +253,105 @@ export function createAttackSequence(
 }
 
 // ═══════════════════════════════════════════════
-// OYUNCU SEÇİMİ (export edildi — test için)
+// OYUNCU SEÇİMİ
 // ═══════════════════════════════════════════════
 
-export function pickPlayerForZone(xi: Player[], zone: string): Player | null {
+export function pickPlayerForZone(
+  xi: Player[],
+  zone: string
+): Player | null {
   let positions: string[];
 
   if (zone.includes('Defense')) {
-    positions = ['DC', 'DL', 'DR', 'DMC', 'WBL', 'WBR'];
+    positions = [
+      'DC',
+      'DL',
+      'DR',
+      'DMC',
+      'WBL',
+      'WBR',
+    ];
   } else if (zone.includes('Midfield')) {
-    if (zone === 'centerMidfield') positions = ['DMC', 'MC', 'AMC'];
-    else if (zone === 'leftMidfield') positions = ['DL', 'ML', 'AML', 'MC', 'WBL', 'KFL'];
-    else positions = ['DR', 'MR', 'AMR', 'MC', 'WBR', 'KFR'];
+    if (zone === 'centerMidfield') {
+      positions = [
+        'DMC',
+        'MC',
+        'AMC',
+      ];
+    } else if (zone === 'leftMidfield') {
+      positions = [
+        'DL',
+        'ML',
+        'AML',
+        'MC',
+        'WBL',
+        'KFL',
+      ];
+    } else {
+      positions = [
+        'DR',
+        'MR',
+        'AMR',
+        'MC',
+        'WBR',
+        'KFR',
+      ];
+    }
   } else if (zone === 'centerAttack') {
-    positions = ['AMC', 'ST', 'GF'];
+    positions = [
+      'AMC',
+      'ST',
+      'GF',
+    ];
   } else if (zone === 'leftAttack') {
-    positions = ['ML', 'AML', 'ST', 'AMC', 'KFL'];
+    positions = [
+      'ML',
+      'AML',
+      'ST',
+      'AMC',
+      'KFL',
+    ];
   } else {
-    positions = ['MR', 'AMR', 'ST', 'AMC', 'KFR'];
+    positions = [
+      'MR',
+      'AMR',
+      'ST',
+      'AMC',
+      'KFR',
+    ];
   }
 
-  const candidates = xi.filter(p => positions.includes(p.position));
+  const candidates = xi.filter(
+    p => positions.includes(p.position)
+  );
+
   if (candidates.length === 0) {
-    return xi.length > 0 ? xi[Math.floor(Math.random() * xi.length)] : null;
+    return xi.length > 0
+      ? xi[Math.floor(Math.random() * xi.length)]
+      : null;
   }
-  return candidates[Math.floor(Math.random() * candidates.length)];
+
+  return candidates[
+    Math.floor(Math.random() * candidates.length)
+  ];
 }
+
+// ═══════════════════════════════════════════════
+// AKSİYON SEÇİMİ
+// ═══════════════════════════════════════════════
 
 function chooseSequenceAction(
   player: Player,
   zone: string,
   team: TeamMatchState
 ): AttackSequenceAction['action'] {
-  const isWing = zone === 'leftAttack' || zone === 'rightAttack';
-  const isAttack = zone.includes('Attack');
+  const isWing =
+    zone === 'leftAttack' ||
+    zone === 'rightAttack';
+
+  const isAttack =
+    zone.includes('Attack');
+
   const directness = team.directness;
 
   const r = Math.random();
@@ -239,10 +372,17 @@ function chooseSequenceAction(
     return 'recycle';
   }
 
-  if (directness === 'direct' && r < 0.25) return 'throughBall';
+  if (
+    directness === 'direct' &&
+    r < 0.25
+  ) {
+    return 'throughBall';
+  }
+
   if (r < 0.55) return 'pass';
   if (r < 0.75) return 'dribble';
   if (r < 0.90) return 'run';
+
   return 'recycle';
 }
 
@@ -265,20 +405,69 @@ function resolveSequenceAction(
   attackTeam: TeamMatchState,
   defendTeam: TeamMatchState
 ): ResolvedAction {
-  const attackerPower = calculateAttackerPower(attacker, action);
-  const defenderPower = calculateDefenderPower(defender, defendTeam);
+  const attackerPower =
+    calculateAttackerPower(
+      attacker,
+      action
+    );
 
-  // 🔧 KALİBRASYON: Base probability 0.52 → 0.58
-  let probability = 0.58 + (attackerPower - defenderPower) / ACTION_SUCCESS_DIVISOR;
+  const defenderPower =
+    calculateDefenderPower(
+      defender,
+      defendTeam
+    );
 
-  if (zone.includes('Attack')) probability += 0.05;
-  if (zone.includes('Defense')) probability -= 0.10;
+  // ───────────────────────────────────────────
+  // AKSİYON BAZLI BAŞLANGIÇ OLASILIKLARI
+  //
+  // Pasların başarı oranını yükseltiyoruz.
+  // ACTION_SUCCESS_DIVISOR diğer aksiyonlarda
+  // aynen korunuyor.
+  // ───────────────────────────────────────────
 
-  if (attackTeam.tempo === 'fast') probability -= 0.03;
-  if (attackTeam.tempo === 'slow') probability += 0.03;
+  let baseProbability = 0.58;
 
-  const finalProb = Math.max(0.20, Math.min(0.90, probability));
-  const success = Math.random() < finalProb;
+  if (action === 'pass') {
+    baseProbability = 0.68;
+  } else if (action === 'throughBall') {
+    baseProbability = 0.64;
+  } else if (action === 'recycle') {
+    baseProbability = 0.75;
+  }
+
+  let probability =
+    baseProbability +
+    (attackerPower - defenderPower) /
+      ACTION_SUCCESS_DIVISOR;
+
+  // Hücum bölgesinde aksiyonlar biraz daha başarılı.
+  if (zone.includes('Attack')) {
+    probability += 0.05;
+  }
+
+  // Savunma bölgesinde baskı daha yüksek.
+  if (zone.includes('Defense')) {
+    probability -= 0.10;
+  }
+
+  // Tempo etkisi.
+  if (attackTeam.tempo === 'fast') {
+    probability -= 0.03;
+  }
+
+  if (attackTeam.tempo === 'slow') {
+    probability += 0.03;
+  }
+
+  // Genel güvenlik sınırı.
+  const finalProb =
+    Math.max(
+      0.20,
+      Math.min(0.90, probability)
+    );
+
+  const success =
+    Math.random() < finalProb;
 
   return {
     success,
@@ -288,82 +477,218 @@ function resolveSequenceAction(
   };
 }
 
-export function calculateAttackerPower(attacker: Player, action: string): number {
+// ═══════════════════════════════════════════════
+// OYUNCU AKSİYON GÜCÜ
+// ═══════════════════════════════════════════════
+
+export function calculateAttackerPower(
+  attacker: Player,
+  action: string
+): number {
   if (action === 'pass') {
-    return eff(attacker, 'passing') * 0.4 + eff(attacker, 'vision') * 0.3 + eff(attacker, 'decisions') * 0.3;
+    return (
+      eff(attacker, 'passing') * 0.4 +
+      eff(attacker, 'vision') * 0.3 +
+      eff(attacker, 'decisions') * 0.3
+    );
   }
+
   if (action === 'dribble') {
-    return eff(attacker, 'dribbling') * 0.4 + eff(attacker, 'agility') * 0.3 + eff(attacker, 'technique') * 0.3;
+    return (
+      eff(attacker, 'dribbling') * 0.4 +
+      eff(attacker, 'agility') * 0.3 +
+      eff(attacker, 'technique') * 0.3
+    );
   }
+
   if (action === 'cross') {
-    return eff(attacker, 'crossing') * 0.5 + eff(attacker, 'technique') * 0.3 + eff(attacker, 'vision') * 0.2;
+    return (
+      eff(attacker, 'crossing') * 0.5 +
+      eff(attacker, 'technique') * 0.3 +
+      eff(attacker, 'vision') * 0.2
+    );
   }
+
   if (action === 'throughBall') {
-    return eff(attacker, 'passing') * 0.4 + eff(attacker, 'vision') * 0.4 + eff(attacker, 'technique') * 0.2;
+    return (
+      eff(attacker, 'passing') * 0.4 +
+      eff(attacker, 'vision') * 0.4 +
+      eff(attacker, 'technique') * 0.2
+    );
   }
+
   if (action === 'run') {
-    return eff(attacker, 'offTheBall') * 0.4 + eff(attacker, 'pace') * 0.3 + eff(attacker, 'anticipation') * 0.3;
+    return (
+      eff(attacker, 'offTheBall') * 0.4 +
+      eff(attacker, 'pace') * 0.3 +
+      eff(attacker, 'anticipation') * 0.3
+    );
   }
+
   if (action === 'recycle') {
-    return eff(attacker, 'passing') * 0.5 + eff(attacker, 'composure') * 0.5;
+    return (
+      eff(attacker, 'passing') * 0.5 +
+      eff(attacker, 'composure') * 0.5
+    );
   }
+
   return 50;
 }
 
-export function calculateDefenderPower(defender: Player | null, team: TeamMatchState): number {
-  if (!defender) return 40;
+// ═══════════════════════════════════════════════
+// SAVUNMACI GÜCÜ
+// ═══════════════════════════════════════════════
 
-  const marking = eff(defender, 'marking');
-  const tackling = eff(defender, 'tackling');
-  const positioning = eff(defender, 'defensivePositioning');
-  const anticipation = eff(defender, 'anticipation');
+export function calculateDefenderPower(
+  defender: Player | null,
+  team: TeamMatchState
+): number {
+  if (!defender) {
+    return 40;
+  }
 
-  let power = marking * 0.3 + tackling * 0.3 + positioning * 0.2 + anticipation * 0.2;
+  const marking =
+    eff(defender, 'marking');
 
-  if (team.pressing === 'high') power += 5;
-  else if (team.pressing === 'low') power -= 5;
+  const tackling =
+    eff(defender, 'tackling');
+
+  const positioning =
+    eff(defender, 'defensivePositioning');
+
+  const anticipation =
+    eff(defender, 'anticipation');
+
+  let power =
+    marking * 0.3 +
+    tackling * 0.3 +
+    positioning * 0.2 +
+    anticipation * 0.2;
+
+  if (team.pressing === 'high') {
+    power += 5;
+  } else if (team.pressing === 'low') {
+    power -= 5;
+  }
 
   return power;
 }
 
-function calculateDefenderPressure(defender: Player | null, team: TeamMatchState): number {
-  if (!defender) return 30;
+// ═══════════════════════════════════════════════
+// SAVUNMA BASKISI
+// ═══════════════════════════════════════════════
 
-  const tackling = eff(defender, 'tackling');
-  const workRate = eff(defender, 'workRate');
-  const stamina = eff(defender, 'stamina');
+function calculateDefenderPressure(
+  defender: Player | null,
+  team: TeamMatchState
+): number {
+  if (!defender) {
+    return 30;
+  }
 
-  let pressure = (tackling + workRate + stamina) / 3;
-  if (team.pressing === 'high') pressure += 10;
-  if (team.pressing === 'low') pressure -= 10;
+  const tackling =
+    eff(defender, 'tackling');
 
-  return Math.max(10, Math.min(95, pressure));
+  const workRate =
+    eff(defender, 'workRate');
+
+  const stamina =
+    eff(defender, 'stamina');
+
+  let pressure =
+    (tackling + workRate + stamina) / 3;
+
+  if (team.pressing === 'high') {
+    pressure += 10;
+  }
+
+  if (team.pressing === 'low') {
+    pressure -= 10;
+  }
+
+  return Math.max(
+    10,
+    Math.min(95, pressure)
+  );
 }
 
-function calculateSpaceCreated(pressure: number, team: TeamMatchState): number {
-  const baseSpace = 100 - pressure;
-  const mentalityBonus = team.mentality === 'attacking' ? 10 : 0;
-  return Math.max(0, Math.min(100, baseSpace + mentalityBonus));
+// ═══════════════════════════════════════════════
+// ALAN OLUŞUMU
+// ═══════════════════════════════════════════════
+
+function calculateSpaceCreated(
+  pressure: number,
+  team: TeamMatchState
+): number {
+  const baseSpace =
+    100 - pressure;
+
+  const mentalityBonus =
+    team.mentality === 'attacking'
+      ? 10
+      : 0;
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      baseSpace + mentalityBonus
+    )
+  );
 }
 
-function getNextZone(currentZone: string, action: string): string {
+// ═══════════════════════════════════════════════
+// BİR SONRAKİ BÖLGE
+// ═══════════════════════════════════════════════
+
+function getNextZone(
+  currentZone: string,
+  action: string
+): string {
   if (currentZone === 'centerMidfield') {
-    if (action === 'throughBall') return 'centerAttack';
-    if (action === 'pass') return 'centerAttack';
+    if (action === 'throughBall') {
+      return 'centerAttack';
+    }
+
+    if (action === 'pass') {
+      return 'centerAttack';
+    }
+
     return 'centerMidfield';
   }
+
   if (currentZone === 'leftMidfield') {
-    if (action === 'pass' || action === 'run') return 'leftAttack';
+    if (
+      action === 'pass' ||
+      action === 'run'
+    ) {
+      return 'leftAttack';
+    }
+
     return 'leftMidfield';
   }
+
   if (currentZone === 'rightMidfield') {
-    if (action === 'pass' || action === 'run') return 'rightAttack';
+    if (
+      action === 'pass' ||
+      action === 'run'
+    ) {
+      return 'rightAttack';
+    }
+
     return 'rightMidfield';
   }
+
   return currentZone;
 }
 
-function getActionLabel(action: string): string {
+// ═══════════════════════════════════════════════
+// AKSİYON İSİMLERİ
+// ═══════════════════════════════════════════════
+
+function getActionLabel(
+  action: string
+): string {
   const labels: Record<string, string> = {
     pass: 'pas yapti',
     dribble: 'calim atti',
@@ -374,8 +699,13 @@ function getActionLabel(action: string): string {
     carry: 'topu tasidi',
     shot: 'sut cekti',
   };
+
   return labels[action] || action;
 }
+
+// ═══════════════════════════════════════════════
+// BOŞ SEQUENCE
+// ═══════════════════════════════════════════════
 
 function emptySequence(
   attackingTeam: TeamMatchState,
@@ -383,17 +713,27 @@ function emptySequence(
   zone: string
 ): AttackSequence {
   return {
-    attackingClubId: attackingTeam.club.id,
-    defendingClubId: defendingTeam.club.id,
+    attackingClubId:
+      attackingTeam.club.id,
+
+    defendingClubId:
+      defendingTeam.club.id,
+
     startedZone: zone,
     finalZone: zone,
+
     actions: [],
+
     totalActions: 0,
+
     finalPressure: 0,
     spaceCreated: 0,
     chanceQuality: 0,
+
     resultedInShot: false,
     resultedInGoal: false,
+
     xG: 0,
   };
 }
+
