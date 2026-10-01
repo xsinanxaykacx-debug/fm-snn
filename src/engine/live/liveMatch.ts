@@ -1119,8 +1119,8 @@ function resolveCounterPressContest(
     console.log(
       '[CP-CHECK] tick=' + state.tick +
       ' reason=ATTEMPT' +
-      ' runner=' + pressingPlayer.id +
-      ' owner=' + owner.id +
+      ' runner=' + pressingPlayer.player.id +
+      ' owner=' + owner.player.id +
       ' distance=' + distance.toFixed(3),
     );
   }
