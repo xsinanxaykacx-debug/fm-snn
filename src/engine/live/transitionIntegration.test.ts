@@ -26,7 +26,7 @@ describe('Live transition integration', () => {
         player.redCard = false;
       }
 
-      simulateMatchLive(home, away, data.players, {
+      const match = simulateMatchLive(home, away, data.players, {
         seed: 1000 + i,
         maxTicks: 1000,
         onTick: (state) => {
@@ -45,7 +45,15 @@ describe('Live transition integration', () => {
           );
         },
       });
+
+      console.log(
+        `seed=${1000 + i} transitionTicks=${transitionTicks} attempts=${match.stats.counterPressAttempts} recoveries=${match.stats.counterPressRecoveries}`
+      );
     }
+
+    console.log(
+      `TOTAL transitionTicks=${transitionTicks} attempts=${counterPressAttempts} recoveries=${counterPressRecoveries}`
+    );
 
     expect(transitionTicks).toBeGreaterThan(0);
     expect(counterPressAttempts).toBeGreaterThan(0);
