@@ -149,7 +149,7 @@ export function LiveMatchScreen() {
                   background: p.isHome ? '#2563eb' : '#dc2626',
                   transition: 'left 80ms linear, top 80ms linear',
                 }}
-                title={`{state.players[p.id]?.name ?? p.id} • {p.intent}`}
+                title={`${state.players[p.id]?.name ?? p.id} • ${p.intent}`}
               >
                 {state.players[p.id]?.id ? p.id.slice(-2) : ''}
               </div>
@@ -177,7 +177,7 @@ export function LiveMatchScreen() {
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Skor</div><div className="text-white text-lg font-bold">{displayScore}</div></div>
-            <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Top sahibi</div><div className="text-white text-lg font-bold">${frame?.ball.ownerId ? frame.ball.ownerId.slice(-2) : '—'}</div></div>
+            <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Top sahibi</div><div className="text-white text-lg font-bold">{frame?.ball.ownerId ? frame.ball.ownerId.slice(-2) : '—'}</div></div>
           </div>
           <div className="text-xs text-slate-500">Oyuncu noktaları gerçek motor koordinatlarından çiziliyor: 104 × 64 m.</div>
           {error && <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-300 text-sm">{error}</div>}
