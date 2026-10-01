@@ -1071,6 +1071,7 @@ function resolveCounterPressContest(
     return false;
   }
 
+  state.stats.counterPressRollsPassed += 1;
   transition.isRecoveryContestActive = true;
 
   const relativeSpeed = Math.hypot(
@@ -1088,6 +1089,7 @@ function resolveCounterPressContest(
   });
 
   if (outcome.type === 'won') {
+    state.stats.counterPressTackleWins += 1;
     applyTackleWon(outcome, state);
 
     if (
@@ -1096,6 +1098,7 @@ function resolveCounterPressContest(
         transition.counterPressClubId
     ) {
       state.stats.counterPressRecoveries += 1;
+      state.stats.counterPressCleanRecoveries += 1;
     } else if (state.ball.ownerId === null) {
       resolveLooseBallControl(state);
 
@@ -1105,10 +1108,14 @@ function resolveCounterPressContest(
           transition.counterPressClubId
       ) {
         state.stats.counterPressRecoveries += 1;
+        state.stats.counterPressLooseBallRecoveries += 1;
       }
     }
   } else if (outcome.type === 'foul') {
+    state.stats.counterPressTackleFouls += 1;
     applyTackleFoul(outcome, state, players);
+  } else {
+    state.stats.counterPressTackleFailures += 1;
   }
 
   transition.isRecoveryContestActive = false;
@@ -1909,6 +1916,12 @@ function createEmptyStats(): LiveMatchStats {
     recoveries: { home: 0, away: 0 },
     counterPressAttempts: 0,
     counterPressRecoveries: 0,
+    counterPressRollsPassed: 0,
+    counterPressTackleWins: 0,
+    counterPressTackleFailures: 0,
+    counterPressTackleFouls: 0,
+    counterPressCleanRecoveries: 0,
+    counterPressLooseBallRecoveries: 0,
     fouls: { home: 0, away: 0 },
     yellowCards: { home: 0, away: 0 },
     redCards: { home: 0, away: 0 },
