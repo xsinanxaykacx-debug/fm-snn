@@ -362,6 +362,12 @@ function generateBallCarrierCandidates(
     const score =
       successProbability * PASS_SCORE.successWeight +
       tacticalFit * PASS_SCORE.tacticalWeight * breakBoost +
+      (isThroughBall
+        ? (_state.transition.breakClubId === self.clubId &&
+            _state.time < _state.transition.expiresAt
+            ? _state.transition.breakQuality * 0.25
+            : 0)
+        : 0) +
       spaceValue * PASS_SCORE.spaceWeight -
       risk * PASS_SCORE.riskWeight;
 
@@ -694,7 +700,13 @@ function decidePriorityIntent(
       ballPosition
     );
 
-    if (distanceToBall <= COUNTER_PRESS_MAX_DISTANCE) {
+    const counterPressReach =
+      Math.min(
+        COUNTER_PRESS_MAX_DISTANCE,
+        8 + state.transition.counterPressProbability * 25
+      );
+
+    if (distanceToBall <= counterPressReach) {
       return {
         intent: 'move',
         reason: 'chase',
