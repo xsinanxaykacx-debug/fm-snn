@@ -1205,6 +1205,11 @@ export interface LiveMatchStats extends MatchStats {
   counterPressTackleFouls: number;
   counterPressCleanRecoveries: number;
   counterPressLooseBallRecoveries: number;
+  counterPressTackleWinChanceSum: number;
+  counterPressTackleWinChanceMin: number;
+  counterPressTackleWinChanceMax: number;
+  counterPressTackleRelativeSpeedSum: number;
+  counterPressTackleDistanceSum: number;
 
   fouls: {
     home: number;
