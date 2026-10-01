@@ -3,7 +3,6 @@
 import { useGameStore } from '../store/gameStore';
 import { sortedTable } from '../engine/league/table';
 import { TeamBadge } from './TeamBadge';
-import { getTeamColor } from '../utils/teamColors';
 
 function getFormForClub(clubId: string, fixtures: any[]): ('W' | 'D' | 'L')[] {
   const played = fixtures
