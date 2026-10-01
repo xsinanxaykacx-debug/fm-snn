@@ -32,10 +32,19 @@ describe('Live transition integration', () => {
         player.redCard = false;
       }
 
+      let lastAttemptCount = 0;
+
       const match = simulateMatchLive(home, away, data.players, {
         seed: 1000 + i,
         maxTicks: 1000,
         onTick: (state) => {
+          if (state.stats.counterPressAttempts > lastAttemptCount) {
+            console.log(
+              `  counterPress attempt #${state.stats.counterPressAttempts}: probability=${state.transition.counterPressProbability.toFixed(3)} quality=${state.transition.counterPressProbability > 0 ? state.transition.breakQuality.toFixed(3) : '0.000'}`
+            );
+            lastAttemptCount = state.stats.counterPressAttempts;
+          }
+
           if (state.transition.counterPressClubId !== null) {
             transitionTicks++;
           }
