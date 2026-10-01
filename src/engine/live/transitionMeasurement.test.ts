@@ -20,6 +20,12 @@ describe('Live transition measurement', () => {
     let counterPressCleanRecoveries = 0;
     let counterPressLooseBallRecoveries = 0;
     let counterPressRecoveries = 0;
+    let tackleWinChanceSum = 0;
+    let tackleWinChanceMin = 1;
+    let tackleWinChanceMax = 0;
+    let tackleRelativeSpeedSum = 0;
+    let tackleDistanceSum = 0;
+    let tackleDiagnosticSamples = 0;
 
     for (let i = 0; i < 100; i++) {
       const home = clubs[i % clubs.length];
@@ -62,6 +68,12 @@ describe('Live transition measurement', () => {
       counterPressCleanRecoveries += match.stats.counterPressCleanRecoveries;
       counterPressLooseBallRecoveries += match.stats.counterPressLooseBallRecoveries;
       counterPressRecoveries += match.stats.counterPressRecoveries;
+      tackleWinChanceSum += match.stats.counterPressTackleWinChanceSum;
+      tackleWinChanceMin = Math.min(tackleWinChanceMin, match.stats.counterPressTackleWinChanceMin);
+      tackleWinChanceMax = Math.max(tackleWinChanceMax, match.stats.counterPressTackleWinChanceMax);
+      tackleRelativeSpeedSum += match.stats.counterPressTackleRelativeSpeedSum;
+      tackleDistanceSum += match.stats.counterPressTackleDistanceSum;
+      tackleDiagnosticSamples += match.stats.counterPressRollsPassed;
     }
 
     const avgProbability =
@@ -84,6 +96,21 @@ describe('Live transition measurement', () => {
         ? counterPressRecoveries / counterPressAttempts
         : 0;
 
+    const avgTackleWinChance =
+      tackleDiagnosticSamples > 0
+        ? tackleWinChanceSum / tackleDiagnosticSamples
+        : 0;
+
+    const avgTackleRelativeSpeed =
+      tackleDiagnosticSamples > 0
+        ? tackleRelativeSpeedSum / tackleDiagnosticSamples
+        : 0;
+
+    const avgTackleDistance =
+      tackleDiagnosticSamples > 0
+        ? tackleDistanceSum / tackleDiagnosticSamples
+        : 0;
+
     console.log('');
     console.log('=== LIVE TRANSITION MEASUREMENT ===');
     console.log('matches=' + matches);
@@ -100,6 +127,12 @@ describe('Live transition measurement', () => {
     console.log('rollPassRate=' + (rollPassRate * 100).toFixed(2) + '%');
     console.log('tackleWinRateAfterRoll=' + (tackleWinRate * 100).toFixed(2) + '%');
     console.log('recoveryRatePerAttempt=' + (recoveryRate * 100).toFixed(2) + '%');
+    console.log('tackleDiagnosticSamples=' + tackleDiagnosticSamples);
+    console.log('avgTackleWinChance=' + (avgTackleWinChance * 100).toFixed(2) + '%');
+    console.log('minTackleWinChance=' + (tackleWinChanceMin * 100).toFixed(2) + '%');
+    console.log('maxTackleWinChance=' + (tackleWinChanceMax * 100).toFixed(2) + '%');
+    console.log('avgTackleRelativeSpeed=' + avgTackleRelativeSpeed.toFixed(3));
+    console.log('avgTackleDistance=' + avgTackleDistance.toFixed(3));
 
     expect(matches).toBe(100);
     expect(transitionStarts).toBeGreaterThan(0);
