@@ -99,7 +99,7 @@ function findWeakestPosition(
   const groups: Record<string, { positions: Position[]; players: Player[] }> = {
     'GK': { positions: ['GK'], players: squad.filter(p => p.position === 'GK') },
     'DEF': { positions: ['DC', 'DL', 'DR'], players: squad.filter(p => ['DC', 'DL', 'DR'].includes(p.position)) },
-    'MID': { positions: ['DM', 'MC', 'ML', 'MR'], players: squad.filter(p => ['DM', 'MC', 'ML', 'MR'].includes(p.position)) },
+    'MID': { positions: ['DMC', 'MC', 'ML', 'MR'], players: squad.filter(p => ['DMC', 'MC', 'ML', 'MR'].includes(p.position)) },
     'ATT': { positions: ['AMC', 'AML', 'AMR', 'ST'], players: squad.filter(p => ['AMC', 'AML', 'AMR', 'ST'].includes(p.position)) },
   };
 
@@ -165,11 +165,11 @@ function findTransferTarget(
     // Tam mevki bulunamazsa, benzer mevkilerden ara
     const relatedPositions: Record<Position, Position[]> = {
       'GK': ['GK'],
-      'DC': ['DC', 'DM'],
+      'DC': ['DC', 'DMC'],
       'DL': ['DL', 'ML'],
       'DR': ['DR', 'MR'],
-      'DM': ['DM', 'MC'],
-      'MC': ['MC', 'DM', 'AMC'],
+      'DMC': ['DMC', 'MC'],
+      'MC': ['MC', 'DMC', 'AMC'],
       'ML': ['ML', 'AML'],
       'MR': ['MR', 'AMR'],
       'AMC': ['AMC', 'MC', 'ST'],
