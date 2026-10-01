@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildPhysicsSnapshot,
   computePairPhysics,
+  getClosingSpeed,
   pairKey,
 } from './physics';
 import type { LiveMatchState } from '../types';
@@ -47,6 +48,63 @@ function makeWorldN(n: number) {
 
   return makeWorld(players);
 }
+
+// ─────────────────────────────────────────────────────────────
+// getClosingSpeed
+// ─────────────────────────────────────────────────────────────
+
+describe('getClosingSpeed', () => {
+  const world = makeWorld([
+    makePlayer('P1', 0, 0, 5, 0),
+    makePlayer('P2', 10, 0, -3, 0),
+    makePlayer('P3', 5, 5, 0, 5),
+  ]);
+  const snapshot = buildPhysicsSnapshot(world, 0);
+
+  it('A → B yönünde pozitif kapanma döner', () => {
+    expect(getClosingSpeed(snapshot, 'P1', 'P2')).toBeCloseTo(8, 10);
+  });
+
+  it('B → A yönünde negatif kapanma döner', () => {
+    expect(getClosingSpeed(snapshot, 'P2', 'P1')).toBeCloseTo(-8, 10);
+  });
+
+  it('invariant: getClosingSpeed(s, A, B) === -getClosingSpeed(s, B, A)', () => {
+    const ids = ['P1', 'P2', 'P3'];
+
+    for (const a of ids) {
+      for (const b of ids) {
+        if (a === b) continue;
+
+        const ab = getClosingSpeed(snapshot, a, b);
+        const ba = getClosingSpeed(snapshot, b, a);
+
+        expect(ab).not.toBeUndefined();
+        expect(ba).not.toBeUndefined();
+        expect(ab!).toBeCloseTo(-ba!, 10);
+      }
+    }
+  });
+
+  it('pair yoksa undefined döner', () => {
+    expect(getClosingSpeed(snapshot, 'P1', 'P99')).toBeUndefined();
+    expect(getClosingSpeed(snapshot, 'P99', 'P1')).toBeUndefined();
+    expect(getClosingSpeed(snapshot, 'P99', 'P98')).toBeUndefined();
+  });
+
+  it('aynı ID için undefined döner', () => {
+    expect(getClosingSpeed(snapshot, 'P1', 'P1')).toBeUndefined();
+  });
+
+  it('ID sırasından bağımsız olarak doğru yön döner', () => {
+    const p1ToP3 = getClosingSpeed(snapshot, 'P1', 'P3');
+    const p3ToP1 = getClosingSpeed(snapshot, 'P3', 'P1');
+
+    expect(p1ToP3).not.toBeUndefined();
+    expect(p3ToP1).not.toBeUndefined();
+    expect(p1ToP3!).toBeCloseTo(-p3ToP1!, 10);
+  });
+});
 
 // ─────────────────────────────────────────────────────────────
 // Pair key

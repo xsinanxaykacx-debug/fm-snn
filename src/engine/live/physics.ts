@@ -112,6 +112,34 @@ export function computePairPhysics(
 }
 
 // ─────────────────────────────────────────────────────────────
+// Snapshot read API
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Snapshot içindeki player pair'den, fromId → toId yönündeki
+ * kapanma hızını okur.
+ *
+ * Yön semantiği korunur: getClosingSpeed(s, A, B)
+ * === -getClosingSpeed(s, B, A).
+ * Pair mevcut değilse undefined döner; 0 ile karıştırılmaz.
+ */
+export function getClosingSpeed(
+  snapshot: PhysicsSnapshot,
+  fromId: string,
+  toId: string,
+): number | undefined {
+  const pair = snapshot.playerPairs.get(pairKey(fromId, toId));
+
+  if (!pair) {
+    return undefined;
+  }
+
+  return fromId < toId
+    ? pair.closingSpeedAB
+    : pair.closingSpeedBA;
+}
+
+// ─────────────────────────────────────────────────────────────
 // World → physics projection
 // ─────────────────────────────────────────────────────────────
 
