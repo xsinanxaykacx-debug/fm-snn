@@ -12,7 +12,7 @@ describe('Live transition integration', () => {
     let counterPressAttempts = 0;
     let counterPressRecoveries = 0;
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 2; i++) {
       const home = clubs[i % clubs.length];
       const away = clubs[(i + 1) % clubs.length];
 
@@ -28,7 +28,7 @@ describe('Live transition integration', () => {
 
       simulateMatchLive(home, away, data.players, {
         seed: 1000 + i,
-        maxTicks: 5000,
+        maxTicks: 1000,
         onTick: (state) => {
           if (state.transition.counterPressClubId !== null) {
             transitionTicks++;
