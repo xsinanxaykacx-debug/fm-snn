@@ -196,6 +196,52 @@ These are intentionally deferred:
 - spatial indexing/active-window optimization: add only after profiling demonstrates a need
 - additional pressure, space and control metrics: add when their consuming layer is implemented
 
+## Dirty Tackle Loose-Ball Contract
+
+When a tackle is won but `newOwnerId === null`, the ball becomes a loose ball.
+
+The loose-ball knock is resolved in `applyTackleWon()`.
+
+### Knock speed
+
+```ts
+knockSpeed = clamp(
+  relativeSpeed * TACKLE_KNOCK_TRANSFER,
+  TACKLE_KNOCK_MIN,
+  TACKLE_KNOCK_MAX
+);
+```
+
+V1 calibration:
+
+- `TACKLE_KNOCK_TRANSFER = 0.8`
+- `TACKLE_KNOCK_MIN = 2.0`
+- `TACKLE_KNOCK_MAX = 5.0`
+
+`relativeSpeed` is recomputed from the current tackler/carrier velocities.
+`TackleOutcome.debug.relativeSpeed` is not used as production input.
+
+### Knock direction
+
+- Use the tackler's horizontal velocity direction when its magnitude is above `PLAYER_VELOCITY_EPSILON`.
+- Otherwise use the normalized direction from tackler to carrier.
+- If both players occupy the same position, use the deterministic `(1, 0)` fallback.
+
+### Ownership
+
+Dirty tackle:
+
+- `ball.ownerId = null`
+- `ball.lastTouchId = tacklerId`
+- `ball.lastTouchClubId = tackler.clubId`
+- `ball.isMoving = true` when a valid carrier exists
+
+`resolveLooseBallControl()` and `stepBall()` are not modified by this contract.
+
+### Timing invariant
+
+`applyTackleWon()` executes in the same tick after `resolveAllTackles()` and before `stepBall()`. No player velocity mutation occurs between these stages. Therefore recomputing relative speed in `applyTackleWon()` produces the same V1 value used by tackle resolution.
+
 ## Design Principles
 
 - Do not replace physical calculations with arbitrary probability tuning.

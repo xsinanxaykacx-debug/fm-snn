@@ -76,6 +76,10 @@ import {
   FATIGUE_FITNESS_FACTOR,
   FATIGUE_MIN_CONDITION,
   FATIGUE_HALFTIME_RECOVERY,
+  PLAYER_VELOCITY_EPSILON,
+  TACKLE_KNOCK_TRANSFER,
+  TACKLE_KNOCK_MIN,
+  TACKLE_KNOCK_MAX,
 } from './config';
 
 import {
@@ -873,7 +877,11 @@ function applyTackleOutcomes(
   return false;
 }
 
-function applyTackleWon(
+/**
+ * @internal
+ * Test edilebilirlik için export edilmiştir.
+ */
+export function applyTackleWon(
   outcome: TackleOutcome & { type: 'won' },
   state: LiveMatchState
 ): void {
@@ -890,11 +898,63 @@ function applyTackleWon(
     state.ball.position.x = outcome.point.x;
     state.ball.position.y = outcome.point.y;
     state.ball.position.z = DEFAULT_BALL_PHYSICS.radius;
-    state.ball.velocity = { x: 0, y: 0, z: 0 };
     state.ball.ownerId = null;
-    state.ball.isMoving = false;
     state.ball.lastTouchId = outcome.tacklerId;
     state.ball.lastTouchClubId = tackler.clubId;
+
+    // ── Loose ball knock (Model A) ──
+    // relativeSpeed'i mevcut oyuncu velocity'lerinden yeniden hesapla.
+    // Aynı tick içinde applyTackleWon çağrıldığı için
+    // resolveAllTackles sırasındaki değerle aynıdır.
+    const carrier = state.players[outcome.ballCarrierId];
+
+    if (carrier) {
+      const relVx = tackler.velocity.x - carrier.velocity.x;
+      const relVy = tackler.velocity.y - carrier.velocity.y;
+      const relativeSpeed = Math.hypot(relVx, relVy);
+
+      const knockSpeed = Math.max(
+        TACKLE_KNOCK_MIN,
+        Math.min(
+          TACKLE_KNOCK_MAX,
+          relativeSpeed * TACKLE_KNOCK_TRANSFER
+        )
+      );
+
+      // Yön: tackler velocity (varsa), fallback tackler → carrier.
+      let dirX = tackler.velocity.x;
+      let dirY = tackler.velocity.y;
+      const tacklerSpeed = Math.hypot(dirX, dirY);
+
+      if (tacklerSpeed < PLAYER_VELOCITY_EPSILON) {
+        const dx = carrier.position.x - tackler.position.x;
+        const dy = carrier.position.y - tackler.position.y;
+        const length = Math.hypot(dx, dy);
+
+        if (length > PLAYER_VELOCITY_EPSILON) {
+          dirX = dx / length;
+          dirY = dy / length;
+        } else {
+          // Tam çakışma: yön geometrik olarak tanımsız.
+          dirX = 1;
+          dirY = 0;
+        }
+      } else {
+        dirX /= tacklerSpeed;
+        dirY /= tacklerSpeed;
+      }
+
+      state.ball.velocity = {
+        x: dirX * knockSpeed,
+        y: dirY * knockSpeed,
+        z: 0,
+      };
+      state.ball.isMoving = true;
+    } else {
+      // Carrier bulunamadı: güvenli fallback.
+      state.ball.velocity = { x: 0, y: 0, z: 0 };
+      state.ball.isMoving = false;
+    }
   }
 
   syncBallOwnerFlags(state);

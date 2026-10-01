@@ -286,6 +286,14 @@ export const TACKLE_DEFENSE_RELATIVE_SPEED_WEIGHT = 0.5;
 
 export const TACKLE_RELATIVE_SPEED_SCALE = 10;
 
+// ── Tackle loose-ball knock (dirty tackle) ──
+// Dirty tackle sonrası topa verilen başlangıç hızı için kalibrasyon.
+// relativeSpeed, tackle anındaki tackler/carrier göreli hızıdır.
+// V1: knockSpeed = clamp(relativeSpeed * TRANSFER, MIN, MAX)
+export const TACKLE_KNOCK_TRANSFER = 0.8;
+export const TACKLE_KNOCK_MIN = 2.0;
+export const TACKLE_KNOCK_MAX = 5.0;
+
 // ─── Clean chance ───
 export const TACKLE_CLEAN_MIN = 0.5;
 export const TACKLE_CLEAN_MAX = 0.95;
