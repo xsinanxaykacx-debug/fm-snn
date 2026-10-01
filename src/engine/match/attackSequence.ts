@@ -341,7 +341,7 @@ export function pickPlayerForZone(
 // ═══════════════════════════════════════════════
 
 function chooseSequenceAction(
-  player: Player,
+  _player: Player,
   zone: string,
   team: TeamMatchState
 ): AttackSequenceAction['action'] {
