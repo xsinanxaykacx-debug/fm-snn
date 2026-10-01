@@ -351,7 +351,14 @@ export function moveAllPlayers(
   // ─── 1. Her oyuncuyu hareket ettir ───
   for (const id of Object.keys(players).sort()) {
     const player = players[id];
-    const decision = decisions[id];
+
+    // Karar kaydı herhangi bir nedenle bu tick'te gelmezse
+    // oyuncunun son geçerli kararını fiziksel olarak sürdür.
+    // Aksi halde velocity dolu kalıp position entegrasyonu atlanabilir.
+    const decision =
+      decisions[id] ??
+      player.currentDecision;
+
     if (!decision) continue;
 
     movePlayer(player, decision, context, physics, tickDuration);
