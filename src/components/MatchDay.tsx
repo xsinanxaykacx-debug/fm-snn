@@ -87,7 +87,6 @@ function StatRow({ label, homeValue, awayValue, homeColor, awayColor, suffix = '
 export function MatchDay() {
   const state = useGameStore();
   const playWeek = useGameStore(s => s.playWeek);
-  const advanceSeason = useGameStore(s => s.advanceSeason);
   const userClub = state.clubs[state.userClubId];
 
   const thisWeek = state.fixtures.filter(m => m.week === state.currentWeek);
