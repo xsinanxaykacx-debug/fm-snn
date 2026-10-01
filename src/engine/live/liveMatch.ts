@@ -68,6 +68,7 @@ import {
   HALF_DURATION_SECONDS,
   ADDED_TIME_SECONDS,
   DEFAULT_LIVE_ENGINE_CONFIG,
+  BALL_CONTROL_MAX_SPEED,
 } from './config';
 
 import {
@@ -764,9 +765,14 @@ function syncBallOwnerFlags(state: LiveMatchState): void {
 function resolveLooseBallControl(state: LiveMatchState): void {
   if (state.ball.ownerId !== null) return;
 
-  // Hızlı hareket eden topu otomatik olarak ayağa yapıştırmayız.
-  // Önce topun fiziksel olarak durması/yavaşlaması gerekir.
-  if (state.ball.isMoving) return;
+  // Topun "hareket ediyor" bayrağı ile "oyuncunun kontrol edebileceği hız"
+  // aynı şey değildir. Yavaşlayan bir top hâlâ isMoving olabilir.
+  const ballSpeed = Math.hypot(
+    state.ball.velocity.x,
+    state.ball.velocity.y
+  );
+
+  if (ballSpeed > BALL_CONTROL_MAX_SPEED) return;
 
   const controlRadius =
     DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.ballControlRadius;
