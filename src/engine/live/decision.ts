@@ -682,6 +682,7 @@ function decidePriorityIntent(
     ballCarrier.clubId === self.clubId
   ) {
     const supportPosition = computeSupportPosition(
+      self,
       ballCarrier,
       attackingDirection
     );
@@ -808,15 +809,31 @@ function makeReturnDecision(
 // ============================================================
 
 function computeSupportPosition(
+  self: LivePlayer,
   ballCarrier: LivePlayer,
   attackingDirection: 1 | -1
 ): Vec2 {
-  const offset =
-    attackingDirection * SUPPORT_FORWARD_OFFSET;
+  // Destek oyuncusu topa yapışmaz.
+  // Kendi formasyon referansını korur; topa sınırlı ölçüde yaklaşır.
+  const homeX = self.homePosition.x;
+  const homeY = self.homePosition.y;
+
+  const ballPull = 0.30;
+  const carrierOffset =
+    attackingDirection * Math.min(SUPPORT_FORWARD_OFFSET, 10);
+
+  const targetX =
+    homeX +
+    (ballCarrier.position.x - homeX) * ballPull +
+    carrierOffset;
+
+  const targetY =
+    homeY +
+    (ballCarrier.position.y - homeY) * 0.20;
 
   return {
-    x: ballCarrier.position.x + offset,
-    y: ballCarrier.position.y,
+    x: Math.max(2, Math.min(102, targetX)),
+    y: Math.max(2, Math.min(62, targetY)),
   };
 }
 
