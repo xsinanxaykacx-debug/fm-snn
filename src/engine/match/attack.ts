@@ -72,7 +72,7 @@ export function pickShooter(attackXI: Player[], zone: string): Player | null {
 // GOLCÜ SEÇİMİ
 // ═══════════════════════════════════════════════
 
-export function pickScorer(attackXI: Player[], zone: string, shooter: Player): Player {
+export function pickScorer(attackXI: Player[], _zone: string, shooter: Player): Player {
   // Şutör zaten en olası golcü
   if (Math.random() < 0.6) return shooter;
 
