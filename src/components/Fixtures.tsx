@@ -153,11 +153,6 @@ interface WeekBlockProps {
 }
 
 function WeekBlock({ week, matches, isActive, isPast, onPlay }: WeekBlockProps) {
-  const state = useGameStore();
-  const userMatch = matches.find(
-    m => m.homeId === state.userClubId || m.awayId === state.userClubId
-  );
-
   const allPlayed = matches.every(m => m.played);
   return (
     <div
