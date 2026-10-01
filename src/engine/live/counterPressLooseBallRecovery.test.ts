@@ -95,6 +95,8 @@ describe('Counter-press loose-ball recovery lifecycle', () => {
       breakQuality: 1,
       hasAttemptedCounterPress: false,
       isRecoveryContestActive: false,
+      pendingLooseBallRecoveryClubId: runner!.clubId,
+      pendingLooseBallRecoveryPlayerId: runner!.player.id,
     };
 
     const recoveriesBefore = state.stats.counterPressLooseBallRecoveries;
@@ -114,5 +116,8 @@ describe('Counter-press loose-ball recovery lifecycle', () => {
     expect(state.stats.counterPressRecoveries).toBeGreaterThanOrEqual(
       recoveriesBefore + 1
     );
+
+    expect(state.transition.pendingLooseBallRecoveryClubId).toBeNull();
+    expect(state.transition.pendingLooseBallRecoveryPlayerId).toBeNull();
   });
 });
