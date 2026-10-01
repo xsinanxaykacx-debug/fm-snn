@@ -1114,10 +1114,10 @@ function buildMarkAssignments(
     const targetId = assignments[defenderId];
     if (assignments[targetId] !== defenderId) continue;
 
-    const defender = allPlayers[defenderId];
-    const reciprocalDefender = allPlayers[targetId];
-    const target = allPlayers[targetId];
-    const reciprocalTarget = allPlayers[defenderId];
+    const defender = players.find(player => player.player.id === defenderId);
+    const reciprocalDefender = players.find(player => player.player.id === targetId);
+    const target = reciprocalDefender;
+    const reciprocalTarget = defender;
 
     if (
       !defender ||
