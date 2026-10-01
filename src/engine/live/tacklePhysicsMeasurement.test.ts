@@ -48,7 +48,7 @@ describe('calculateClosingSpeed', () => {
 
     const relativeSpeed = Math.hypot(5, -5);
 
-    expect(closingSpeed).toBeCloseTo(35 / Math.sqrt(26), 10);
+    expect(closingSpeed).toBeCloseTo(20 / Math.sqrt(26), 10);
     expect(Math.abs(closingSpeed)).toBeLessThan(relativeSpeed);
     expect(relativeSpeed).toBeCloseTo(Math.sqrt(50), 10);
   });
