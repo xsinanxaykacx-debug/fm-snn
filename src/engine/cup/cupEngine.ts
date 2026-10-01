@@ -1,6 +1,6 @@
 // src/engine/cup/cupEngine.ts
 
-import type { CupState, CupMatch, CupRound, Match, Player, Club } from '../types';
+import type { CupState, CupMatch, CupRound, Match, Club } from '../types';
 
 // ═══════════════════════════════════════════════
 // KUPA HAFTA TAKVİMİ
