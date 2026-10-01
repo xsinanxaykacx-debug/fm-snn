@@ -56,6 +56,8 @@ import {
   CHASE_DISTANCE_WEIGHT,
   CHASE_TACKLING_WEIGHT,
   MAX_CHASE_PER_TEAM,
+  GK_CHASE_MAX_DISTANCE,
+  GK_CHASE_MAX_X,
 
   PASS_SCORE,
   THROUGH_BALL_MIN_DISTANCE,
@@ -98,6 +100,11 @@ import {
   MARK_OPENNESS_WEIGHT,
   MARK_DISTANCE_WEIGHT,
   MARKING_OFFSET_DISTANCE,
+  MARK_ASSIGNMENT_MAX_PER_OPPONENT,
+  MARK_THREAT_DISTANCE_WEIGHT,
+  MARK_THREAT_GOAL_WEIGHT,
+  MARK_THREAT_OPENNESS_WEIGHT,
+  MARK_THREAT_ROLE_WEIGHT,
 
   SUPPORT_FORWARD_OFFSET,
   SUPPORT_MIN_SPACE,
@@ -226,29 +233,69 @@ export function shouldDecide(
 // CHASE ALLOCATION
 // ============================================================
 
+function isGoalkeeperChaseAllowed(
+  player: LivePlayer,
+  ballPosition: Vec2,
+  pitch: PitchDimensions
+): boolean {
+  if (player.role !== 'GK') return true;
+
+  const distance = computeDistance(player.position, ballPosition);
+  if (distance > GK_CHASE_MAX_DISTANCE) return false;
+
+  const ownPenaltyArea =
+    player.isHome
+      ? ballPosition.x <= pitch.penaltyAreaDepth &&
+        ballPosition.y >= (pitch.width - pitch.penaltyAreaWidth) / 2 &&
+        ballPosition.y <= (pitch.width + pitch.penaltyAreaWidth) / 2
+      : ballPosition.x >= pitch.length - pitch.penaltyAreaDepth &&
+        ballPosition.y >= (pitch.width - pitch.penaltyAreaWidth) / 2 &&
+        ballPosition.y <= (pitch.width + pitch.penaltyAreaWidth) / 2;
+
+  if (ownPenaltyArea) return true;
+
+  const ownHalf =
+    player.isHome
+      ? ballPosition.x <= pitch.length / 2
+      : ballPosition.x >= pitch.length / 2;
+
+  const goalkeeperXDistance =
+    player.isHome
+      ? Math.abs(ballPosition.x - player.homePosition.x)
+      : Math.abs(ballPosition.x - player.homePosition.x);
+
+  return ownHalf && goalkeeperXDistance <= GK_CHASE_MAX_X;
+}
+
 export function allocateChase(
   teamPlayers: LivePlayer[],
-  ballPosition: Vec2
+  ballPosition: Vec2,
+  pitch?: PitchDimensions
 ): Set<string> {
-  const scored = teamPlayers.map(player => {
-    const distance = computeDistance(
-      player.position,
-      ballPosition
-    );
+  const scored = teamPlayers
+    .filter(player =>
+      pitch === undefined ||
+      isGoalkeeperChaseAllowed(player, ballPosition, pitch)
+    )
+    .map(player => {
+      const distance = computeDistance(
+        player.position,
+        ballPosition
+      );
 
-    const tackling = attrRatio(
-      player.player.attributes.tackling
-    );
+      const tackling = attrRatio(
+        player.player.attributes.tackling
+      );
 
-    const score =
-      distance * CHASE_DISTANCE_WEIGHT +
-      tackling * CHASE_TACKLING_WEIGHT;
+      const score =
+        distance * CHASE_DISTANCE_WEIGHT +
+        tackling * CHASE_TACKLING_WEIGHT;
 
-    return {
-      id: player.player.id,
-      score,
-    };
-  });
+      return {
+        id: player.player.id,
+        score,
+      };
+    });
 
   scored.sort((a, b) => {
     if (a.score !== b.score) {
@@ -603,7 +650,8 @@ function decidePriorityIntent(
   state: DecisionState,
   chaseSet: Set<string>,
   ballCarrier: LivePlayer | null,
-  attackingDirection: 1 | -1
+  attackingDirection: 1 | -1,
+  markAssignments: MarkAssignments
 ): Decision {
   const ballPosition: Vec2 = {
     x: state.ball.position.x,
@@ -661,18 +709,22 @@ function decidePriorityIntent(
     }
 
     // MARK
-    const markTarget = findMarkTarget(perception);
-    if (markTarget !== null) {
+    const assignedMarkId = markAssignments[self.player.id];
+    const assignedMark = assignedMarkId === undefined
+      ? null
+      : perception.opponents.find(opponent => opponent.id === assignedMarkId) ?? null;
+
+    if (assignedMark !== null) {
       const markTargetPoint = computeMarkingPoint(
         self,
-        markTarget.position
+        assignedMark.position
       );
 
       return {
         intent: 'mark',
         reason: 'mark',
         target: markTargetPoint,
-        targetPlayerId: markTarget.id,
+        targetPlayerId: assignedMark.id,
         power: DECISION_POWER.mark,
         timestamp: state.time,
       };
@@ -725,13 +777,17 @@ function decidePriorityIntent(
       };
     }
 
-    const markTarget = findMarkTarget(perception);
-    if (markTarget !== null) {
+    const assignedMarkId = markAssignments[self.player.id];
+    const assignedMark = assignedMarkId === undefined
+      ? null
+      : perception.opponents.find(opponent => opponent.id === assignedMarkId) ?? null;
+
+    if (assignedMark !== null) {
       return {
         intent: 'mark',
         reason: 'mark',
-        target: markTarget.position,
-        targetPlayerId: markTarget.id,
+        target: computeMarkingPoint(self, assignedMark.position),
+        targetPlayerId: assignedMark.id,
         power: DECISION_POWER.mark,
         timestamp: state.time,
       };
@@ -966,6 +1022,103 @@ function findMarkTarget(
     id: best.id,
     position: best.position,
   };
+}
+
+// ============================================================
+// GLOBAL MARK ASSIGNMENT
+// ============================================================
+
+export type MarkAssignments = Record<string, string>;
+
+function markRoleThreat(position: LivePlayer['player']['position']): number {
+  switch (position) {
+    case 'ST':
+      return 1.00;
+    case 'AMC':
+    case 'AML':
+    case 'AMR':
+      return 0.85;
+    case 'KFL':
+    case 'GF':
+    case 'KFR':
+      return 0.75;
+    case 'MC':
+    case 'ML':
+    case 'MR':
+      return 0.55;
+    case 'DMC':
+      return 0.45;
+    default:
+      return 0.30;
+  }
+}
+
+function buildMarkAssignments(
+  players: LivePlayer[],
+  ballPosition: Vec2,
+  pitch: PitchDimensions
+): MarkAssignments {
+  const assignments: MarkAssignments = {};
+  const defenders = players.filter(player => player.role !== 'GK');
+  const opponentsByTeam = new Map<boolean, LivePlayer[]>();
+
+  for (const player of players) {
+    const list = opponentsByTeam.get(player.isHome);
+    if (list) list.push(player);
+    else opponentsByTeam.set(player.isHome, [player]);
+  }
+
+  for (const defender of defenders) {
+    const opponents = opponentsByTeam.get(!defender.isHome) ?? [];
+    const candidates = opponents
+      .filter(opponent =>
+        computeDistance(defender.position, opponent.position) <= MARK_MAX_DISTANCE
+      )
+      .map(opponent => {
+        const distanceToBall = computeDistance(opponent.position, ballPosition);
+        const distanceToGoal = defender.isHome
+          ? computeDistance(opponent.position, { x: 0, y: pitch.width / 2 })
+          : computeDistance(opponent.position, { x: pitch.length, y: pitch.width / 2 });
+
+        const ballThreat = clamp01(
+          1 - distanceToBall / MARK_MAX_DISTANCE
+        );
+        const goalThreat = clamp01(
+          1 - distanceToGoal / pitch.length
+        );
+        const openness = 0.5;
+        const roleThreat = markRoleThreat(opponent.player.position);
+
+        const score =
+          ballThreat * MARK_THREAT_DISTANCE_WEIGHT +
+          goalThreat * MARK_THREAT_GOAL_WEIGHT +
+          openness * MARK_THREAT_OPENNESS_WEIGHT +
+          roleThreat * MARK_THREAT_ROLE_WEIGHT;
+
+        return {
+          opponent,
+          score,
+          distance: computeDistance(defender.position, opponent.position),
+        };
+      })
+      .sort((a, b) =>
+        b.score - a.score ||
+        a.distance - b.distance ||
+        a.opponent.player.id.localeCompare(b.opponent.player.id)
+      );
+
+    for (const candidate of candidates) {
+      const alreadyAssigned = Object.values(assignments)
+        .filter(id => id === candidate.opponent.player.id).length;
+
+      if (alreadyAssigned < MARK_ASSIGNMENT_MAX_PER_OPPONENT) {
+        assignments[defender.player.id] = candidate.opponent.player.id;
+        break;
+      }
+    }
+  }
+
+  return assignments;
 }
 
 // ============================================================
@@ -1245,8 +1398,13 @@ export function computeAllDecisions(
   const homePlayers = allPlayers.filter(p => p.isHome);
   const awayPlayers = allPlayers.filter(p => !p.isHome);
 
-  const homeChase = allocateChase(homePlayers, ballPosition);
-  const awayChase = allocateChase(awayPlayers, ballPosition);
+  const homeChase = allocateChase(homePlayers, ballPosition, state.pitch);
+  const awayChase = allocateChase(awayPlayers, ballPosition, state.pitch);
+  const markAssignments = buildMarkAssignments(
+    allPlayers,
+    ballPosition,
+    state.pitch
+  );
 
   for (const id of Object.keys(state.players).sort()) {
     const player = state.players[id];
