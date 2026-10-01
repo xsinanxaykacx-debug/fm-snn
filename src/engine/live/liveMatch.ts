@@ -105,6 +105,7 @@ import {
 
 import {
   resolveAllTackles,
+  resolveTackle,
 } from './tackle';
 
 import {
@@ -236,11 +237,14 @@ export function simulateMatchLive(
 
     transition: {
       counterPressClubId: null,
+      counterPressPlayerId: null,
       breakClubId: null,
       startedAt: 0,
       expiresAt: 0,
       counterPressProbability: 0,
       breakQuality: 0,
+      hasAttemptedCounterPress: false,
+      isRecoveryContestActive: false,
     },
 
     isStopped: false,
@@ -379,9 +383,12 @@ function updateTransitionState(
 ): void {
   if (state.time >= state.transition.expiresAt) {
     state.transition.counterPressClubId = null;
+    state.transition.counterPressPlayerId = null;
     state.transition.breakClubId = null;
     state.transition.counterPressProbability = 0;
     state.transition.breakQuality = 0;
+    state.transition.hasAttemptedCounterPress = false;
+    state.transition.isRecoveryContestActive = false;
   }
 
   const currentOwnerId = state.ball.ownerId;
@@ -417,11 +424,14 @@ function updateTransitionState(
 
   state.transition = {
     counterPressClubId: previousOwner.clubId,
+    counterPressPlayerId: pressing.playerId,
     breakClubId: currentOwner.clubId,
     startedAt: state.time,
     expiresAt: state.time + 6,
     counterPressProbability: pressing.probability,
     breakQuality: breakResolution.quality,
+    hasAttemptedCounterPress: false,
+    isRecoveryContestActive: false,
   };
 }
 
@@ -507,7 +517,7 @@ function runTick(
 
   // ─── 8b. Ball actions ───
   if (!tackleChangedPossession) {
-    applyBallActions(state, decisions);
+    applyBallActions(state, decisions, players);
   }
 
   // ─── 8c. Transition ───
@@ -969,7 +979,8 @@ function resolveLooseBallControl(state: LiveMatchState): void {
 
 function applyBallActions(
   state: LiveMatchState,
-  decisions: Record<string, Decision>
+  decisions: Record<string, Decision>,
+  players: Record<string, Player>
 ): void {
   const ownerId = state.ball.ownerId;
   if (ownerId === null) return;
@@ -979,6 +990,14 @@ function applyBallActions(
 
   const decision = decisions[ownerId];
   if (!decision) return;
+
+  // V1: İlk aksiyon öncesinde counter-press bir "contest" başlatabilir.
+  // Contest başarılı olsa bile possession doğrudan atanmaz; mevcut tackle
+  // resolver fiziksel sonucu belirler. Böylece recovery gerçek top
+  // sahipliği değişimi üzerinden gerçekleşir.
+  if (resolveCounterPressContest(state, owner, players)) {
+    return;
+  }
 
   switch (decision.intent) {
     case 'pass':
@@ -1000,6 +1019,102 @@ function applyBallActions(
     default:
       break;
   }
+}
+
+function resolveCounterPressContest(
+  state: LiveMatchState,
+  owner: LivePlayer,
+  players: Record<string, Player>
+): boolean {
+  const transition = state.transition;
+
+  if (
+    transition.counterPressClubId === null ||
+    transition.breakClubId !== owner.clubId ||
+    state.time >= transition.expiresAt ||
+    transition.hasAttemptedCounterPress
+  ) {
+    return false;
+  }
+
+  // Bu transition penceresinde yalnızca ilk aksiyon için bir contest hakkı var.
+  transition.hasAttemptedCounterPress = true;
+
+  const pressingPlayer = transition.counterPressPlayerId
+    ? state.players[transition.counterPressPlayerId]
+    : null;
+
+  if (
+    !pressingPlayer ||
+    pressingPlayer.clubId !== transition.counterPressClubId
+  ) {
+    return false;
+  }
+
+  const dx = pressingPlayer.position.x - owner.position.x;
+  const dy = pressingPlayer.position.y - owner.position.y;
+  const distance = Math.hypot(dx, dy);
+  const tackleRadius =
+    DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.tackleRadius;
+
+  // Yakın değilse fiziksel mücadele yoktur. Sahte recovery yapılmaz.
+  if (distance > tackleRadius) {
+    return false;
+  }
+
+  state.stats.counterPressAttempts += 1;
+
+  // Counter-press zarı yalnızca fiziksel olarak erişilebilir runner
+  // için atılır. Başarısızsa rakibin normal aksiyonu devam eder.
+  if (!nextBool(state.rng, transition.counterPressProbability)) {
+    return false;
+  }
+
+  transition.isRecoveryContestActive = true;
+
+  const relativeSpeed = Math.hypot(
+    pressingPlayer.velocity.x - owner.velocity.x,
+    pressingPlayer.velocity.y - owner.velocity.y
+  );
+
+  const outcome = resolveTackle({
+    tackler: pressingPlayer,
+    ballCarrier: owner,
+    distance,
+    angle: Math.atan2(dy, dx),
+    relativeSpeed,
+    rng: state.rng,
+  });
+
+  if (outcome.type === 'won') {
+    applyTackleWon(outcome, state);
+
+    if (
+      state.ball.ownerId !== null &&
+      state.players[state.ball.ownerId]?.clubId ===
+        transition.counterPressClubId
+    ) {
+      state.stats.counterPressRecoveries += 1;
+    } else if (state.ball.ownerId === null) {
+      resolveLooseBallControl(state);
+
+      if (
+        state.ball.ownerId !== null &&
+        state.players[state.ball.ownerId]?.clubId ===
+          transition.counterPressClubId
+      ) {
+        state.stats.counterPressRecoveries += 1;
+      }
+    }
+  } else if (outcome.type === 'foul') {
+    applyTackleFoul(outcome, state, players);
+  }
+
+  transition.isRecoveryContestActive = false;
+
+  // Tackle kazanılsa da, başarısız olsa da, rakibin bu tick'teki
+  // organize ball-action'ı tüketilmiş olur. Fizik sonucu state'te kalır.
+  return true;
 }
 
 function handlePassAction(
@@ -1791,6 +1906,8 @@ function createEmptyStats(): LiveMatchStats {
     crossesSuccess: { home: 0, away: 0 },
     dangerousAttacks: { home: 0, away: 0 },
     recoveries: { home: 0, away: 0 },
+    counterPressAttempts: 0,
+    counterPressRecoveries: 0,
     fouls: { home: 0, away: 0 },
     yellowCards: { home: 0, away: 0 },
     redCards: { home: 0, away: 0 },
