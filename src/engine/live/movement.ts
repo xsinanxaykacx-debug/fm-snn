@@ -162,6 +162,17 @@ export function movePlayer(
   if (dist < PLAYER_TARGET_TOLERANCE) {
     player.velocity.x *= 1 - PLAYER_TURN_RATE * 0.5;
     player.velocity.y *= 1 - PLAYER_TURN_RATE * 0.5;
+
+    const settledSpeed = Math.sqrt(
+      player.velocity.x * player.velocity.x +
+        player.velocity.y * player.velocity.y
+    );
+
+    if (settledSpeed < PLAYER_VELOCITY_EPSILON) {
+      player.velocity.x = 0;
+      player.velocity.y = 0;
+    }
+
     return;
   }
 
