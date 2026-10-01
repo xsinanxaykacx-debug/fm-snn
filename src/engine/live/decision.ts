@@ -700,21 +700,13 @@ function decidePriorityIntent(
       ballPosition
     );
 
-    const defensiveLine =
-      self.isHome
-        ? state.home.club.tactic.defensiveLine
-        : state.away.club.tactic.defensiveLine;
-
-    const lineReachModifier =
-      defensiveLine === 'high' ? 1.15 :
-      defensiveLine === 'low' ? 0.85 :
-      1;
-
+    // defensiveLine etkisi resolveCounterPress() içinde probability'ye
+    // zaten uygulanıyor. Reach burada probability'den türetilir;
+    // DecisionState'e takım taktiği taşımaya gerek yoktur.
     const counterPressReach =
       Math.min(
         COUNTER_PRESS_MAX_DISTANCE,
-        (8 + state.transition.counterPressProbability * 25) *
-          lineReachModifier
+        8 + state.transition.counterPressProbability * 25
       );
 
     if (distanceToBall <= counterPressReach) {
