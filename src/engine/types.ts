@@ -732,6 +732,12 @@ export interface Ball {
   position: Vec3;
   velocity: Vec3;
 
+  /**
+   * Kontrollü pasın ulaşacağı hedef nokta.
+   * Şut, orta ve clearance için null'dır.
+   */
+  targetPosition: Vec2 | null;
+
   ownerId: string | null;
 
   lastTouchId: string | null;
