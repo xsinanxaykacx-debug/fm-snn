@@ -92,6 +92,31 @@ function summarizeTeam(
 // Production actionResolution.ts'e dokunulmaz.
 // ═══════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════
+// LANE + PRESSURE GEOMETRY BREAKDOWN
+// Test scope only — production geometry untouched.
+// ═══════════════════════════════════════════════
+
+interface LaneBreakdown {
+  tick: number;
+  passerId: string;
+  lane: number;
+  interference: number;
+  oppInInner: number;
+  oppInOuter: number;
+  targetDistance: number;
+}
+
+interface PressureBreakdown {
+  tick: number;
+  passerId: string;
+  pressure: number;
+  pressureRaw: number;
+  oppWithin2: number;
+  oppWithin4: number;
+  oppWithin7: number;
+}
+
 interface PassDecomposition {
   tick: number;
   passerId: string;
@@ -193,6 +218,97 @@ function localPressureAtOwner(
   return localClamp(pressure / 2.5, 0, 1);
 }
 
+function localLaneClarityWithCount(
+  owner: LivePlayer,
+  target: { x: number; y: number },
+  state: LiveMatchState
+): { lane: number; interference: number; oppInInner: number; oppInOuter: number } {
+  const dx = target.x - owner.position.x;
+  const dy = target.y - owner.position.y;
+  const length = Math.hypot(dx, dy);
+
+  if (length < 0.001) {
+    return { lane: 0, interference: 0, oppInInner: 0, oppInOuter: 0 };
+  }
+
+  let interference = 0;
+  let oppInInner = 0;
+  let oppInOuter = 0;
+
+  for (const id of Object.keys(state.players).sort()) {
+    const opponent = state.players[id];
+    if (opponent.isHome === owner.isHome) continue;
+
+    const px = opponent.position.x - owner.position.x;
+    const py = opponent.position.y - owner.position.y;
+    const projection = (px * dx + py * dy) / (length * length);
+    if (projection <= 0 || projection >= 1) continue;
+
+    const closestX = owner.position.x + dx * projection;
+    const closestY = owner.position.y + dy * projection;
+    const lateral = Math.hypot(
+      opponent.position.x - closestX,
+      opponent.position.y - closestY
+    );
+
+    if (lateral < 1.5) {
+      interference += 0.55;
+      oppInInner += 1;
+    } else if (lateral < 3) {
+      interference += 0.20;
+      oppInOuter += 1;
+    }
+  }
+
+  return {
+    lane: localClamp(1 - interference, 0.05, 1),
+    interference,
+    oppInInner,
+    oppInOuter,
+  };
+}
+
+function localPressureAtOwnerWithCount(
+  owner: LivePlayer,
+  state: LiveMatchState
+): {
+  pressure: number;
+  pressureRaw: number;
+  oppWithin2: number;
+  oppWithin4: number;
+  oppWithin7: number;
+} {
+  let raw = 0;
+  let oppWithin2 = 0;
+  let oppWithin4 = 0;
+  let oppWithin7 = 0;
+
+  for (const id of Object.keys(state.players).sort()) {
+    const opponent = state.players[id];
+    if (opponent.isHome === owner.isHome) continue;
+
+    const d = localDistance(owner.position, opponent.position);
+    if (d <= 2) {
+      raw += 1;
+      oppWithin2 += 1;
+    } else if (d <= 4) {
+      raw += 0.65;
+      oppWithin4 += 1;
+    } else if (d <= 7) {
+      raw += 0.30;
+      oppWithin7 += 1;
+    }
+  }
+
+  return {
+    pressure: localClamp(raw / 2.5, 0, 1),
+    pressureRaw: raw,
+    oppWithin2,
+    oppWithin4,
+    oppWithin7,
+  };
+}
+
 function localMentalityModifier(mentality: string, isAttacking: boolean): number {
   if (mentality === 'attacking') return isAttacking ? 1.06 : 0.94;
   if (mentality === 'defensive') return isAttacking ? 0.94 : 1.06;
@@ -246,8 +362,19 @@ function decomposePass(
 
   const skillProbability = passingSkill / 15;
 
-  const lane = localLaneClarity(owner, decision.target, state);
+  const laneInfo = localLaneClarityWithCount(owner, decision.target, state);
+  const lane = laneInfo.lane;
   const lanePenalty = (1 - lane) * 0.35;
+
+  hoisted.LANE_BREAKDOWN.push({
+    tick,
+    passerId: owner.player.id,
+    lane: laneInfo.lane,
+    interference: laneInfo.interference,
+    oppInInner: laneInfo.oppInInner,
+    oppInOuter: laneInfo.oppInOuter,
+    targetDistance: localDistance(owner.position, decision.target),
+  });
 
   const targetDistance = localDistance(owner.position, decision.target);
   const distanceFactor =
@@ -256,8 +383,19 @@ function decomposePass(
       : localClamp(1 - (targetDistance - 12) / 55, 0.55, 1);
   const distancePenaltyContribution = (1 - distanceFactor) * 0.25;
 
-  const pressure = localPressureAtOwner(owner, state);
+  const pressureInfo = localPressureAtOwnerWithCount(owner, state);
+  const pressure = pressureInfo.pressure;
   const pressurePenalty = pressure * 0.30;
+
+  hoisted.PRESSURE_BREAKDOWN.push({
+    tick,
+    passerId: owner.player.id,
+    pressure: pressureInfo.pressure,
+    pressureRaw: pressureInfo.pressureRaw,
+    oppWithin2: pressureInfo.oppWithin2,
+    oppWithin4: pressureInfo.oppWithin4,
+    oppWithin7: pressureInfo.oppWithin7,
+  });
 
   const tactic =
     state.home.club.id === owner.clubId
@@ -322,6 +460,8 @@ function decomposePass(
 
 const hoisted = vi.hoisted(() => ({
   PASS_DECOMP: [] as PassDecomposition[],
+  LANE_BREAKDOWN: [] as LaneBreakdown[],
+  PRESSURE_BREAKDOWN: [] as PressureBreakdown[],
   currentTick: -1,
 }));
 
@@ -358,6 +498,8 @@ vi.mock('./actionResolution', async (importOriginal) => {
 describe('single match bench', () => {
   it(`fixtureSeed=${DEFAULT_FIXTURE_SEED}, matchSeed=${SEED}, ticks=${MATCH_TICKS}`, () => {
     hoisted.PASS_DECOMP.length = 0;
+    hoisted.LANE_BREAKDOWN.length = 0;
+    hoisted.PRESSURE_BREAKDOWN.length = 0;
     hoisted.currentTick = -1;
 
     const handle = installDeterministicRandom(DEFAULT_FIXTURE_SEED);
@@ -557,7 +699,123 @@ describe('single match bench', () => {
           tacticPenalty: avgTactic.toFixed(4),
         });
       }
+      // ═══════════════════════════════════════════════
+      // LANE HISTOGRAM
+      // ═══════════════════════════════════════════════
 
+      console.log('=== LANE HISTOGRAM ===');
+      {
+        const buckets = new Array(10).fill(0);
+        for (const l of hoisted.LANE_BREAKDOWN) {
+          let idx = Math.floor(l.lane * 10);
+          if (idx < 0) idx = 0;
+          if (idx > 9) idx = 9;
+          buckets[idx] += 1;
+        }
+        const total = hoisted.LANE_BREAKDOWN.length;
+        console.table(
+          buckets.map((count, i) => ({
+            range: `${(i / 10).toFixed(1)}–${((i + 1) / 10).toFixed(1)}`,
+            count,
+            pct: total > 0 ? `${((count / total) * 100).toFixed(1)}%` : 'n/a',
+          }))
+        );
+      }
+
+      // ═══════════════════════════════════════════════
+      // PRESSURE HISTOGRAM
+      // ═══════════════════════════════════════════════
+
+      console.log('=== PRESSURE HISTOGRAM ===');
+      {
+        const buckets = new Array(10).fill(0);
+        for (const p of hoisted.PRESSURE_BREAKDOWN) {
+          let idx = Math.floor(p.pressure * 10);
+          if (idx < 0) idx = 0;
+          if (idx > 9) idx = 9;
+          buckets[idx] += 1;
+        }
+        const total = hoisted.PRESSURE_BREAKDOWN.length;
+        console.table(
+          buckets.map((count, i) => ({
+            range: `${(i / 10).toFixed(1)}–${((i + 1) / 10).toFixed(1)}`,
+            count,
+            pct: total > 0 ? `${((count / total) * 100).toFixed(1)}%` : 'n/a',
+          }))
+        );
+      }
+
+      // ═══════════════════════════════════════════════
+      // GEOMETRY MEANS
+      // ═══════════════════════════════════════════════
+
+      console.log('=== GEOMETRY MEANS ===');
+      {
+        const n = hoisted.LANE_BREAKDOWN.length;
+        const m = hoisted.PRESSURE_BREAKDOWN.length;
+
+        const laneStats = n > 0
+          ? {
+              lane: avg(hoisted.LANE_BREAKDOWN.map(l => l.lane)),
+              interference: avg(hoisted.LANE_BREAKDOWN.map(l => l.interference)),
+              oppInInner: avg(hoisted.LANE_BREAKDOWN.map(l => l.oppInInner)),
+              oppInOuter: avg(hoisted.LANE_BREAKDOWN.map(l => l.oppInOuter)),
+            }
+          : { lane: 0, interference: 0, oppInInner: 0, oppInOuter: 0 };
+
+        const pressStats = m > 0
+          ? {
+              pressure: avg(hoisted.PRESSURE_BREAKDOWN.map(p => p.pressure)),
+              pressureRaw: avg(hoisted.PRESSURE_BREAKDOWN.map(p => p.pressureRaw)),
+              oppWithin2: avg(hoisted.PRESSURE_BREAKDOWN.map(p => p.oppWithin2)),
+              oppWithin4: avg(hoisted.PRESSURE_BREAKDOWN.map(p => p.oppWithin4)),
+              oppWithin7: avg(hoisted.PRESSURE_BREAKDOWN.map(p => p.oppWithin7)),
+            }
+          : { pressure: 0, pressureRaw: 0, oppWithin2: 0, oppWithin4: 0, oppWithin7: 0 };
+
+        console.table({
+          'lane mean': laneStats.lane.toFixed(4),
+          'interference mean': laneStats.interference.toFixed(4),
+          'oppInInner mean (lateral<1.5)': laneStats.oppInInner.toFixed(3),
+          'oppInOuter mean (1.5-3)': laneStats.oppInOuter.toFixed(3),
+          'pressure mean': pressStats.pressure.toFixed(4),
+          'pressureRaw mean': pressStats.pressureRaw.toFixed(4),
+          'oppWithin2 mean (d<=2)': pressStats.oppWithin2.toFixed(3),
+          'oppWithin4 mean (2-4)': pressStats.oppWithin4.toFixed(3),
+          'oppWithin7 mean (4-7)': pressStats.oppWithin7.toFixed(3),
+        });
+      }
+
+      // ═══════════════════════════════════════════════
+      // GEOMETRY RATIOS
+      // ═══════════════════════════════════════════════
+
+      console.log('=== GEOMETRY RATIOS ===');
+      {
+        const n = hoisted.LANE_BREAKDOWN.length;
+        const m = hoisted.PRESSURE_BREAKDOWN.length;
+
+        if (n > 0 && m > 0) {
+          const noInterference = hoisted.LANE_BREAKDOWN.filter(l => l.interference === 0).length;
+          const atLeastOneInner = hoisted.LANE_BREAKDOWN.filter(l => l.oppInInner >= 1).length;
+          const atLeastOneOuter = hoisted.LANE_BREAKDOWN.filter(l => l.oppInOuter >= 1).length;
+          const atCap = hoisted.LANE_BREAKDOWN.filter(l => l.lane <= 0.05 + 1e-9).length;
+
+          const zeroPressure = hoisted.PRESSURE_BREAKDOWN.filter(p => p.pressure === 0).length;
+          const anyWithin2 = hoisted.PRESSURE_BREAKDOWN.filter(p => p.oppWithin2 >= 1).length;
+          const anyWithin4 = hoisted.PRESSURE_BREAKDOWN.filter(p => p.oppWithin4 >= 1).length;
+
+          console.table({
+            'interference==0 (lane=1.0)': `${noInterference} (${((noInterference / n) * 100).toFixed(1)}%)`,
+            'oppInInner>=1 (lateral<1.5)': `${atLeastOneInner} (${((atLeastOneInner / n) * 100).toFixed(1)}%)`,
+            'oppInOuter>=1 (1.5-3)': `${atLeastOneOuter} (${((atLeastOneOuter / n) * 100).toFixed(1)}%)`,
+            'lane at floor (<=0.05)': `${atCap} (${((atCap / n) * 100).toFixed(1)}%)`,
+            'pressure==0': `${zeroPressure} (${((zeroPressure / m) * 100).toFixed(1)}%)`,
+            'anyWithin2 (d<=2)': `${anyWithin2} (${((anyWithin2 / m) * 100).toFixed(1)}%)`,
+            'anyWithin4 (2-4)': `${anyWithin4} (${((anyWithin4 / m) * 100).toFixed(1)}%)`,
+          });
+        }
+      }
     } finally {
       handle.restore();
     }
