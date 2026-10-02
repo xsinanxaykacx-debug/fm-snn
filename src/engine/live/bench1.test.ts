@@ -119,6 +119,7 @@ describe('single match bench', () => {
 
       let firstState: LiveMatchState | null = null;
       let capturedTick = -1;
+      let firstStatePlayers: Record<string, Player> | null = null;
 
       const t0 = Date.now();
 
@@ -129,6 +130,12 @@ describe('single match bench', () => {
           if (firstState === null) {
             firstState = state;
             capturedTick = state.tick;
+            firstStatePlayers = Object.fromEntries(
+              Object.entries(state.players).map(([id, livePlayer]) => [
+                id,
+                structuredClone(livePlayer.player),
+              ])
+            );
           }
         },
       });
@@ -144,8 +151,8 @@ describe('single match bench', () => {
         console.log('home on-pitch count :', homeIds.length);
         console.log('away on-pitch count :', awayIds.length);
 
-        summarizeTeam('HOME', homeIds, players);
-        summarizeTeam('AWAY', awayIds, players);
+        summarizeTeam('HOME', homeIds, firstStatePlayers ?? players);
+        summarizeTeam('AWAY', awayIds, firstStatePlayers ?? players);
       } else {
         console.log('!! firstState could not be captured (onTick never fired)');
       }
