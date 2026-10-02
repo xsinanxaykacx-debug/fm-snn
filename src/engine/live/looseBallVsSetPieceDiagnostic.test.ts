@@ -94,15 +94,6 @@ type TransitionRecord = {
   note: string;
 };
 
-type TickBall = {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  speed: number;
-};
-
 function distanceXY(
   ax: number,
   ay: number,
@@ -329,7 +320,6 @@ describe.skipIf(!RUN)('Loose-ball vs set-piece possession diagnostic', () => {
 
           onTick: (state: LiveMatchState): void => {
             const ownerId = state.ball.ownerId;
-            const ball = snapshotBall(state);
             const nearest = nearestPlayer(state);
             const currentSetPiece = makeSetPieceSnapshot(state);
             const newBoundary = findNewBoundaryEvent(
