@@ -32,6 +32,8 @@ import {
   ControlBallTraceBuffer,
 } from './controlBallTrace';
 
+export { DEFAULT_MAX_TICKS };
+
 export type {
   CClass,
   Confidence,
