@@ -240,7 +240,7 @@ export function resolvePassAction(
     tactic.directness === 'direct' ? 1.06 :
     tactic.directness === 'short' ? 0.97 : 1;
 
-  const skillProbability = passingSkill / 20;
+  const skillProbability = passingSkill / 15;
 
   // Pass quality is primarily driven by the passer's effective skill.
   // Contextual factors reduce that base probability additively so several
