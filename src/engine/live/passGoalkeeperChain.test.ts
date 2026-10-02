@@ -30,7 +30,7 @@ describe('Pass + Goalkeeper Chain V7', () => {
     if (!RUN) skip();
     random = installDeterministicRandom(DEFAULT_FIXTURE_SEED);
     const diag = new PassGoalkeeperChainDiagnostic(PASS_TICK, BOUNDARY_TICK);
-    let currentTick = -1;
+    let currentTick = 0;
 
     const originalApplyPass = ballModule.applyPass;
     applyPassSpy = vi.spyOn(ballModule, 'applyPass').mockImplementation((ball, from, to, power, physics, playerId, clubId) => {
@@ -46,7 +46,7 @@ describe('Pass + Goalkeeper Chain V7', () => {
       const velLen = resultSpeed;
       const normVx = velLen > 1e-9 ? resultVx / velLen : 0;
       const normVy = velLen > 1e-9 ? resultVy / velLen : 0;
-      diag.recordApplyPass({ tick: currentTick, playerId: playerId ?? 'null', clubId: clubId ?? 'null', fromX: from.x, fromY: from.y, targetX: to.x, targetY: to.y, power, resultVx, resultVy, resultSpeed, dirX, dirY, dirMatchesVelocity: Math.abs(normVx - dirX) < 0.01 && Math.abs(normVy - dirY) < 0.01 });
+      diag.recordApplyPass({ tick: currentTick + 1, playerId: playerId ?? 'null', clubId: clubId ?? 'null', fromX: from.x, fromY: from.y, targetX: to.x, targetY: to.y, power, resultVx, resultVy, resultSpeed, dirX, dirY, dirMatchesVelocity: Math.abs(normVx - dirX) < 0.01 && Math.abs(normVy - dirY) < 0.01 });
       return result;
     });
 
@@ -54,14 +54,14 @@ describe('Pass + Goalkeeper Chain V7', () => {
     controlBallSpy = vi.spyOn(ballModule, 'controlBall').mockImplementation((ball, playerId, clubId) => {
       const previousOwnerId = ball.ownerId;
       const result = originalControlBall(ball, playerId, clubId);
-      diag.recordControlBall({ tick: currentTick, ownerId: playerId, clubId, previousOwnerId, resultingLastTouchId: result.lastTouchId, resultingLastTouchClubId: result.lastTouchClubId });
+      diag.recordControlBall({ tick: currentTick + 1, ownerId: playerId, clubId, previousOwnerId, resultingLastTouchId: result.lastTouchId, resultingLastTouchClubId: result.lastTouchClubId });
       return result;
     });
 
     const originalBoundary = eventsModule.detectBoundaryOutcome;
     boundarySpy = vi.spyOn(eventsModule, 'detectBoundaryOutcome').mockImplementation(input => {
       const result = originalBoundary(input);
-      diag.recordBoundary({ tick: currentTick, input, result });
+      diag.recordBoundary({ tick: currentTick + 1, input, result });
       return result;
     });
 
