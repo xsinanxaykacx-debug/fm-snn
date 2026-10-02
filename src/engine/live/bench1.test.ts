@@ -131,6 +131,8 @@ interface PressureCompositionRecord {
   tick: number;
   passerId: string;
   pressureRaw: number;
+  pressure: number;
+  effectivePressurePenalty: number;
   oppWithin2: number;
   oppWithin4: number;
   oppWithin7: number;
@@ -529,6 +531,8 @@ function decomposePass(
     tick,
     passerId: owner.player.id,
     pressureRaw: pressureComposition.pressureRaw,
+    pressure: pressureComposition.pressure,
+    effectivePressurePenalty: pressure * 0.30,
     oppWithin2: pressureComposition.oppWithin2,
     oppWithin4: pressureComposition.oppWithin4,
     oppWithin7: pressureComposition.oppWithin7,
@@ -899,24 +903,99 @@ describe('single match bench', () => {
         }
       }
 
-      console.log('=== PRESSURE COMPOSITION ===');
+      console.log('=== PRESSURE V2 DIAGNOSTIC ===');
       {
-        const pressureCombo = new Map<string, number>();
-        for (const p of hoisted.PRESSURE_COMPOSITION) {
-          const key = p.oppWithin2 + '-' + p.oppWithin4 + '-' + p.oppWithin7;
-          pressureCombo.set(key, (pressureCombo.get(key) ?? 0) + 1);
-        }
-        const sorted = [...pressureCombo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
-        console.log('top pressure compositions (within2-within4-within7):');
-        console.table(sorted.map(([combo, count]) => ({ composition: combo, count, pct: ((count / hoisted.PRESSURE_COMPOSITION.length) * 100).toFixed(1) + '%' })));
+        const total = hoisted.PRESSURE_COMPOSITION.length;
+
+        const pressureRawBuckets = [
+          { label: '0', test: (v: number) => v === 0 },
+          { label: '0–0.5', test: (v: number) => v > 0 && v < 0.5 },
+          { label: '0.5–1', test: (v: number) => v >= 0.5 && v < 1 },
+          { label: '1–1.5', test: (v: number) => v >= 1 && v < 1.5 },
+          { label: '1.5–2', test: (v: number) => v >= 1.5 && v < 2 },
+          { label: '2–2.5', test: (v: number) => v >= 2 && v < 2.5 },
+          { label: '2.5+', test: (v: number) => v >= 2.5 },
+        ];
+
         console.log('pressureRaw histogram:');
-        const rawBuckets = new Array(8).fill(0);
-        for (const p of hoisted.PRESSURE_COMPOSITION) {
-          let idx = Math.min(7, Math.floor(p.pressureRaw));
-          if (p.pressureRaw === 0) idx = 0;
-          rawBuckets[idx] += 1;
+        console.table(
+          pressureRawBuckets.map(b => {
+            const count = hoisted.PRESSURE_COMPOSITION.filter(p => b.test(p.pressureRaw)).length;
+            return {
+              range: b.label,
+              count,
+              pct: total > 0 ? ((count / total) * 100).toFixed(1) + '%' : 'n/a',
+            };
+          })
+        );
+
+        console.log('pressure / effective penalty summary:');
+        console.table({
+          'pressure mean': total > 0 ? avg(hoisted.PRESSURE_COMPOSITION.map(p => p.pressure)).toFixed(4) : '0.0000',
+          'pressure >= 0.9': total > 0
+            ? `${hoisted.PRESSURE_COMPOSITION.filter(p => p.pressure >= 0.9).length} (${((hoisted.PRESSURE_COMPOSITION.filter(p => p.pressure >= 0.9).length / total) * 100).toFixed(1)}%)`
+            : '0 (0.0%)',
+          'effectivePressurePenalty mean': total > 0
+            ? avg(hoisted.PRESSURE_COMPOSITION.map(p => p.effectivePressurePenalty)).toFixed(4)
+            : '0.0000',
+          'effectivePressurePenalty at pressure>=0.9': total > 0
+            ? avg(hoisted.PRESSURE_COMPOSITION.filter(p => p.pressure >= 0.9).map(p => p.effectivePressurePenalty)).toFixed(4)
+            : '0.0000',
+        });
+
+        const highPressure = hoisted.PRESSURE_COMPOSITION.filter(p => p.pressure >= 0.9);
+        const highCombo = new Map<string, number>();
+        for (const p of highPressure) {
+          const key = p.oppWithin2 + '-' + p.oppWithin4 + '-' + p.oppWithin7;
+          highCombo.set(key, (highCombo.get(key) ?? 0) + 1);
         }
-        console.table(rawBuckets.map((count, i) => ({ range: i === 7 ? '7+' : i + '–' + (i + 1), count, pct: ((count / hoisted.PRESSURE_COMPOSITION.length) * 100).toFixed(1) + '%' })));
+
+        console.log('pressure >= 0.9 composition (within2-within4-within7):');
+        const highSorted = [...highCombo.entries()].sort((a, b) => b[1] - a[1]);
+        console.table(
+          highSorted.map(([combo, count]) => ({
+            composition: combo,
+            count,
+            pctOfHighPressure: highPressure.length > 0
+              ? ((count / highPressure.length) * 100).toFixed(1) + '%'
+              : 'n/a',
+            pctOfAllPasses: total > 0
+              ? ((count / total) * 100).toFixed(1) + '%'
+              : 'n/a',
+          }))
+        );
+
+        const classify = (p: PressureCompositionRecord): string => {
+          const near = p.oppWithin2;
+          const mid = p.oppWithin4;
+          const far = p.oppWithin7;
+
+          if (near === 1 && mid === 0 && far === 0) return '1 near';
+          if (near === 2 && mid === 0 && far === 0) return '2 near';
+          if (near === 2 && mid >= 1) return '2 near + mid';
+          if (near === 1 && mid >= 2) return '1 near + 2+ mid';
+          if (near >= 3) return '3+ near';
+          if (near === 0 && mid >= 1) return '0 near + mid/far';
+          return 'other';
+        };
+
+        console.log('pressure >= 0.9 grouped composition:');
+        const grouped = new Map<string, number>();
+        for (const p of highPressure) {
+          const key = classify(p);
+          grouped.set(key, (grouped.get(key) ?? 0) + 1);
+        }
+        console.table(
+          [...grouped.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([composition, count]) => ({
+              composition,
+              count,
+              pctOfHighPressure: highPressure.length > 0
+                ? ((count / highPressure.length) * 100).toFixed(1) + '%'
+                : 'n/a',
+            }))
+        );
       }
       // ═══════════════════════════════════════════════
       // PRESSURE HISTOGRAM
