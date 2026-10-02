@@ -320,6 +320,7 @@ describe.skipIf(!RUN)('Loose-ball vs set-piece possession diagnostic', () => {
 
           onTick: (state: LiveMatchState): void => {
             const ownerId = state.ball.ownerId;
+            const ballSpeed = Math.hypot(state.ball.velocity.x, state.ball.velocity.y);
             const nearest = nearestPlayer(state);
             const currentSetPiece = makeSetPieceSnapshot(state);
             const newBoundary = findNewBoundaryEvent(
@@ -496,7 +497,7 @@ describe.skipIf(!RUN)('Loose-ball vs set-piece possession diagnostic', () => {
                   category === 'B'
                     ? restartDistance
                     : null,
-                ballSpeedAtTransition: ball.speed,
+                ballSpeedAtTransition: ballSpeed,
 
                 nearestDistanceAtEligible: eligibleDistance,
                 eligibleTick,
