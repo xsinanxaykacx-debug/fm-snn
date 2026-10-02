@@ -1,2 +1,78 @@
-// V7 targeted forensic harness\n// Usage:\n// $env:RUN_PASS_GOALKEEPER_TRACE='1'\n// npx vitest run src/engine/live/passGoalkeeperChain.test.ts\n\nimport { describe, it, expect, vi, afterEach } from 'vitest';\nimport * as ballModule from './ball';\nimport { simulateMatchLive } from './liveMatch';\nimport { PassGoalkeeperChainDiagnostic, type PassCallRecord } from './diagnostics/passGoalkeeperChainDiagnostic';\nimport { installDeterministicRandom, DEFAULT_FIXTURE_SEED, type DeterministicRandomHandle } from './diagnostics/deterministicFixture';\nimport { generateGameData } from '../data/generateData';\n\nconst MATCH_SEED = 1000;\nconst MATCH_TICKS = 54_000;\nconst PASS_TICK = 53_497;\nconst BOUNDARY_TICK = 53_573;\nconst RUN = typeof process !== 'undefined' && process.env.RUN_PASS_GOALKEEPER_TRACE === '1';\n\ndescribe('Pass + Goalkeeper Chain V7', () => {\n  let random: DeterministicRandomHandle | null = null;\n  let applyPassSpy: ReturnType<typeof vi.spyOn> | null = null;\n  let controlBallSpy: ReturnType<typeof vi.spyOn> | null = null;\n\n  afterEach(() => {\n    applyPassSpy?.mockRestore();\n    controlBallSpy?.mockRestore();\n    applyPassSpy = null;\n    controlBallSpy = null;\n    random?.restore();\n    random = null;\n  });\n\n  it('traces tick 53497 pass and tick 53573 boundary resolution', ({ skip }) => {
-    if (!RUN) skip();\n    random = installDeterministicRandom(DEFAULT_FIXTURE_SEED);\n    const passCalls: PassCallRecord[] = [];\n\n    const originalApplyPass = ballModule.applyPass;\n    applyPassSpy = vi.spyOn(ballModule, 'applyPass').mockImplementation((ball, from, to, power, physics, playerId, clubId) => {\n      const result = originalApplyPass(ball, from, to, power, physics, playerId, clubId);\n      const speed = Math.hypot(result.velocity.x, result.velocity.y, result.velocity.z);\n      passCalls.push({\n        playerId,\n        clubId,\n        from: { ...from },\n        to: { ...to },\n        power,\n        speed,\n      });\n      return result;\n    });\n\n    controlBallSpy = vi.spyOn(ballModule, 'controlBall');\n\n    const data = generateGameData();\n    const clubs = Object.values(data.clubs);\n    const home = structuredClone(clubs[0]);\n    const away = structuredClone(clubs[1]);\n    const players = structuredClone(data.players);\n\n    const diag = new PassGoalkeeperChainDiagnostic(PASS_TICK, BOUNDARY_TICK);\n\n    simulateMatchLive(home, away, players, {\n      seed: MATCH_SEED,\n      maxTicks: MATCH_TICKS,\n      onTick: state => diag.onTick(state, passCalls),\n    });\n\n    const passCall = passCalls.find(call => call.playerId === 'player_club_1_18');\n    expect(passCall).toBeDefined();\n    expect(controlBallSpy).toBeDefined();\n\n    console.log('=== V7 CONTROL BALL SUMMARY ===');\n    console.log('controlBallCalls=' + (controlBallSpy?.mock.calls.length ?? 0));\n    const lastControl = controlBallSpy?.mock.calls.at(-1);\n    if (lastControl) console.log('lastControl player=' + lastControl[1] + ' club=' + lastControl[2]);\n  }, 10 * 60 * 1000);\n});\n
+// V7 targeted forensic harness
+// Usage:
+// $env:RUN_PASS_GOALKEEPER_TRACE='1'
+// npx vitest run src/engine/live/passGoalkeeperChain.test.ts
+
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import * as ballModule from './ball';
+import { simulateMatchLive } from './liveMatch';
+import { PassGoalkeeperChainDiagnostic, type PassCallRecord } from './diagnostics/passGoalkeeperChainDiagnostic';
+import { installDeterministicRandom, DEFAULT_FIXTURE_SEED, type DeterministicRandomHandle } from './diagnostics/deterministicFixture';
+import { generateGameData } from '../data/generateData';
+
+const MATCH_SEED = 1000;
+const MATCH_TICKS = 54_000;
+const PASS_TICK = 53_497;
+const BOUNDARY_TICK = 53_573;
+const RUN = typeof process !== 'undefined' && process.env.RUN_PASS_GOALKEEPER_TRACE === '1';
+
+describe('Pass + Goalkeeper Chain V7', () => {
+  let random: DeterministicRandomHandle | null = null;
+  let applyPassSpy: ReturnType<typeof vi.spyOn> | null = null;
+  let controlBallSpy: ReturnType<typeof vi.spyOn> | null = null;
+
+  afterEach(() => {
+    applyPassSpy?.mockRestore();
+    controlBallSpy?.mockRestore();
+    applyPassSpy = null;
+    controlBallSpy = null;
+    random?.restore();
+    random = null;
+  });
+
+  it('traces tick 53497 pass and tick 53573 boundary resolution', ({ skip }) => {
+    if (!RUN) skip();
+    random = installDeterministicRandom(DEFAULT_FIXTURE_SEED);
+    const passCalls: PassCallRecord[] = [];
+
+    const originalApplyPass = ballModule.applyPass;
+    applyPassSpy = vi.spyOn(ballModule, 'applyPass').mockImplementation((ball, from, to, power, physics, playerId, clubId) => {
+      const result = originalApplyPass(ball, from, to, power, physics, playerId, clubId);
+      const speed = Math.hypot(result.velocity.x, result.velocity.y, result.velocity.z);
+      passCalls.push({
+        playerId,
+        clubId,
+        from: { ...from },
+        to: { ...to },
+        power,
+        speed,
+      });
+      return result;
+    });
+
+    controlBallSpy = vi.spyOn(ballModule, 'controlBall');
+
+    const data = generateGameData();
+    const clubs = Object.values(data.clubs);
+    const home = structuredClone(clubs[0]);
+    const away = structuredClone(clubs[1]);
+    const players = structuredClone(data.players);
+
+    const diag = new PassGoalkeeperChainDiagnostic(PASS_TICK, BOUNDARY_TICK);
+
+    simulateMatchLive(home, away, players, {
+      seed: MATCH_SEED,
+      maxTicks: MATCH_TICKS,
+      onTick: state => diag.onTick(state, passCalls),
+    });
+
+    const passCall = passCalls.find(call => call.playerId === 'player_club_1_18');
+    expect(passCall).toBeDefined();
+    expect(controlBallSpy).toBeDefined();
+
+    console.log('=== V7 CONTROL BALL SUMMARY ===');
+    console.log('controlBallCalls=' + (controlBallSpy?.mock.calls.length ?? 0));
+    const lastControl = controlBallSpy?.mock.calls.at(-1);
+    if (lastControl) console.log('lastControl player=' + lastControl[1] + ' club=' + lastControl[2]);
+  }, 10 * 60 * 1000);
+});
