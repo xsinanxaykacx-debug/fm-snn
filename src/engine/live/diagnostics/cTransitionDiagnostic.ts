@@ -24,9 +24,14 @@ import type {
   TackleOutcome,
 } from '../../types';
 
+import { DEFAULT_LIVE_ENGINE_CONFIG } from '../config';
+
 export const C1_MAX_BALL_SPEED = 1.5;
 export const C1_MAX_DISTANCE = 0.6;
 export const DEFAULT_MAX_TICKS = 12_000;
+
+export const BALL_CONTROL_RADIUS =
+  DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.ballControlRadius;
 
 export type CClass =
   | 'C1_loose_ball_resolver'
@@ -44,6 +49,7 @@ export interface TickSnapshot {
   ballX: number;
   ballY: number;
   ballSpeed: number;
+  ballVelocityZ: number;
   isMoving: boolean;
   lastTouchId: string | null;
   lastTouchClubId: string | null;
@@ -78,6 +84,28 @@ export interface TickLocalEvent {
   minute: number;
 }
 
+export type C5SubClassification =
+  | 'LIKELY_LOOSE_BALL'
+  | 'C5_UNEXPLAINED_UNCHANGED'
+  | 'C5_UNEXPLAINED_CHANGED'
+  | 'C5_UNEXPLAINED_LOST';
+
+export interface C5Lifecycle {
+  subClassification: C5SubClassification;
+  tMinus1Distance: number;
+  movementDistance: number;
+  movementPlusTMinus1Distance: number;
+  tDistance: number;
+  tBallSpeed: number;
+  tBallVelocityZ: number;
+  tIsMoving: boolean;
+  tPlus1OwnerId: string | null;
+  tPlus1OwnerSame: boolean;
+  tPlus1BallIsMoving: boolean;
+  tPlus1SetPieceType: SetPieceState['type'] | null;
+  tPlus1EventDelta: number;
+}
+
 export interface CTickRecord {
   tick: number;
   classification: CClass;
@@ -85,8 +113,10 @@ export interface CTickRecord {
   evidence: string[];
   before: TickSnapshot;
   at: TickSnapshot;
+  after?: TickSnapshot;
   events: TickLocalEvent[];
   rngDelta: number;
+  c5Lifecycle?: C5Lifecycle;
 }
 
 interface SetPieceLifecycleEvidence {
@@ -103,6 +133,13 @@ export interface CReport {
   totalC: number;
   dist: Record<CClass, number>;
   conf: Record<Confidence, number>;
+  c5SubDist: Record<C5SubClassification, number>;
+  ballControlRadius: number;
+  c5DistanceStats: {
+    total: number;
+    withinRadiusByUpperBound: number;
+    outsideRadiusByUpperBound: number;
+  };
   rngTotal: number;
   records: readonly CTickRecord[];
 }
@@ -135,6 +172,7 @@ function takeSnapshot(state: LiveMatchState): TickSnapshot {
     ballX: state.ball.position.x,
     ballY: state.ball.position.y,
     ballSpeed: getBallSpeed(state),
+    ballVelocityZ: state.ball.velocity.z,
     isMoving: state.ball.isMoving,
     lastTouchId: state.ball.lastTouchId,
     lastTouchClubId: state.ball.lastTouchClubId,
@@ -210,6 +248,49 @@ function distanceToNewOwnerAtPreviousTick(
     player.y,
     previous.ballX,
     previous.ballY,
+  );
+}
+
+function findPlayer(
+  snapshot: TickSnapshot,
+  id: string | null,
+): TickSnapshot['players'][number] | undefined {
+  if (id === null) return undefined;
+  return snapshot.players.find(player => player.id === id);
+}
+
+function distanceToOwner(
+  snapshot: TickSnapshot,
+  ownerId: string | null,
+): number {
+  const player = findPlayer(snapshot, ownerId);
+  if (!player) return Number.POSITIVE_INFINITY;
+
+  return distance(
+    player.x,
+    player.y,
+    snapshot.ballX,
+    snapshot.ballY,
+  );
+}
+
+function movementDistance(
+  before: TickSnapshot,
+  at: TickSnapshot,
+  ownerId: string | null,
+): number {
+  const previousPlayer = findPlayer(before, ownerId);
+  const currentPlayer = findPlayer(at, ownerId);
+
+  if (!previousPlayer || !currentPlayer) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return distance(
+    previousPlayer.x,
+    previousPlayer.y,
+    currentPlayer.x,
+    currentPlayer.y,
   );
 }
 
@@ -543,6 +624,51 @@ function classifyC(
   );
 }
 
+function buildC5Lifecycle(
+  before: TickSnapshot,
+  at: TickSnapshot,
+  after: TickSnapshot,
+): C5Lifecycle {
+  const ownerId = at.ownerId;
+  const tMinus1Distance = distanceToOwner(before, ownerId);
+  const movement = movementDistance(before, at, ownerId);
+  const upperBound = tMinus1Distance + movement;
+  const tDistance = distanceToOwner(at, ownerId);
+
+  let subClassification: C5SubClassification;
+
+  if (after.ownerId === null) {
+    subClassification = 'C5_UNEXPLAINED_LOST';
+  } else if (after.ownerId !== ownerId) {
+    subClassification = 'C5_UNEXPLAINED_CHANGED';
+  } else if (
+    Number.isFinite(upperBound) &&
+    upperBound <= BALL_CONTROL_RADIUS
+  ) {
+    subClassification = 'LIKELY_LOOSE_BALL';
+  } else {
+    subClassification = 'C5_UNEXPLAINED_UNCHANGED';
+  }
+
+  return {
+    subClassification,
+    tMinus1Distance,
+    movementDistance: movement,
+    movementPlusTMinus1Distance: upperBound,
+    tDistance,
+    tBallSpeed: at.ballSpeed,
+    tBallVelocityZ: at.ballVelocityZ,
+    tIsMoving: at.isMoving,
+    tPlus1OwnerId: after.ownerId,
+    tPlus1OwnerSame:
+      ownerId !== null && after.ownerId === ownerId,
+    tPlus1BallIsMoving: after.isMoving,
+    tPlus1SetPieceType: after.setPieceType,
+    tPlus1EventDelta:
+      after.eventsLength - at.eventsLength,
+  };
+}
+
 export class CTransitionDiagnostic {
   private initialized = false;
   private prev: TickSnapshot | null = null;
@@ -557,6 +683,9 @@ export class CTransitionDiagnostic {
   // runTick içindeki onTackleResolved, onTick'ten önce çalışır.
   // Outcome'lar bir sonraki onTick'te aynı tick'in evidence'ı olarak tüketilir.
   private tackleOutcomesSinceLastTick: TackleOutcome[] = [];
+
+  // C geçişi T+1 snapshot'ı geldiğinde lifecycle ile tamamlanır.
+  private pendingC5Record: CTickRecord | null = null;
 
   constructor(maxTicks: number = DEFAULT_MAX_TICKS) {
     this.maxTicks = maxTicks;
@@ -600,6 +729,22 @@ export class CTransitionDiagnostic {
       this.previousEventLength,
       state.events.length,
     );
+
+    // Bir önceki C geçişinin T+1 snapshot'ı artık mevcut.
+    if (this.pendingC5Record !== null) {
+      const pending = this.pendingC5Record;
+      pending.after = snap;
+
+      if (pending.classification === 'C5_unexplained') {
+        pending.c5Lifecycle = buildC5Lifecycle(
+          pending.before,
+          pending.at,
+          snap,
+        );
+      }
+
+      this.pendingC5Record = null;
+    }
 
     const newSetPiece =
       previous.setPieceType === null &&
@@ -655,6 +800,11 @@ export class CTransitionDiagnostic {
 
       this.records.push(record);
 
+      if (record.classification === 'C5_unexplained') {
+        // T+1 henüz bilinmiyor; record aynı referans üzerinden finalize edilir.
+        this.pendingC5Record = record;
+      }
+
       if (previous.setPieceType !== null) {
         this.activeSetPiece = null;
       }
@@ -688,18 +838,61 @@ export class CTransitionDiagnostic {
       unknown: 0,
     };
 
+    const c5SubDist: Record<C5SubClassification, number> = {
+      LIKELY_LOOSE_BALL: 0,
+      C5_UNEXPLAINED_UNCHANGED: 0,
+      C5_UNEXPLAINED_CHANGED: 0,
+      C5_UNEXPLAINED_LOST: 0,
+    };
+
     let rngTotal = 0;
+    let c5Total = 0;
+    let withinRadiusByUpperBound = 0;
+    let outsideRadiusByUpperBound = 0;
 
     for (const record of this.records) {
       dist[record.classification] += 1;
       conf[record.confidence] += 1;
       rngTotal += record.rngDelta;
+
+      if (record.classification === 'C5_unexplained' &&
+          record.c5Lifecycle !== undefined) {
+        c5Total += 1;
+        c5SubDist[record.c5Lifecycle.subClassification] += 1;
+
+        if (
+          Number.isFinite(
+            record.c5Lifecycle.movementPlusTMinus1Distance,
+          ) &&
+          record.c5Lifecycle.movementPlusTMinus1Distance <=
+            BALL_CONTROL_RADIUS
+        ) {
+          withinRadiusByUpperBound += 1;
+        } else {
+          outsideRadiusByUpperBound += 1;
+        }
+      }
     }
 
-    console.log('=== C-TRANSITION DIAGNOSTIC ===');
+    console.log('=== C-TRANSITION DIAGNOSTIC V2 ===');
+    console.log(
+      'ballControlRadius=' + BALL_CONTROL_RADIUS.toFixed(3) + ' m',
+    );
     console.log(
       'total C transitions: ' +
       this.records.length,
+    );
+    console.table(dist);
+    console.table(conf);
+
+    console.log('=== C5 SUBCLASSIFICATION ===');
+    console.table(c5SubDist);
+
+    console.log('=== C5 GEOMETRY ===');
+    console.log(
+      'C5 total=' + c5Total +
+      ' | upperBound<=radius=' + withinRadiusByUpperBound +
+      ' | upperBound>radius=' + outsideRadiusByUpperBound,
     );
     console.table(dist);
     console.table(conf);
@@ -720,13 +913,25 @@ export class CTransitionDiagnostic {
       );
 
       for (const record of c5.slice(0, 50)) {
+        const life = record.c5Lifecycle;
+
         console.log(
           'tick=' + record.tick,
-          'evidence=[' + record.evidence.join(' | ') + ']',
-          'owner: ' + record.before.ownerId +
-          ' -> ' + record.at.ownerId,
-          'speed(T-1)=' +
-          record.before.ballSpeed.toFixed(3),
+          'sub=' + (life?.subClassification ?? 'PENDING'),
+          'owner=' + record.before.ownerId +
+          ' -> ' + record.at.ownerId +
+          ' -> ' + (life?.tPlus1OwnerId ?? 'PENDING'),
+          'dist(T-1)=' +
+          (life ? life.tMinus1Distance.toFixed(3) : 'PENDING'),
+          'move=' +
+          (life ? life.movementDistance.toFixed(3) : 'PENDING'),
+          'upper=' +
+          (life ? life.movementPlusTMinus1Distance.toFixed(3) : 'PENDING'),
+          'dist(T)=' +
+          (life ? life.tDistance.toFixed(3) : 'PENDING'),
+          'speed(T)=' + record.at.ballSpeed.toFixed(3),
+          'vz(T)=' + record.at.ballVelocityZ.toFixed(3),
+          'moving(T)=' + record.at.isMoving,
           'setPiece(T-1->T)=' +
           (record.before.setPieceType ?? '-') +
           '->' +
@@ -802,6 +1007,13 @@ export class CTransitionDiagnostic {
       totalC: this.records.length,
       dist,
       conf,
+      c5SubDist,
+      ballControlRadius: BALL_CONTROL_RADIUS,
+      c5DistanceStats: {
+        total: c5Total,
+        withinRadiusByUpperBound,
+        outsideRadiusByUpperBound,
+      },
       rngTotal,
       records: this.records,
     };
