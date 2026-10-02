@@ -104,9 +104,18 @@ describe('single match bench', () => {
       console.log('probability clamp        : (0.35, 0.92)');
       console.log('actionResolution SHA     : 3c87e5480b33f3662e999e47bd2de83e9120ab59');
 
+      const homeSquadCount = Object.values(players).filter(
+        player => player.clubId === home.id && player.squadRole !== 'u21'
+      ).length;
+      const awaySquadCount = Object.values(players).filter(
+        player => player.clubId === away.id && player.squadRole !== 'u21'
+      ).length;
+
       console.log('=== ROSTER INPUT ===');
-      console.log('home.players.length :', home.players.length);
-      console.log('away.players.length :', away.players.length);
+      console.log('home squad count    :', homeSquadCount);
+      console.log('away squad count    :', awaySquadCount);
+      console.log('home lineup input   :', home.lineup?.length ?? 0);
+      console.log('away lineup input   :', away.lineup?.length ?? 0);
 
       let firstState: LiveMatchState | null = null;
       let capturedTick = -1;
