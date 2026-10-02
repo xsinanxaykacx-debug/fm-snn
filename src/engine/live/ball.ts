@@ -119,6 +119,7 @@ export function createBall(pitch: PitchDimensions): Ball {
       z: DEFAULT_BALL_PHYSICS.radius,
     },
     velocity: { x: 0, y: 0, z: 0 },
+    targetPosition: null,
     ownerId: null,
     lastTouchId: null,
     lastTouchClubId: null,
@@ -158,8 +159,29 @@ export function stepBall(
   ball.velocity.z *= physics.airDrag;
 
   // 3) Konum güncelle
-  ball.position.x += ball.velocity.x * tickDuration;
-  ball.position.y += ball.velocity.y * tickDuration;
+  // Kontrollü pas hedefini geçemez. Eski davranışta pas hızı hedefi
+  // aştıktan sonra devam ettiği için top kale çizgisine taşınabiliyordu.
+  if (ball.targetPosition !== null) {
+    const dx = ball.targetPosition.x - ball.position.x;
+    const dy = ball.targetPosition.y - ball.position.y;
+    const remaining = Math.hypot(dx, dy);
+    const travel = Math.hypot(ball.velocity.x, ball.velocity.y) * tickDuration;
+
+    if (remaining <= Math.max(travel, 1e-6)) {
+      ball.position.x = ball.targetPosition.x;
+      ball.position.y = ball.targetPosition.y;
+      ball.velocity.x = 0;
+      ball.velocity.y = 0;
+      ball.targetPosition = null;
+    } else {
+      ball.position.x += ball.velocity.x * tickDuration;
+      ball.position.y += ball.velocity.y * tickDuration;
+    }
+  } else {
+    ball.position.x += ball.velocity.x * tickDuration;
+    ball.position.y += ball.velocity.y * tickDuration;
+  }
+
   ball.position.z += ball.velocity.z * tickDuration;
 
   // 4) Zemin çarpışması / sekme
@@ -225,6 +247,7 @@ export function applyPass(
   const dir = directionTo(from, to);
 
   ball.ownerId = null;
+  ball.targetPosition = { x: to.x, y: to.y };
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
 
@@ -254,6 +277,7 @@ export function applyShot(
   const dir = directionTo(from, to);
 
   ball.ownerId = null;
+  ball.targetPosition = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
 
@@ -286,6 +310,7 @@ export function applyCross(
   const dir = directionTo(from, to);
 
   ball.ownerId = null;
+  ball.targetPosition = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
 
@@ -318,6 +343,7 @@ export function applyClearance(
   const dir = normalizeDirection(direction);
 
   ball.ownerId = null;
+  ball.targetPosition = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
 
@@ -362,6 +388,7 @@ export function controlBall(
   clubId: string
 ): Ball {
   ball.ownerId = playerId;
+  ball.targetPosition = null;
   ball.lastTouchId = playerId;
   ball.lastTouchClubId = clubId;
   ball.velocity = { x: 0, y: 0, z: 0 };
@@ -372,6 +399,7 @@ export function controlBall(
 
 export function releaseBall(ball: Ball): Ball {
   ball.ownerId = null;
+  ball.targetPosition = null;
   return ball;
 }
 
