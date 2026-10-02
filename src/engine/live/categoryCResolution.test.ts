@@ -1,37 +1,28 @@
 // src/engine/live/categoryCResolution.test.ts
 //
-// DIAGNOSTIC ONLY — C-transition v3.
+// DIAGNOSTIC ONLY — C-transition v4.
+// Production dosyalarına dokunulmaz.
 //
 // Kullanım:
-//   git pull
+//   git pull --ff-only
 //   $env:RUN_LIVE_DIAGNOSTIC="1"
 //   npx vitest run src/engine/live/categoryCResolution.test.ts
-//
-// Production dosyalarına dokunulmaz.
-// vi.mock yalnızca test scope'unda controlBall'ı sarar.
 
 import { describe, expect, it, vi } from 'vitest';
 
-// vi.mock hoisted olduğu için factory içinde trace modülünü dinamik
-// import ediyoruz. Böylece test module initialization sırasına bağımlı
-// kalmıyoruz.
 vi.mock('./ball', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('./ball')>();
-
+  const actual = await importOriginal<typeof import('./ball')>();
   const { recordControlBallTrace } =
     await import('./diagnostics/controlBallTrace');
 
   return {
     ...actual,
-
     controlBall: (
       ball: Parameters<typeof actual.controlBall>[0],
       ownerId: Parameters<typeof actual.controlBall>[1],
       clubId: Parameters<typeof actual.controlBall>[2],
     ) => {
       const stack = new Error().stack ?? '';
-
       recordControlBallTrace(
         ownerId,
         clubId,
@@ -40,8 +31,6 @@ vi.mock('./ball', async (importOriginal) => {
         ball.ownerId,
         stack,
       );
-
-      // Kritik: davranış değişmez; gerçek implementation aynen çağrılır.
       return actual.controlBall(ball, ownerId, clubId);
     },
   };
@@ -50,12 +39,10 @@ vi.mock('./ball', async (importOriginal) => {
 import { generateGameData } from '../data/generateData';
 import type { Club, Player } from '../types';
 import { simulateMatchLive } from './liveMatch';
-
 import {
-  CTransitionDiagnosticV3,
+  CTransitionDiagnosticV4,
   DEFAULT_MAX_TICKS,
-} from './diagnostics/cTransitionDiagnosticV3';
-
+} from './diagnostics/cTransitionDiagnosticV4';
 import { traceBuffer } from './diagnostics/controlBallTrace';
 
 const RUN = process.env.RUN_LIVE_DIAGNOSTIC === '1';
@@ -94,13 +81,10 @@ function getFixture(data: {
     );
   }
 
-  return {
-    home: clubs[0],
-    away: clubs[1],
-  };
+  return { home: clubs[0], away: clubs[1] };
 }
 
-describe.skipIf(!RUN)('C-transition diagnostic v3', () => {
+describe.skipIf(!RUN)('C-transition diagnostic v4', () => {
   it(
     'runs ' + SEEDS.length + ' seeds x ' + MAX_TICKS_PER_SEED + ' ticks',
     () => {
@@ -131,45 +115,7 @@ describe.skipIf(!RUN)('C-transition diagnostic v3', () => {
         NONE: 0,
       };
 
-      const callerBySubAggregate = {
-        LIKELY_LOOSE_BALL: {
-          resolveLooseBallControl: 0,
-          applyTackleWon: 0,
-          updateSetPieceStatus: 0,
-          handlePassAction: 0,
-          kickoff: 0,
-          other: 0,
-          NONE: 0,
-        },
-        C5_UNEXPLAINED_UNCHANGED: {
-          resolveLooseBallControl: 0,
-          applyTackleWon: 0,
-          updateSetPieceStatus: 0,
-          handlePassAction: 0,
-          kickoff: 0,
-          other: 0,
-          NONE: 0,
-        },
-        C5_UNEXPLAINED_CHANGED: {
-          resolveLooseBallControl: 0,
-          applyTackleWon: 0,
-          updateSetPieceStatus: 0,
-          handlePassAction: 0,
-          kickoff: 0,
-          other: 0,
-          NONE: 0,
-        },
-        C5_UNEXPLAINED_LOST: {
-          resolveLooseBallControl: 0,
-          applyTackleWon: 0,
-          updateSetPieceStatus: 0,
-          handlePassAction: 0,
-          kickoff: 0,
-          other: 0,
-          NONE: 0,
-        },
-      };
-
+      const setPieceAggregate: Record<string, number> = {};
       let totalC = 0;
 
       for (const seed of SEEDS) {
@@ -177,29 +123,24 @@ describe.skipIf(!RUN)('C-transition diagnostic v3', () => {
 
         const data = cloneData(baseline);
         resetPlayers(data.players);
-
         const { home, away } = getFixture(data);
 
         const diagnostic =
-          new CTransitionDiagnosticV3(traceBuffer, MAX_TICKS_PER_SEED);
+          new CTransitionDiagnosticV4(
+            traceBuffer,
+            MAX_TICKS_PER_SEED,
+          );
 
-        simulateMatchLive(
-          home,
-          away,
-          data.players,
-          {
-            seed,
-            maxTicks: MAX_TICKS_PER_SEED,
-
-            onTackleResolved: outcome => {
-              diagnostic.onTackleResolved(outcome);
-            },
-
-            onTick: state => {
-              diagnostic.onTick(state);
-            },
+        simulateMatchLive(home, away, data.players, {
+          seed,
+          maxTicks: MAX_TICKS_PER_SEED,
+          onTackleResolved: outcome => {
+            diagnostic.onTackleResolved(outcome);
           },
-        );
+          onTick: state => {
+            diagnostic.onTick(state);
+          },
+        });
 
         const report = diagnostic.report();
 
@@ -217,10 +158,8 @@ describe.skipIf(!RUN)('C-transition diagnostic v3', () => {
           callerAggregate[key] += report.callerDist[key];
         }
 
-        for (const sub of Object.keys(callerBySubAggregate) as Array<keyof typeof callerBySubAggregate>) {
-          for (const caller of Object.keys(callerBySubAggregate[sub]) as Array<keyof typeof callerBySubAggregate[typeof sub]>) {
-            callerBySubAggregate[sub][caller] += report.callerBySub[sub][caller];
-          }
+        for (const [type, count] of Object.entries(report.setPieceMutationTypes)) {
+          setPieceAggregate[type] = (setPieceAggregate[type] ?? 0) + count;
         }
       }
 
@@ -229,31 +168,22 @@ describe.skipIf(!RUN)('C-transition diagnostic v3', () => {
       console.log('total C transitions: ' + totalC);
       console.table(aggregate);
 
-      console.log('=== AGGREGATE C5 SUBCLASSIFICATION ===');
+      console.log('=== AGGREGATE C5 LIFECYCLE (rapor; karar kanıtı değil) ===');
       console.table(c5Aggregate);
 
-      console.log('=== AGGREGATE C5 CALLER ===');
+      console.log('=== AGGREGATE CONTROL-BALL CALLER ===');
       console.table(callerAggregate);
 
-      console.log('=== AGGREGATE C5 SUBCLASS × CALLER ===');
-      console.table(callerBySubAggregate);
+      console.log('=== AGGREGATE updateSetPieceStatus × T-1 setPieceType ===');
+      console.table(setPieceAggregate);
 
-      console.log('');
       console.log('=== KARAR NOKTASI ===');
-
-      if (c5Aggregate.C5_UNEXPLAINED_UNCHANGED === 0) {
-        console.log('C5 UNCHANGED = 0.');
-      } else {
-        const resolved =
-          callerBySubAggregate.C5_UNEXPLAINED_UNCHANGED.resolveLooseBallControl;
-        const total =
-          c5Aggregate.C5_UNEXPLAINED_UNCHANGED;
-
-        console.log(
-          'UNCHANGED resolveLooseBallControl oranı: %' +
-          ((resolved / total) * 100).toFixed(1),
-        );
-      }
+      console.log(
+        'Mutation trace birincil kanıt. Geometri yalnızca yardımcı bilgi.',
+      );
+      console.log(
+        'Final C5: ' + aggregate.C5_unexplained,
+      );
 
       expect(totalC).toBeGreaterThanOrEqual(0);
     },
