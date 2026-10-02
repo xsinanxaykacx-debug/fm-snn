@@ -312,12 +312,10 @@ describe.skipIf(!RUN)('Loose-ball vs set-piece possession diagnostic', () => {
         const { home, away } = getFixture(data);
 
         let previousOwnerId: string | null = null;
-        let previousTick = 0;
         let previousEventCount = 0;
         let previousSetPiece: SetPieceSnapshot | null = null;
 
         let nullStartTick: number | null = null;
-        let nullStartBall: TickBall | null = null;
 
         let activeBoundary: BoundarySnapshot | null = null;
         let activeSetPiece: SetPieceSnapshot | null = null;
@@ -357,7 +355,6 @@ describe.skipIf(!RUN)('Loose-ball vs set-piece possession diagnostic', () => {
               previousOwnerId !== null
             ) {
               nullStartTick = state.tick;
-              nullStartBall = ball;
               firstEligibleTick = null;
               firstEligibleDistance = null;
 
@@ -538,7 +535,6 @@ describe.skipIf(!RUN)('Loose-ball vs set-piece possession diagnostic', () => {
 
               // Lifecycle consumed.
               nullStartTick = null;
-              nullStartBall = null;
               activeBoundary = null;
               activeSetPiece = null;
               firstEligibleTick = null;
@@ -546,7 +542,6 @@ describe.skipIf(!RUN)('Loose-ball vs set-piece possession diagnostic', () => {
             }
 
             previousOwnerId = ownerId;
-            previousTick = state.tick;
             previousEventCount = state.events.length;
             previousSetPiece = currentSetPiece;
           },
