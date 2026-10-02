@@ -53,6 +53,13 @@ type Frame = {
     ownerId: string | null;
     lastTouchId: string | null;
   };
+  latestEvent: {
+    minute: number;
+    type: string;
+    description: string;
+    team?: 'home' | 'away';
+    xG?: number;
+  } | null;
   players: FramePlayer[];
 };
 
@@ -96,6 +103,15 @@ function compactFrame(state: LiveMatchState): Frame {
       ownerId: state.ball.ownerId,
       lastTouchId: state.ball.lastTouchId,
     },
+    latestEvent: state.events.length > 0
+      ? {
+          minute: state.events[state.events.length - 1].minute,
+          type: state.events[state.events.length - 1].type,
+          description: state.events[state.events.length - 1].description,
+          team: state.events[state.events.length - 1].team,
+          xG: state.events[state.events.length - 1].xG,
+        }
+      : null,
     players: Object.keys(state.players).sort().map(id => {
       const p = state.players[id];
       const decision = state.decisions[id]?.decision ?? p.currentDecision;
