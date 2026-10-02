@@ -61,6 +61,5 @@ describe.skipIf(!RUN)('Goal Boundary Provenance V3', () => {
       }
     },
     10 * 60 * 1000,
-    );
-  });
+  );
 });
