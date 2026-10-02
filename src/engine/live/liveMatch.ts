@@ -1025,7 +1025,12 @@ function syncBallOwnerFlags(state: LiveMatchState): void {
 // LOOSE BALL CONTROL
 // ═══════════════════════════════════════════════
 
-function resolveLooseBallControl(state: LiveMatchState): void {
+/**
+ * @internal
+ * Test edilebilirlik için export edilmiştir.
+ * Production akışında runTick/applyBallActions üzerinden çağrılır.
+ */
+export function resolveLooseBallControl(state: LiveMatchState): void {
   if (state.ball.ownerId !== null) return;
 
   // Topun "hareket ediyor" bayrağı ile "oyuncunun kontrol edebileceği hız"
@@ -1075,7 +1080,12 @@ function resolveLooseBallControl(state: LiveMatchState): void {
   resolvePendingLooseBallRecovery(state);
 }
 
-function resolvePendingLooseBallRecovery(state: LiveMatchState): void {
+/**
+ * @internal
+ * Test edilebilirlik için export edilmiştir.
+ * Production akışında runTick üzerinden çağrılır.
+ */
+export function resolvePendingLooseBallRecovery(state: LiveMatchState): void {
   const transition = state.transition;
 
   if (transition.pendingLooseBallRecoveryClubId === null) {
