@@ -240,7 +240,7 @@ export function resolvePassAction(
     tactic.directness === 'direct' ? 1.06 :
     tactic.directness === 'short' ? 0.97 : 1;
 
-  const baseProbability = passingSkill / 100;
+  const skillProbability = passingSkill / 20;
 
   // Pass quality is primarily driven by the passer's effective skill.
   // Contextual factors reduce that base probability additively so several
@@ -267,13 +267,13 @@ export function resolvePassAction(
       pressurePenalty +
       tacticPenalty,
     0,
-    0.65
+    0.35
   );
 
-  const raw = baseProbability * (1 - totalPenalty);
+  const raw = skillProbability - totalPenalty;
 
   return {
-    probability: clamp(raw, 0.15, 0.92),
+    probability: clamp(raw, 0.35, 0.92),
     quality: clamp(
       (passingSkill / 100) *
       lane *
