@@ -27,11 +27,15 @@ describe.skipIf(!RUN)('Pending lifecycle + ownership cycle', () => {
 
     const changes: Change[] = [];
     const starts:any[]=[]; const ends:any[]=[]; const active:any[]=[];
+    let finalLooseBallRecoveries=0, finalRecoveries=0, totalTicks=0;
     let prevOwner:string|null=null, prevPending:string|null=null;
 
     simulateMatchLive(clubs[0], clubs[1], data.players, {
       seed: SEED,
       onTick:(state:LiveMatchState)=>{
+        totalTicks=state.tick+1;
+        finalLooseBallRecoveries=state.stats.counterPressLooseBallRecoveries;
+        finalRecoveries=state.stats.counterPressRecoveries;
         const pending=state.transition.pendingLooseBallRecoveryPlayerId;
         const pendingClub=state.transition.pendingLooseBallRecoveryClubId;
         const owner=state.ball.ownerId;
@@ -59,12 +63,13 @@ describe.skipIf(!RUN)('Pending lifecycle + ownership cycle', () => {
       }
     });
 
-    const finalLoose=stateStats(changes); // marker only; final stats are captured below via an independent final tick is unavailable.
     console.log('\n=====================================================\nBÖLÜM A — PENDING LIFECYCLE\n=====================================================\n');
     console.log('pending aktif tick sayısı:',active.length);
     console.log('pending start olayı:',starts.length);
     console.log('pending end olayı:',ends.length);
-    console.log('Note: recovery counters are printed from lifecycle events above; zero-event final counters require no production mutation.');
+    console.log('total ticks:',totalTicks);
+    console.log('counterPressLooseBallRecoveries:',finalLooseBallRecoveries);
+    console.log('counterPressRecoveries:',finalRecoveries);
 
     console.log('\n--- PENDING START OLAYLARI ---');
     console.table(starts);
@@ -99,10 +104,8 @@ describe.skipIf(!RUN)('Pending lifecycle + ownership cycle', () => {
       .sort((a,b)=>b.count-a.count).slice(0,20));
 
     console.log('\n=== ÖZET ===');
-    console.log(JSON.stringify({seed:SEED,pending:{activeTicks:active.length,startEvents:starts.length,endEvents:ends.length},
+    console.log(JSON.stringify({seed:SEED,pending:{activeTicks:active.length,startEvents:starts.length,endEvents:ends.length,looseBallRecoveries:finalLooseBallRecoveries,recoveries:finalRecoveries},
       ownershipCycle:{window:[CYCLE_START,CYCLE_END],changeCount:changes.length,classification:cls,
         meanDelta:diffs.length?diffs.reduce((a,b)=>a+b,0)/diffs.length:0}},null,2));
   }, 60*60*1000);
 });
-
-function stateStats(_:Change[]) { return null; }
