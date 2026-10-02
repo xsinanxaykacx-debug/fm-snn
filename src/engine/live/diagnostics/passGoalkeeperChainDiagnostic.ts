@@ -1,70 +1,120 @@
-// V7 targeted forensic diagnostic: pass -> loose ball -> boundary -> goalkeeper save.
-// Production untouched.
+import type { LiveMatchState, MatchEvent } from '../../types';
+import type { BoundaryOutcome, DetectEventInput } from '../events';
 
-import type { LiveMatchState, MatchEvent, DecisionDebug } from '../../types';
-
-export interface PassCallRecord {
-  playerId: string | null | undefined;
-  clubId: string | null | undefined;
-  from: { x: number; y: number; z: number };
-  to: { x: number; y: number };
+export interface ApplyPassCall {
+  tick: number;
+  playerId: string;
+  clubId: string;
+  fromX: number;
+  fromY: number;
+  targetX: number;
+  targetY: number;
   power: number;
-  speed: number;
+  resultVx: number;
+  resultVy: number;
+  resultSpeed: number;
+  dirX: number;
+  dirY: number;
+  dirMatchesVelocity: boolean;
+}
+
+export interface ControlBallCall {
+  tick: number;
+  ownerId: string;
+  clubId: string;
+  previousOwnerId: string | null;
+  resultingLastTouchId: string | null;
+  resultingLastTouchClubId: string | null;
+}
+
+export interface BoundaryCall {
+  tick: number;
+  input: DetectEventInput;
+  result: BoundaryOutcome;
+}
+
+interface TickSnapshotV7 {
+  tick: number;
+  scoreHome: number;
+  scoreAway: number;
+  eventsLength: number;
+  newEvents: MatchEvent[];
+  ballOwnerId: string | null;
+  ballLastTouchId: string | null;
+  ballLastTouchClubId: string | null;
+  setPieceType: string | null;
+  setPieceStatus: string | null;
+  setPieceTakerId: string | null;
 }
 
 export class PassGoalkeeperChainDiagnostic {
-  private lastEventLength = 0;
-  private lastScore = { home: 0, away: 0 };
+  private snapshots = new Map<number, TickSnapshotV7>();
+  private lastEventsLength = 0;
+  private applyPassCalls: ApplyPassCall[] = [];
+  private controlBallCalls: ControlBallCall[] = [];
+  private boundaryCalls: BoundaryCall[] = [];
 
   constructor(private readonly passTick: number, private readonly boundaryTick: number) {}
 
-  onTick(state: LiveMatchState, passCalls: readonly PassCallRecord[]): void {
+  onTick(state: LiveMatchState): void {
     const newEvents: MatchEvent[] = [];
-    for (let i = this.lastEventLength; i < state.events.length; i++) newEvents.push(state.events[i]);
-    this.lastEventLength = state.events.length;
+    for (let i = this.lastEventsLength; i < state.events.length; i++) newEvents.push(state.events[i]);
+    this.lastEventsLength = state.events.length;
+    this.snapshots.set(state.tick, {
+      tick: state.tick,
+      scoreHome: state.score.home,
+      scoreAway: state.score.away,
+      eventsLength: state.events.length,
+      newEvents,
+      ballOwnerId: state.ball.ownerId,
+      ballLastTouchId: state.ball.lastTouchId,
+      ballLastTouchClubId: state.ball.lastTouchClubId,
+      setPieceType: state.setPiece?.type ?? null,
+      setPieceStatus: state.setPiece?.status ?? null,
+      setPieceTakerId: state.setPiece?.takerId ?? null,
+    });
+  }
 
-    const scoreChanged = state.score.home !== this.lastScore.home || state.score.away !== this.lastScore.away;
+  recordApplyPass(call: ApplyPassCall): void { this.applyPassCalls.push(call); }
+  recordControlBall(call: ControlBallCall): void { this.controlBallCalls.push(call); }
+  recordBoundary(call: BoundaryCall): void { this.boundaryCalls.push(call); }
 
-    if (state.tick === this.passTick) {
-      const passEvent = newEvents.find(event => event.type === 'pass');
-      const playerId = passEvent?.playerId ?? null;
-      const decisionDebug: DecisionDebug | undefined = playerId ? state.decisions[playerId] : undefined;
-      const callsForPlayer = passCalls.filter(call => call.playerId === playerId);
-
-      console.log('=== V7 PASS CHAIN ===');
-      console.log('tick=' + state.tick + ' passEventPlayer=' + (playerId ?? 'null'));
-      console.log('event=' + (passEvent?.type ?? 'none') + ' club=' + (passEvent?.clubId ?? 'null'));
-      if (decisionDebug) {
-        const d = decisionDebug.decision;
-        const s = decisionDebug.selected;
-        console.log('decision intent=' + d.intent + ' targetPlayerId=' + (d.targetPlayerId ?? 'null') +
-          ' target=(' + (d.target?.x.toFixed(3) ?? '?') + ',' + (d.target?.y.toFixed(3) ?? '?') + ')' +
-          ' power=' + d.power.toFixed(6));
-        console.log('selected type=' + (s?.type ?? 'null') + ' targetPlayerId=' + (s?.targetPlayerId ?? 'null') +
-          ' score=' + (s?.score.toFixed(6) ?? '?') + ' successProbability=' + (s?.successProbability.toFixed(6) ?? '?'));
-      } else console.log('decisionDebug=none');
-      console.log('applyPassCallsForPlayer=' + callsForPlayer.length);
-      for (const call of callsForPlayer.slice(-3)) {
-        console.log('applyPass from=(' + call.from.x.toFixed(3) + ',' + call.from.y.toFixed(3) + ',' + call.from.z.toFixed(3) + ')' +
-          ' to=(' + call.to.x.toFixed(3) + ',' + call.to.y.toFixed(3) + ')' +
-          ' power=' + call.power.toFixed(6) + ' speed=' + call.speed.toFixed(6) +
-          ' delta=(' + (call.to.x-call.from.x).toFixed(3) + ',' + (call.to.y-call.from.y).toFixed(3) + ')');
-      }
+  report(): void {
+    console.log('');
+    console.log('=== V7 PASS CHAIN ===');
+    const passCalls = this.applyPassCalls.filter(c => c.tick === this.passTick);
+    if (!passCalls.length) console.log('(no applyPass call at target tick)');
+    for (const c of passCalls) {
+      console.log('tick=' + c.tick + ' player=' + c.playerId + ' club=' + c.clubId);
+      console.log('from=(' + c.fromX.toFixed(3) + ',' + c.fromY.toFixed(3) + ') target=(' + c.targetX.toFixed(3) + ',' + c.targetY.toFixed(3) + ')');
+      console.log('power=' + c.power.toFixed(6) + ' dir=(' + c.dirX.toFixed(3) + ',' + c.dirY.toFixed(3) + ')');
+      console.log('resultV=(' + c.resultVx.toFixed(3) + ',' + c.resultVy.toFixed(3) + ') speed=' + c.resultSpeed.toFixed(3));
+      console.log('dirMatchesVelocity=' + c.dirMatchesVelocity);
     }
-
-    if (state.tick === this.boundaryTick) {
-      const goalEvent = newEvents.find(event => event.type === 'goal');
-      const goalKickEvent = newEvents.find(event => event.type === 'goal_kick');
-      console.log('');
-      console.log('=== V7 GOALKEEPER / BOUNDARY CHAIN ===');
-      console.log('tick=' + state.tick + ' score=' + state.score.home + '-' + state.score.away +
-        ' scoreChanged=' + scoreChanged + ' prevScore=' + this.lastScore.home + '-' + this.lastScore.away);
-      console.log('newEvents=' + (newEvents.map(event => event.type).join(',') || '-'));
-      console.log('goalEvent=' + (goalEvent ? 'YES' : 'NO') + ' goalKickEvent=' + (goalKickEvent ? 'YES' : 'NO'));
-      console.log('ballOwner=' + (state.ball.ownerId ?? 'null') + ' lastTouch=' + (state.ball.lastTouchId ?? 'null') +
-        ' lastTouchClub=' + (state.ball.lastTouchClubId ?? 'null'));
+    console.log('');
+    console.log('=== V7 GOALKEEPER / BOUNDARY CHAIN ===');
+    const boundaries = this.boundaryCalls.filter(c => c.tick === this.boundaryTick);
+    for (const c of boundaries) {
+      console.log('boundary prev=(' + c.input.prevBallPos.x.toFixed(3) + ',' + c.input.prevBallPos.y.toFixed(3) + ',' + c.input.prevBallPos.z.toFixed(3) + ') next=(' + c.input.nextBallPos.x.toFixed(3) + ',' + c.input.nextBallPos.y.toFixed(3) + ',' + c.input.nextBallPos.z.toFixed(3) + ')');
+      console.log('lastTouch=' + (c.input.lastTouchId ?? 'null') + ' club=' + (c.input.lastTouchClubId ?? 'null') + ' result=' + c.result.type);
+      if (c.result.type === 'goal') console.log('scorerSide=' + c.result.scorerSide + ' ownGoal=' + c.result.ownGoal);
     }
-
-    this.lastScore = { home: state.score.home, away: state.score.away };
+    const snap = this.snapshots.get(this.boundaryTick);
+    const prev = this.snapshots.get(this.boundaryTick - 1);
+    if (snap && prev) {
+      const scoreChanged = snap.scoreHome !== prev.scoreHome || snap.scoreAway !== prev.scoreAway;
+      console.log('score=' + prev.scoreHome + '-' + prev.scoreAway + ' -> ' + snap.scoreHome + '-' + snap.scoreAway + ' scoreChanged=' + scoreChanged);
+      console.log('newEvents=[' + snap.newEvents.map(e => e.type).join(',') + ']');
+      console.log('goalEventPushed=' + snap.newEvents.some(e => e.type === 'goal'));
+      console.log('goalKickEventPushed=' + snap.newEvents.some(e => e.type === 'goal_kick'));
+      console.log('owner=' + (snap.ballOwnerId ?? 'null') + ' lastTouch=' + (snap.ballLastTouchId ?? 'null') + '(' + (snap.ballLastTouchClubId ?? 'null') + ')');
+      console.log('setPiece=' + (snap.setPieceType ?? '-') + '/' + (snap.setPieceStatus ?? '-') + '/' + (snap.setPieceTakerId ?? '-'));
+    }
+    console.log('');
+    console.log('=== V7 CONTROL BALL @ 53421 ===');
+    const calls = this.controlBallCalls.filter(c => c.tick === 53421);
+    if (!calls.length) console.log('(no controlBall call at tick 53421)');
+    for (const c of calls) console.log('tick=' + c.tick + ' owner=' + c.ownerId + '(' + c.clubId + ') prevOwner=' + (c.previousOwnerId ?? 'null') + ' lastTouch->' + (c.resultingLastTouchId ?? 'null') + '(' + (c.resultingLastTouchClubId ?? 'null') + ')');
+    console.log('total controlBall calls=' + this.controlBallCalls.length);
   }
 }
