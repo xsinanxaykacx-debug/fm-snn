@@ -26,6 +26,13 @@ type LiveFrame = {
     ownerId: string | null;
     lastTouchId: string | null;
   };
+  latestEvent: {
+    minute: number;
+    type: string;
+    description: string;
+    team?: 'home' | 'away';
+    xG?: number;
+  } | null;
   players: FramePlayer[];
 };
 
@@ -415,6 +422,7 @@ export function LiveMatchScreen() {
               </button>
             </div>
           )}
+        </div>
         </div>
       </div>
       {result && (
