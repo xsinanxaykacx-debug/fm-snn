@@ -55,8 +55,12 @@ describe.skipIf(!RUN)('Goal Boundary Provenance V3', () => {
         const report = diagnostic.finalize(boundaryCalls);
 
         expect(report.summary.totalGoals).toBeGreaterThanOrEqual(0);
-      },
-      10 * 60 * 1000,
+      } finally {
+        spy.mockRestore();
+        random.restore();
+      }
+    },
+    10 * 60 * 1000,
     );
   });
 });
