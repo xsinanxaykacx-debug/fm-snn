@@ -979,6 +979,80 @@ describe('single match bench', () => {
           return 'other';
         };
 
+        console.log('=== PRESSURE SATURATION COMPOSITION ===');
+        {
+          const saturated = hoisted.PRESSURE_COMPOSITION.filter(p => p.pressure >= 1);
+          const rawValues = saturated.map(p => p.pressureRaw);
+          const total = saturated.length;
+
+          const saturationClass = (p: PressureCompositionRecord): string => {
+            const near = p.oppWithin2;
+            const mid = p.oppWithin4;
+            const far = p.oppWithin7;
+
+            if (near === 2 && mid === 0 && far === 0) return '2 near';
+            if (near === 2 && mid === 1 && far === 0) return '2 near + 1 mid';
+            if (near === 2 && mid === 0 && far === 1) return '2 near + 1 far';
+            if (near >= 3) return '3+ near';
+            if (near === 1 && mid >= 2) return '1 near + 2+ mid';
+            if (near === 1 && mid >= 1) return '1 near + mid + ...';
+            if (near === 0 && (mid >= 1 || far >= 1)) return '0 near + mid/far';
+            return 'other';
+          };
+
+          const groups = new Map<string, number>();
+          for (const p of saturated) {
+            const key = saturationClass(p);
+            groups.set(key, (groups.get(key) ?? 0) + 1);
+          }
+
+          console.log('pressure == 1.0 composition:');
+          console.table(
+            [...groups.entries()]
+              .sort((a, b) => b[1] - a[1])
+              .map(([composition, count]) => ({
+                composition,
+                count,
+                pctOfSaturation: total > 0 ? ((count / total) * 100).toFixed(1) + '%' : 'n/a',
+                pctOfAllPasses: hoisted.PRESSURE_COMPOSITION.length > 0
+                  ? ((count / hoisted.PRESSURE_COMPOSITION.length) * 100).toFixed(1) + '%'
+                  : 'n/a',
+              }))
+          );
+
+          console.log('pressureRaw >= 2.5 summary:');
+          console.table({
+            count: total,
+            pctOfAllPasses: hoisted.PRESSURE_COMPOSITION.length > 0
+              ? ((total / hoisted.PRESSURE_COMPOSITION.length) * 100).toFixed(1) + '%'
+              : 'n/a',
+            meanRaw: total > 0 ? avg(rawValues).toFixed(4) : '0.0000',
+            medianRaw: total > 0
+              ? [...rawValues].sort((a, b) => a - b)[Math.floor(rawValues.length / 2)].toFixed(4)
+              : '0.0000',
+            minRaw: total > 0 ? Math.min(...rawValues).toFixed(4) : '0.0000',
+            maxRaw: total > 0 ? Math.max(...rawValues).toFixed(4) : '0.0000',
+          });
+
+          console.log('saturation raw buckets:');
+          const rawBuckets = [
+            { range: '2.5–3.0', test: (v: number) => v >= 2.5 && v < 3 },
+            { range: '3.0–3.5', test: (v: number) => v >= 3 && v < 3.5 },
+            { range: '3.5–4.0', test: (v: number) => v >= 3.5 && v < 4 },
+            { range: '4+', test: (v: number) => v >= 4 },
+          ];
+          console.table(
+            rawBuckets.map(b => {
+              const count = rawValues.filter(b.test).length;
+              return {
+                range: b.range,
+                count,
+                pctOfSaturation: total > 0 ? ((count / total) * 100).toFixed(1) + '%' : 'n/a',
+              };
+            })
+          );
+        }
+
         console.log('pressure >= 0.9 grouped composition:');
         const grouped = new Map<string, number>();
         for (const p of highPressure) {
