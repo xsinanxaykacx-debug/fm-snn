@@ -525,8 +525,7 @@ export function runTick(
   const tackleChangedPossession = applyTackleOutcomes(
     tackleOutcomes,
     state,
-    players,
-    options.onTackleResolved
+    players
   );
 
   // ─── 8. Top hareketi ───
@@ -568,7 +567,7 @@ export function runTick(
 
   // ─── 8c. Ball actions ───
   if (!tackleChangedPossession) {
-    applyBallActions(state, decisions, players);
+    applyBallActions(state, decisions, players, options.onTackleResolved);
   }
 
   // ─── 9. Sınır geçişi ───
@@ -873,12 +872,9 @@ function buildDecisionState(state: LiveMatchState): DecisionState {
 function applyTackleOutcomes(
   outcomes: TackleOutcome[],
   state: LiveMatchState,
-  players: Record<string, Player>,
-  onTackleResolved?: (outcome: TackleOutcome) => void
+  players: Record<string, Player>
 ): boolean {
   for (const outcome of outcomes) {
-    onTackleResolved?.(outcome);
-
     if (outcome.type === 'failed') continue;
 
     if (outcome.type === 'won') {
@@ -1128,7 +1124,8 @@ export function resolvePendingLooseBallRecovery(state: LiveMatchState): void {
 function applyBallActions(
   state: LiveMatchState,
   decisions: Record<string, Decision>,
-  players: Record<string, Player>
+  players: Record<string, Player>,
+  onTackleResolved?: (outcome: TackleOutcome) => void
 ): void {
   const ownerId = state.ball.ownerId;
   if (ownerId === null) return;
@@ -1143,7 +1140,7 @@ function applyBallActions(
   // Contest başarılı olsa bile possession doğrudan atanmaz; mevcut tackle
   // resolver fiziksel sonucu belirler. Böylece recovery gerçek top
   // sahipliği değişimi üzerinden gerçekleşir.
-  if (resolveCounterPressContest(state, owner, players)) {
+  if (resolveCounterPressContest(state, owner, players, onTackleResolved)) {
     return;
   }
 
@@ -1177,7 +1174,8 @@ function applyBallActions(
 export function resolveCounterPressContest(
   state: LiveMatchState,
   owner: LivePlayer,
-  players: Record<string, Player>
+  players: Record<string, Player>,
+  onTackleResolved?: (outcome: TackleOutcome) => void
 ): boolean {
   const transition = state.transition;
 
@@ -1285,6 +1283,8 @@ export function resolveCounterPressContest(
     state.stats.counterPressTackleRelativeSpeedSum += outcome.debug.relativeSpeed;
     state.stats.counterPressTackleDistanceSum += outcome.debug.distance;
   }
+
+  onTackleResolved?.(outcome);
 
   if (outcome.type === 'won') {
     state.stats.counterPressTackleWins += 1;
