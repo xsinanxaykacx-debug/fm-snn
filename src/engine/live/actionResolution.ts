@@ -156,6 +156,17 @@ function pressureAtOwner(owner: LivePlayer, state: LiveMatchState): number {
   return clamp(pressure / 2.5, 0, 1);
 }
 
+function laneProjectionWeight(projection: number): number {
+  if (projection <= 0.25) return 0.10;
+  if (projection <= 0.50) {
+    return 0.10 + ((projection - 0.25) / 0.25) * 0.25;
+  }
+  if (projection <= 0.75) {
+    return 0.35 + ((projection - 0.50) / 0.25) * 0.35;
+  }
+  return 0.70 + ((projection - 0.75) / 0.25) * 0.30;
+}
+
 function laneClarity(
   owner: LivePlayer,
   target: Vec2,
@@ -186,8 +197,10 @@ function laneClarity(
       opponent.position.y - closestY
     );
 
-    if (lateral < 1.5) interference += 0.55;
-    else if (lateral < 3) interference += 0.20;
+    const projectionWeight = laneProjectionWeight(projection);
+
+    if (lateral < 1.5) interference += 0.55 * projectionWeight;
+    else if (lateral < 3) interference += 0.20 * projectionWeight;
   }
 
   return clamp(1 - interference, 0.05, 1);
