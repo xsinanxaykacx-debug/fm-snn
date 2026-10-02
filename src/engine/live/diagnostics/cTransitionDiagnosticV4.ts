@@ -1,43 +1,28 @@
 // src/engine/live/diagnostics/cTransitionDiagnosticV4.ts
 //
 // DIAGNOSTIC ONLY — v4.
-// Production dosyalarına dokunmaz.
 //
-// Birincil kanıt: controlBall mutation caller.
+// MUTATION TRACE birincil sınıflandırma kanıtıdır.
 // Geometri yalnızca yardımcı rapor bilgisidir.
-//
-// Karar:
-//   resolveLooseBallControl -> C1 / high
-//   updateSetPieceStatus -> T-1 setPieceType'a göre:
-//      kickoff -> C4 / high
-//      corner | throw_in | goal_kick -> C2 / high
-//      free_kick -> C3 / high
-//      null/unknown -> C5 / unknown
-//   Base diagnostic'in tackle/foul lifecycle kanıtı -> C3
-//   kickoff lifecycle kanıtı -> C4
-//   başka mutation kanıtı yok -> C5 / unknown
-//
-// C5 lifecycle alt sınıfı korunur fakat artık sınıflandırma kararında
-// kullanılmaz. CHANGED/LOST kayıtları mutation caller'a göre C1/C2/C3/C4
-// olarak kalır; T+1 owner bilgisi raporda tutulur.
+// Production dosyalarına dokunmaz.
+// RNG delta hiçbir kategori kararında kullanılmaz.
 
-import type { LiveMatchState, TackleOutcome } from '../../types';
+import type { LiveMatchState, SetPieceState } from '../../types';
 
 import {
-  CTransitionDiagnostic,
   DEFAULT_MAX_TICKS,
-  type CClass,
-  type CReport,
-  type Confidence,
+  type TickSnapshot,
+  type TickLocalEvent,
   type CTickRecord,
-  type C5SubClassification,
+  type CClass,
+  type Confidence,
+  takeSnapshot,
+  sliceEvents,
 } from './cTransitionDiagnostic';
 
-import {
-  traceBuffer as defaultTraceBuffer,
-  type ControlBallCaller,
-  type ControlBallTrace,
-  ControlBallTraceBuffer,
+import type {
+  ControlBallTrace,
+  ControlBallCaller,
 } from './controlBallTrace';
 
 export { DEFAULT_MAX_TICKS };
@@ -45,351 +30,522 @@ export { DEFAULT_MAX_TICKS };
 export type {
   CClass,
   Confidence,
+  TickSnapshot,
+  TickLocalEvent,
   CTickRecord,
-  C5SubClassification,
-  ControlBallCaller,
   ControlBallTrace,
+  ControlBallCaller,
 };
+
+export type C5SubClass =
+  | 'LIKELY_LOOSE_BALL'
+  | 'UNCHANGED'
+  | 'CHANGED'
+  | 'LOST';
 
 export interface CTickRecordV4 extends CTickRecord {
   controlBall: ControlBallTrace | null;
-  finalClassification: CClass;
-  finalConfidence: Confidence;
-  mutationEvidence: string | null;
-  setPieceSourceType: string | null;
+  tMinus1SetPieceType: SetPieceState['type'] | null;
+  next: TickSnapshot | null;
+  nextOwnerId: string | null;
+  c5Sub: C5SubClass | null;
+  decisionEvidence: string;
 }
 
-export interface CReportV4 extends Omit<CReport, 'records'> {
-  callerDist: Record<ControlBallCaller | 'NONE', number>;
-  callerByFinalClass: Record<CClass, Record<ControlBallCaller | 'NONE', number>>;
-  setPieceMutationTypes: Record<string, number>;
+export interface CReportV4 {
+  totalC: number;
+  dist: Record<CClass, number>;
+  conf: Record<Confidence, number>;
+  sub: Record<C5SubClass, number>;
+  callerDist: Record<ControlBallCaller, number>;
+  updateSetPieceStatusByType: Record<string, number>;
+  rngTotal: number;
   records: readonly CTickRecordV4[];
 }
 
-function makeCallerZero(): Record<ControlBallCaller | 'NONE', number> {
+function computeSubClass(
+  record: CTickRecordV4,
+  nextOwnerId: string | null,
+): C5SubClass {
+  if (nextOwnerId === null) return 'LOST';
+  if (nextOwnerId !== record.at.ownerId) return 'CHANGED';
+
+  const previousOwner = record.before.players.find(
+    player => player.id === record.at.ownerId,
+  );
+  const currentOwner = record.at.players.find(
+    player => player.id === record.at.ownerId,
+  );
+
+  if (!previousOwner || !currentOwner) return 'UNCHANGED';
+
+  const movement = Math.hypot(
+    currentOwner.x - previousOwner.x,
+    currentOwner.y - previousOwner.y,
+  );
+  const distance = Math.hypot(
+    record.before.ballX - previousOwner.x,
+    record.before.ballY - previousOwner.y,
+  );
+
+  return distance + movement <= 0.6
+    ? 'LIKELY_LOOSE_BALL'
+    : 'UNCHANGED';
+}
+
+function makeBaseRecord(
+  before: TickSnapshot,
+  at: TickSnapshot,
+  events: TickLocalEvent[],
+  mutation: ControlBallTrace | null,
+): Omit<CTickRecordV4, 'classification' | 'confidence' | 'decisionEvidence'> {
   return {
-    resolveLooseBallControl: 0,
-    applyTackleWon: 0,
-    updateSetPieceStatus: 0,
-    handlePassAction: 0,
-    kickoff: 0,
-    other: 0,
-    NONE: 0,
+    tick: at.tick,
+    before,
+    at,
+    events,
+    rngDelta: at.rngCounter - before.rngCounter,
+    evidence: [],
+    controlBall: mutation,
+    tMinus1SetPieceType: before.setPieceType,
+    next: null,
+    nextOwnerId: null,
+    c5Sub: null,
   };
 }
 
-function makeClassCallerZero(): Record<CClass, Record<ControlBallCaller | 'NONE', number>> {
-  return {
-    C1_loose_ball_resolver: makeCallerZero(),
-    C2_boundary_set_piece: makeCallerZero(),
-    C3_direct_action_resolution: makeCallerZero(),
-    C4_kickoff: makeCallerZero(),
-    C5_unexplained: makeCallerZero(),
-  };
-}
+function classifyC(
+  before: TickSnapshot,
+  at: TickSnapshot,
+  events: TickLocalEvent[],
+  mutation: ControlBallTrace | null,
+): CTickRecordV4 {
+  const base = makeBaseRecord(before, at, events, mutation);
 
-function classifyMutation(
-  record: CTickRecord,
-  controlBall: ControlBallTrace | null,
-): {
-  classification: CClass;
-  confidence: Confidence;
-  evidence: string | null;
-  setPieceSourceType: string | null;
-} {
-  const caller = controlBall?.caller ?? null;
+  if (mutation?.caller === 'resolveLooseBallControl') {
+    base.evidence.push(
+      'mutation trace: controlBall(caller=resolveLooseBallControl, owner=' +
+      mutation.ownerId +
+      ', seq=' +
+      mutation.seq +
+      ')',
+    );
 
-  if (caller === 'resolveLooseBallControl') {
     return {
+      ...base,
       classification: 'C1_loose_ball_resolver',
       confidence: 'high',
-      evidence: 'mutation trace: resolveLooseBallControl',
-      setPieceSourceType: null,
+      decisionEvidence: 'controlBall.caller=resolveLooseBallControl',
     };
   }
 
-  if (caller === 'updateSetPieceStatus') {
-    const sourceType = record.before.setPieceType;
+  if (mutation?.caller === 'updateSetPieceStatus') {
+    const type = before.setPieceType;
 
-    if (sourceType === 'kickoff') {
+    if (type === 'kickoff') {
+      base.evidence.push(
+        'mutation trace: updateSetPieceStatus + T-1 setPieceType=kickoff',
+      );
       return {
+        ...base,
         classification: 'C4_kickoff',
         confidence: 'high',
-        evidence: 'mutation trace: updateSetPieceStatus; T-1 setPieceType=kickoff',
-        setPieceSourceType: sourceType,
+        decisionEvidence: 'updateSetPieceStatus + T-1 kickoff',
       };
     }
 
     if (
-      sourceType === 'corner' ||
-      sourceType === 'throw_in' ||
-      sourceType === 'goal_kick'
+      type === 'corner' ||
+      type === 'throw_in' ||
+      type === 'goal_kick'
     ) {
+      base.evidence.push(
+        'mutation trace: updateSetPieceStatus + T-1 setPieceType=' +
+        type,
+      );
       return {
+        ...base,
         classification: 'C2_boundary_set_piece',
         confidence: 'high',
-        evidence:
-          'mutation trace: updateSetPieceStatus; T-1 setPieceType=' +
-          sourceType,
-        setPieceSourceType: sourceType,
+        decisionEvidence: 'updateSetPieceStatus + T-1 ' + type,
       };
     }
 
-    if (sourceType === 'free_kick') {
+    if (type === 'free_kick') {
+      base.evidence.push(
+        'mutation trace: updateSetPieceStatus + T-1 setPieceType=free_kick',
+      );
       return {
+        ...base,
         classification: 'C3_direct_action_resolution',
         confidence: 'high',
-        evidence:
-          'mutation trace: updateSetPieceStatus; T-1 setPieceType=free_kick',
-        setPieceSourceType: sourceType,
+        decisionEvidence: 'updateSetPieceStatus + T-1 free_kick',
       };
     }
 
+    base.evidence.push(
+      'mutation trace: updateSetPieceStatus + T-1 setPieceType=' +
+      (type ?? 'null'),
+    );
+
     return {
+      ...base,
       classification: 'C5_unexplained',
       confidence: 'unknown',
-      evidence:
-        'mutation trace: updateSetPieceStatus; T-1 setPieceType=' +
-        (sourceType ?? 'null'),
-      setPieceSourceType: sourceType,
+      decisionEvidence:
+        'updateSetPieceStatus + T-1 setPieceType bilinmiyor',
     };
   }
 
-  // Base diagnostic'in tackle/foul/interception/kickoff lifecycle kanıtı
-  // mutation caller bulunmasa bile korunur.
+  const foulsDelta =
+    (at.foulsHome - before.foulsHome) +
+    (at.foulsAway - before.foulsAway);
+
+  const tackleWinsDelta =
+    at.counterPressTackleWins -
+    before.counterPressTackleWins;
+
+  const tackleFoulsDelta =
+    at.counterPressTackleFouls -
+    before.counterPressTackleFouls;
+
+  if (foulsDelta > 0 || tackleWinsDelta > 0 || tackleFoulsDelta > 0) {
+    if (foulsDelta > 0) {
+      base.evidence.push('fouls delta=+' + foulsDelta);
+    }
+    if (tackleWinsDelta > 0) {
+      base.evidence.push(
+        'counterPressTackleWins delta=+' + tackleWinsDelta,
+      );
+    }
+    if (tackleFoulsDelta > 0) {
+      base.evidence.push(
+        'counterPressTackleFouls delta=+' + tackleFoulsDelta,
+      );
+    }
+
+    return {
+      ...base,
+      classification: 'C3_direct_action_resolution',
+      confidence: 'high',
+      decisionEvidence: 'tackle/foul stat delta',
+    };
+  }
+
+  const intercepted = events.find(
+    event =>
+      event.type === 'pass' &&
+      event.description.startsWith('Pas kesildi'),
+  );
+
+  if (intercepted) {
+    base.evidence.push('interception event: "Pas kesildi"');
+    return {
+      ...base,
+      classification: 'C3_direct_action_resolution',
+      confidence: 'high',
+      decisionEvidence: 'interception event',
+    };
+  }
+
+  const kickoff = events.find(event => event.type === 'kickoff');
+
+  if (kickoff) {
+    base.evidence.push('kickoff event');
+    return {
+      ...base,
+      classification: 'C4_kickoff',
+      confidence: 'high',
+      decisionEvidence: 'kickoff event',
+    };
+  }
+
+  base.evidence.push(
+    'mutation trace yok; T-1 ballSpeed=' +
+    before.ballSpeed.toFixed(3),
+  );
+
   return {
-    classification: record.classification,
-    confidence: record.confidence,
-    evidence: null,
-    setPieceSourceType: null,
+    ...base,
+    classification: 'C5_unexplained',
+    confidence: 'unknown',
+    decisionEvidence: 'hiçbir mutation/lifecycle kanıtı yok',
   };
 }
 
 export class CTransitionDiagnosticV4 {
-  private readonly base: CTransitionDiagnostic;
-  private readonly trace: ControlBallTraceBuffer;
-  private readonly tickCalls = new Map<number, readonly ControlBallTrace[]>();
-  private lastSeenTraceSequence = -1;
+  private initialized = false;
+  private prev: TickSnapshot | null = null;
+  private readonly records: CTickRecordV4[] = [];
+  private pendingRecord: CTickRecordV4 | null = null;
+  private readonly maxTicks: number;
+  private stopped = false;
+  private lastConsumedSeq = -1;
+  private previousEventLength = 0;
 
   constructor(
-    trace: ControlBallTraceBuffer = defaultTraceBuffer,
+    private readonly trace: {
+      drainAfter(seq: number): readonly ControlBallTrace[];
+      getLastSeq(): number;
+      clear(): void;
+    },
     maxTicks: number = DEFAULT_MAX_TICKS,
   ) {
-    this.trace = trace;
-    this.base = new CTransitionDiagnostic(maxTicks);
-  }
-
-  onTackleResolved(outcome: TackleOutcome): void {
-    this.base.onTackleResolved(outcome);
+    this.maxTicks = maxTicks;
   }
 
   onTick(state: LiveMatchState): void {
-    const calls = this.trace.getSince(this.lastSeenTraceSequence);
-    this.lastSeenTraceSequence = this.trace.getLastSequence();
+    if (this.stopped) return;
 
-    if (calls.length > 0) {
-      this.tickCalls.set(state.tick, calls);
+    const snap = takeSnapshot(state);
+    const mutationsThisTick = this.trace.drainAfter(this.lastConsumedSeq);
+    this.lastConsumedSeq = this.trace.getLastSeq();
+
+    if (this.pendingRecord !== null) {
+      this.pendingRecord.next = snap;
+      this.pendingRecord.nextOwnerId = snap.ownerId;
+      this.pendingRecord.c5Sub = computeSubClass(
+        this.pendingRecord,
+        snap.ownerId,
+      );
+      this.pendingRecord = null;
     }
 
-    this.base.onTick(state);
+    if (!this.initialized) {
+      this.prev = snap;
+      this.previousEventLength = snap.eventsLength;
+      this.initialized = true;
+      return;
+    }
+
+    const before = this.prev;
+    const isC =
+      before.ownerId === null &&
+      snap.ownerId !== null;
+
+    if (isC) {
+      const events = sliceEvents(
+        state,
+        this.previousEventLength,
+        snap.eventsLength,
+      );
+
+      const mutation =
+        mutationsThisTick.find(
+          call => call.ownerId === snap.ownerId,
+        ) ?? null;
+
+      const record = classifyC(
+        before,
+        snap,
+        events,
+        mutation,
+      );
+
+      this.records.push(record);
+      this.pendingRecord = record;
+    }
+
+    this.prev = snap;
+    this.previousEventLength = snap.eventsLength;
+
+    if (snap.tick >= this.maxTicks) {
+      this.stopped = true;
+    }
   }
 
   getRecords(): readonly CTickRecordV4[] {
-    return this.buildRecords();
+    return this.records;
   }
 
   report(): CReportV4 {
-    const baseReport = this.base.report();
-    const records = this.buildRecords();
+    const dist: Record<CClass, number> = {
+      C1_loose_ball_resolver: 0,
+      C2_boundary_set_piece: 0,
+      C3_direct_action_resolution: 0,
+      C4_kickoff: 0,
+      C5_unexplained: 0,
+    };
 
-    const callerDist = makeCallerZero();
-    const callerByFinalClass = makeClassCallerZero();
-    const setPieceMutationTypes: Record<string, number> = {};
+    const conf: Record<Confidence, number> = {
+      high: 0,
+      medium: 0,
+      unknown: 0,
+    };
 
-    for (const record of records) {
-      const caller: ControlBallCaller | 'NONE' =
-        record.controlBall?.caller ?? 'NONE';
+    const sub: Record<C5SubClass, number> = {
+      LIKELY_LOOSE_BALL: 0,
+      UNCHANGED: 0,
+      CHANGED: 0,
+      LOST: 0,
+    };
 
-      if (record.controlBall !== null) {
-        callerDist[caller] += 1;
-      } else {
-        callerDist.NONE += 1;
+    const callerDist: Record<ControlBallCaller, number> = {
+      resolveLooseBallControl: 0,
+      applyTackleWon: 0,
+      updateSetPieceStatus: 0,
+      handlePassAction: 0,
+      kickoff: 0,
+      other: 0,
+      NONE: 0,
+    };
+
+    const updateSetPieceStatusByType: Record<string, number> = {};
+    let rngTotal = 0;
+
+    for (const record of this.records) {
+      dist[record.classification]++;
+      conf[record.confidence]++;
+      rngTotal += record.rngDelta;
+
+      if (record.c5Sub !== null) {
+        sub[record.c5Sub]++;
       }
 
-      callerByFinalClass[record.finalClassification][caller] += 1;
+      const caller =
+        record.controlBall?.caller ?? 'NONE';
+      callerDist[caller]++;
 
-      if (record.controlBall?.caller === 'updateSetPieceStatus') {
-        const key = record.setPieceSourceType ?? 'null';
-        setPieceMutationTypes[key] =
-          (setPieceMutationTypes[key] ?? 0) + 1;
+      if (caller === 'updateSetPieceStatus') {
+        const key =
+          record.tMinus1SetPieceType ?? 'null';
+        updateSetPieceStatusByType[key] =
+          (updateSetPieceStatusByType[key] ?? 0) + 1;
       }
     }
 
-    console.log('=== C-TRANSITION DIAGNOSTIC v4 ===');
-    console.log('total C: ' + records.length);
-    console.log('=== FINAL CLASSIFICATION ===');
-    console.table(
-      records.reduce<Record<CClass, number>>(
-        (acc, record) => {
-          acc[record.finalClassification] += 1;
-          return acc;
-        },
-        {
-          C1_loose_ball_resolver: 0,
-          C2_boundary_set_piece: 0,
-          C3_direct_action_resolution: 0,
-          C4_kickoff: 0,
-          C5_unexplained: 0,
-        },
-      ),
-    );
-
-    console.log('=== ORIGINAL BASE CLASSIFICATION ===');
-    console.table(baseReport.dist);
-
-    console.log('=== FINAL CONFIDENCE ===');
-    console.table(
-      records.reduce<Record<Confidence, number>>(
-        (acc, record) => {
-          acc[record.finalConfidence] += 1;
-          return acc;
-        },
-        { high: 0, medium: 0, unknown: 0 },
-      ),
-    );
-
-    console.log('=== C5 LIFECYCLE INFO (rapor; karar kanıtı değil) ===');
-    console.table(baseReport.c5SubDist);
-
-    console.log('=== CONTROL-BALL MUTATION TRACE ===');
-    console.log('controlBall called: ' + records.filter(r => r.controlBall !== null).length);
-    console.log('controlBall not called: ' + records.filter(r => r.controlBall === null).length);
-    console.log('caller distribution:');
-    console.table(callerDist);
-
-    console.log('=== FINAL CLASS × CALLER ===');
-    console.table(callerByFinalClass);
-
-    console.log('=== updateSetPieceStatus × T-1 setPieceType ===');
-    console.table(setPieceMutationTypes);
-
-    const changed = records.filter(
-      r => r.c5Lifecycle?.subClassification === 'C5_UNEXPLAINED_CHANGED',
-    );
-    const lost = records.filter(
-      r => r.c5Lifecycle?.subClassification === 'C5_UNEXPLAINED_LOST',
-    );
+    console.log('=== FINAL CLASSIFICATION (v4) ===');
+    console.log('total C: ' + this.records.length);
+    console.table(dist);
+    console.table(conf);
 
     console.log(
-      '=== CHANGED/LOST lifecycle (C1/C2/C3/C4 kararından bağımsız yardımcı bilgi) ===',
+      '=== SUBCLASS (raporlama; karar değiştirmez) ===',
     );
-    console.log('CHANGED: ' + changed.length);
-    console.log('LOST: ' + lost.length);
+    console.table(sub);
 
-    for (const record of [...changed, ...lost]) {
+    console.log('=== CALLER DISTRIBUTION (tüm C) ===');
+    console.table(callerDist);
+
+    console.log(
+      '=== AGGREGATE updateSetPieceStatus × T-1 setPieceType ===',
+    );
+    console.table(updateSetPieceStatusByType);
+
+    console.log(
+      'sum rngDelta (yardımcı bilgi, kategori kararında KULLANILMADI): ' +
+      rngTotal,
+    );
+
+    const changed = this.records.filter(
+      record => record.c5Sub === 'CHANGED',
+    );
+    const lost = this.records.filter(
+      record => record.c5Sub === 'LOST',
+    );
+
+    if (changed.length > 0) {
       console.log(
-        'tick=' + record.tick +
-        ' final=' + record.finalClassification +
-        ' caller=' + (record.controlBall?.caller ?? 'NONE') +
-        ' owner: ' + record.before.ownerId +
-        ' -> ' + record.at.ownerId +
-        ' -> ' + (record.after?.ownerId ?? 'N/A') +
-        ' T-1 setPiece=' + (record.before.setPieceType ?? '-') +
-        ' evidence=' + (record.mutationEvidence ?? 'none'),
+        '=== CHANGED lifecycle (' +
+        changed.length +
+        ') ===',
       );
-    }
 
-    console.log('=== GEOMETRY (yardımcı bilgi; karar kanıtı değil) ===');
-    const geometryExamples = records
-      .filter(r => r.controlBall?.caller === 'resolveLooseBallControl')
-      .slice(0, 10);
-
-    for (const record of geometryExamples) {
-      console.log(
-        'tick=' + record.tick +
-        ' final=' + record.finalClassification +
-        ' dist(T-1)=' +
-        (record.c5Lifecycle?.tMinus1Distance.toFixed(3) ?? 'N/A') +
-        ' dist(T)=' +
-        (record.c5Lifecycle?.tDistance.toFixed(3) ?? 'N/A') +
-        ' speed(T-1)=' +
-        (record.before.ballSpeed.toFixed(3)),
-      );
-    }
-
-    console.log('=== KARAR NOKTASI ===');
-    const unresolved = records.filter(
-      r => r.finalClassification === 'C5_unexplained',
-    ).length;
-
-    console.log('final C5: ' + unresolved);
-
-    return {
-      totalC: records.length,
-      dist: records.reduce<Record<CClass, number>>(
-        (acc, record) => {
-          acc[record.finalClassification] += 1;
-          return acc;
-        },
-        {
-          C1_loose_ball_resolver: 0,
-          C2_boundary_set_piece: 0,
-          C3_direct_action_resolution: 0,
-          C4_kickoff: 0,
-          C5_unexplained: 0,
-        },
-      ),
-      conf: records.reduce<Record<Confidence, number>>(
-        (acc, record) => {
-          acc[record.finalConfidence] += 1;
-          return acc;
-        },
-        { high: 0, medium: 0, unknown: 0 },
-      ),
-      c5SubDist: baseReport.c5SubDist,
-      rngTotal: baseReport.rngTotal,
-      callerDist,
-      callerByFinalClass,
-      setPieceMutationTypes,
-      records,
-    };
-  }
-
-  private buildRecords(): readonly CTickRecordV4[] {
-    return this.base.getRecords().map(record => {
-      const calls = this.tickCalls.get(record.tick) ?? [];
-      const controlBall =
-        record.before.ownerId === null && record.at.ownerId !== null
-          ? this.findMatchingControlBall(record, calls)
-          : null;
-
-      const mutation = classifyMutation(record, controlBall);
-
-      return {
-        ...record,
-        controlBall,
-        finalClassification: mutation.classification,
-        finalConfidence: mutation.confidence,
-        mutationEvidence: mutation.evidence,
-        setPieceSourceType: mutation.setPieceSourceType,
-      };
-    });
-  }
-
-  private findMatchingControlBall(
-    record: CTickRecord,
-    calls: readonly ControlBallTrace[],
-  ): ControlBallTrace | null {
-    const ownerId = record.at.ownerId;
-
-    if (ownerId === null) return null;
-
-    for (let i = calls.length - 1; i >= 0; i -= 1) {
-      if (calls[i].ownerId === ownerId) {
-        return calls[i];
+      for (const record of changed) {
+        console.log(
+          'tick=' + record.tick +
+          ' owner: ' +
+          record.before.ownerId +
+          ' -> ' +
+          record.at.ownerId +
+          ' -> ' +
+          record.nextOwnerId +
+          ' class=' +
+          record.classification +
+          ' controlBall=' +
+          (record.controlBall?.caller ?? 'NONE') +
+          ' events=[' +
+          record.events.map(event => event.type).join(',') +
+          ']',
+        );
       }
     }
 
-    return null;
+    if (lost.length > 0) {
+      console.log(
+        '=== LOST lifecycle (' +
+        lost.length +
+        ') ===',
+      );
+
+      for (const record of lost) {
+        console.log(
+          'tick=' + record.tick +
+          ' owner: ' +
+          record.before.ownerId +
+          ' -> ' +
+          record.at.ownerId +
+          ' -> ' +
+          record.nextOwnerId +
+          ' class=' +
+          record.classification +
+          ' controlBall=' +
+          (record.controlBall?.caller ?? 'NONE') +
+          ' setPiece(T-1)=' +
+          (record.tMinus1SetPieceType ?? '-') +
+          ' setPiece(T+1)=' +
+          (record.next?.setPieceType ?? '-'),
+        );
+      }
+    }
+
+    const c5 = dist.C5_unexplained;
+
+    console.log('=== KARAR NOKTASI ===');
+    console.log('C5_unexplained: ' + c5);
+
+    if (c5 === 0) {
+      console.log(
+        'Tüm C geçişleri mutation/lifecycle kanıtı ile açıklandı. Production patch YOK.',
+      );
+    } else {
+      console.log(
+        'C5 > 0: kalan kayıtları T-1/T/T+1 lifecycle ile incele.',
+      );
+      for (
+        const record of this.records
+          .filter(item => item.classification === 'C5_unexplained')
+          .slice(0, 30)
+      ) {
+        console.log(
+          'tick=' + record.tick +
+          ' owner: ' +
+          record.before.ownerId +
+          ' -> ' +
+          record.at.ownerId +
+          ' controlBall=' +
+          (record.controlBall?.caller ?? 'NONE') +
+          ' T-1 setPiece=' +
+          (record.tMinus1SetPieceType ?? '-') +
+          ' events=[' +
+          record.events.map(event => event.type).join(',') +
+          ']' +
+          ' evidence=[' +
+          record.evidence.join(' | ') +
+          ']',
+        );
+      }
+    }
+
+    return {
+      totalC: this.records.length,
+      dist,
+      conf,
+      sub,
+      callerDist,
+      updateSetPieceStatusByType,
+      rngTotal,
+      records: this.records,
+    };
   }
 }
