@@ -216,9 +216,6 @@ export function resolvePassAction(
     avg(a.passing, a.vision, a.firstTouch, a.technique, a.decisions) *
     conditionFactor(owner);
 
-  const pressureSkill =
-    1 - pressure * (0.18 + (100 - a.composure) / 500);
-
   const distancePenalty =
     targetDistance <= 12
       ? 1
