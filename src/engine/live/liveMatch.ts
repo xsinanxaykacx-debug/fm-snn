@@ -298,7 +298,8 @@ export function simulateMatchLive(
           }
         }
         options.onTick?.(s);
-      }
+      },
+      options.onTackleResolved
     );
   }
 
