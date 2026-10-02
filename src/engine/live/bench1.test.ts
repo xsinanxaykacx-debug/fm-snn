@@ -97,6 +97,20 @@ function summarizeTeam(
 // Test scope only — production geometry untouched.
 // ═══════════════════════════════════════════════
 
+interface LaneOpponentInfo {
+  projection: number;
+  lateral: number;
+  distanceFromOwner: number;
+  distanceToTarget: number;
+  isInner: boolean;
+  isOuter: boolean;
+}
+
+interface LaneOpponentRecord extends LaneOpponentInfo {
+  tick: number;
+  passerId: string;
+}
+
 interface LaneBreakdown {
   tick: number;
   passerId: string;
@@ -105,6 +119,21 @@ interface LaneBreakdown {
   oppInInner: number;
   oppInOuter: number;
   targetDistance: number;
+}
+
+interface PressureOpponentInfo {
+  distance: number;
+  band: 'within2' | 'within4' | 'within7';
+  contribution: number;
+}
+
+interface PressureCompositionRecord {
+  tick: number;
+  passerId: string;
+  pressureRaw: number;
+  oppWithin2: number;
+  oppWithin4: number;
+  oppWithin7: number;
 }
 
 interface PressureBreakdown {
@@ -309,6 +338,84 @@ function localPressureAtOwnerWithCount(
   };
 }
 
+function localLaneClarityWithProjection(
+  owner: LivePlayer,
+  target: { x: number; y: number },
+  state: LiveMatchState
+): { lane: number; interference: number; oppInInner: number; oppInOuter: number; opponents: LaneOpponentInfo[] } {
+  const dx = target.x - owner.position.x;
+  const dy = target.y - owner.position.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 0.001) return { lane: 0, interference: 0, oppInInner: 0, oppInOuter: 0, opponents: [] };
+
+  let interference = 0, oppInInner = 0, oppInOuter = 0;
+  const opponents: LaneOpponentInfo[] = [];
+
+  for (const id of Object.keys(state.players).sort()) {
+    const opponent = state.players[id];
+    if (opponent.isHome === owner.isHome) continue;
+
+    const px = opponent.position.x - owner.position.x;
+    const py = opponent.position.y - owner.position.y;
+    const projection = (px * dx + py * dy) / (length * length);
+    if (projection <= 0 || projection >= 1) continue;
+
+    const closestX = owner.position.x + dx * projection;
+    const closestY = owner.position.y + dy * projection;
+    const lateral = Math.hypot(opponent.position.x - closestX, opponent.position.y - closestY);
+    const isInner = lateral < 1.5;
+    const isOuter = lateral >= 1.5 && lateral < 3;
+
+    if (isInner) { interference += 0.55; oppInInner += 1; }
+    else if (isOuter) { interference += 0.20; oppInOuter += 1; }
+
+    if (isInner || isOuter) {
+      opponents.push({
+        projection,
+        lateral,
+        distanceFromOwner: localDistance(owner.position, opponent.position),
+        distanceToTarget: localDistance(opponent.position, target),
+        isInner,
+        isOuter,
+      });
+    }
+  }
+
+  return { lane: localClamp(1 - interference, 0.05, 1), interference, oppInInner, oppInOuter, opponents };
+}
+
+function localPressureWithComposition(
+  owner: LivePlayer,
+  state: LiveMatchState
+): { pressure: number; pressureRaw: number; oppWithin2: number; oppWithin4: number; oppWithin7: number; opponents: PressureOpponentInfo[] } {
+  let raw = 0, oppWithin2 = 0, oppWithin4 = 0, oppWithin7 = 0;
+  const opponents: PressureOpponentInfo[] = [];
+
+  for (const id of Object.keys(state.players).sort()) {
+    const opponent = state.players[id];
+    if (opponent.isHome === owner.isHome) continue;
+
+    const d = localDistance(owner.position, opponent.position);
+    let band: PressureOpponentInfo['band'] | null = null;
+    let contribution = 0;
+
+    if (d <= 2) { raw += 1; oppWithin2 += 1; band = 'within2'; contribution = 1; }
+    else if (d <= 4) { raw += 0.65; oppWithin4 += 1; band = 'within4'; contribution = 0.65; }
+    else if (d <= 7) { raw += 0.30; oppWithin7 += 1; band = 'within7'; contribution = 0.30; }
+
+    if (band !== null) opponents.push({ distance: d, band, contribution });
+  }
+
+  return {
+    pressure: localClamp(raw / 2.5, 0, 1),
+    pressureRaw: raw,
+    oppWithin2,
+    oppWithin4,
+    oppWithin7,
+    opponents,
+  };
+}
+
 function localMentalityModifier(mentality: string, isAttacking: boolean): number {
   if (mentality === 'attacking') return isAttacking ? 1.06 : 0.94;
   if (mentality === 'defensive') return isAttacking ? 0.94 : 1.06;
@@ -376,6 +483,11 @@ function decomposePass(
     targetDistance: localDistance(owner.position, decision.target),
   });
 
+  const laneProjectionInfo = localLaneClarityWithProjection(owner, decision.target, state);
+  hoisted.LANE_OPPONENTS.push(
+    ...laneProjectionInfo.opponents.map(o => ({ tick, passerId: owner.player.id, ...o }))
+  );
+
   const targetDistance = localDistance(owner.position, decision.target);
   const distanceFactor =
     targetDistance <= 12
@@ -395,6 +507,16 @@ function decomposePass(
     oppWithin2: pressureInfo.oppWithin2,
     oppWithin4: pressureInfo.oppWithin4,
     oppWithin7: pressureInfo.oppWithin7,
+  });
+
+  const pressureComposition = localPressureWithComposition(owner, state);
+  hoisted.PRESSURE_COMPOSITION.push({
+    tick,
+    passerId: owner.player.id,
+    pressureRaw: pressureComposition.pressureRaw,
+    oppWithin2: pressureComposition.oppWithin2,
+    oppWithin4: pressureComposition.oppWithin4,
+    oppWithin7: pressureComposition.oppWithin7,
   });
 
   const tactic =
@@ -462,6 +584,8 @@ const hoisted = vi.hoisted(() => ({
   PASS_DECOMP: [] as PassDecomposition[],
   LANE_BREAKDOWN: [] as LaneBreakdown[],
   PRESSURE_BREAKDOWN: [] as PressureBreakdown[],
+  LANE_OPPONENTS: [] as LaneOpponentRecord[],
+  PRESSURE_COMPOSITION: [] as PressureCompositionRecord[],
   currentTick: -1,
 }));
 
@@ -500,6 +624,8 @@ describe('single match bench', () => {
     hoisted.PASS_DECOMP.length = 0;
     hoisted.LANE_BREAKDOWN.length = 0;
     hoisted.PRESSURE_BREAKDOWN.length = 0;
+    hoisted.LANE_OPPONENTS.length = 0;
+    hoisted.PRESSURE_COMPOSITION.length = 0;
     hoisted.currentTick = -1;
 
     const handle = installDeterministicRandom(DEFAULT_FIXTURE_SEED);
@@ -722,6 +848,61 @@ describe('single match bench', () => {
         );
       }
 
+      // ═══════════════════════════════════════════════
+      // LANE OPPONENT PROJECTION
+      // ═══════════════════════════════════════════════
+
+      console.log('=== LANE OPPONENT PROJECTION ===');
+      {
+        const inner = hoisted.LANE_OPPONENTS.filter(o => o.isInner);
+        const outer = hoisted.LANE_OPPONENTS.filter(o => o.isOuter);
+        const projectionBuckets = (arr: LaneOpponentRecord[]) => {
+          const b = new Array(4).fill(0);
+          for (const o of arr) {
+            let idx = Math.floor(o.projection * 4);
+            if (idx < 0) idx = 0;
+            if (idx > 3) idx = 3;
+            b[idx] += 1;
+          }
+          return b;
+        };
+        const innerBuckets = projectionBuckets(inner);
+        const outerBuckets = projectionBuckets(outer);
+        const innerTotal = inner.length || 1;
+        const outerTotal = outer.length || 1;
+        console.table({ 'inner count': inner.length, 'outer count': outer.length });
+        console.log('inner opponents — projection histogram:');
+        console.table(innerBuckets.map((count, i) => ({ projection: (i * 0.25).toFixed(2) + '–' + ((i + 1) * 0.25).toFixed(2), count, pct: ((count / innerTotal) * 100).toFixed(1) + '%' })));
+        console.log('outer opponents — projection histogram:');
+        console.table(outerBuckets.map((count, i) => ({ projection: (i * 0.25).toFixed(2) + '–' + ((i + 1) * 0.25).toFixed(2), count, pct: ((count / outerTotal) * 100).toFixed(1) + '%' })));
+        if (inner.length) {
+          const meanProj = inner.reduce((s, o) => s + o.projection, 0) / inner.length;
+          const meanDistOwner = inner.reduce((s, o) => s + o.distanceFromOwner, 0) / inner.length;
+          const meanDistTarget = inner.reduce((s, o) => s + o.distanceToTarget, 0) / inner.length;
+          console.log('inner opponents — geometry means:');
+          console.table({ 'mean projection': meanProj.toFixed(3), 'mean distance from owner': meanDistOwner.toFixed(3), 'mean distance to target': meanDistTarget.toFixed(3) });
+        }
+      }
+
+      console.log('=== PRESSURE COMPOSITION ===');
+      {
+        const pressureCombo = new Map<string, number>();
+        for (const p of hoisted.PRESSURE_COMPOSITION) {
+          const key = p.oppWithin2 + '-' + p.oppWithin4 + '-' + p.oppWithin7;
+          pressureCombo.set(key, (pressureCombo.get(key) ?? 0) + 1);
+        }
+        const sorted = [...pressureCombo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
+        console.log('top pressure compositions (within2-within4-within7):');
+        console.table(sorted.map(([combo, count]) => ({ composition: combo, count, pct: ((count / hoisted.PRESSURE_COMPOSITION.length) * 100).toFixed(1) + '%' })));
+        console.log('pressureRaw histogram:');
+        const rawBuckets = new Array(8).fill(0);
+        for (const p of hoisted.PRESSURE_COMPOSITION) {
+          let idx = Math.min(7, Math.floor(p.pressureRaw));
+          if (p.pressureRaw === 0) idx = 0;
+          rawBuckets[idx] += 1;
+        }
+        console.table(rawBuckets.map((count, i) => ({ range: i === 7 ? '7+' : i + '–' + (i + 1), count, pct: ((count / hoisted.PRESSURE_COMPOSITION.length) * 100).toFixed(1) + '%' })));
+      }
       // ═══════════════════════════════════════════════
       // PRESSURE HISTOGRAM
       // ═══════════════════════════════════════════════
