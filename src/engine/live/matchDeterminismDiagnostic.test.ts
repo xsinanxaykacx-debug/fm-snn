@@ -203,7 +203,7 @@ function runTargetMatch(
 
     if (firstTackle === null) {
       firstTackle = {
-        tick: currentTick,
+        tick: lastObservedTick + 1,
         runner: outcome.tacklerId,
         owner: outcome.ballCarrierId,
         distance:
@@ -215,10 +215,10 @@ function runTargetMatch(
     }
   };
 
-  let currentTick = 0;
+  let lastObservedTick = 0;
 
   const onTick = (state: LiveMatchState): void => {
-    currentTick = state.tick;
+    lastObservedTick = state.tick;
 
     const currentOwnerId = state.ball.ownerId;
     const currentPendingPlayerId =
@@ -505,7 +505,7 @@ function printAllComparisons(
       finalRngCounter: c.finalRngCounter,
       totalTicks: c.totalTicks,
       duration: c.matchDuration,
-      goals: c.finalStats.homeGoals + '-' + c.finalStats.awayScore,
+      goals: c.finalStats.homeGoals + '-' + c.finalStats.awayGoals,
       possession: c.finalStats.homePossession + '-' + c.finalStats.awayPossession,
       tackles: c.finalStats.tackleCount,
       tackleWins: c.finalStats.tackleWins,
