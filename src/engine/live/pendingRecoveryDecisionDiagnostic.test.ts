@@ -205,7 +205,7 @@ describe('Pending recovery decision diagnostic (v5)', () => {
       const onTick = (state: LiveMatchState) => {
         const tick = state.tick;
         const pendingId: string | null =
-          state.pendingLooseBallRecoveryPlayerId ?? null;
+          state.transition.pendingLooseBallRecoveryPlayerId ?? null;
 
         // Gerçek pending başlangıcı: null → playerId.
         const isPendingStart =
