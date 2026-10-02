@@ -10,18 +10,33 @@ const SEED_START = 1000;
 interface HarnessMatchResult {
   seed: number;
   ticks: number;
+
   transitions: number;
   attempts: number;
   rolls: number;
+
   wins: number;
   failures: number;
   fouls: number;
-  dirtyTackles: number;
-  pendingSet: number;
-  pendingExpired: number;
+
+  clean: number;
+  dirty: number;
+
+  cleanChances: number[];
+  expectedCleanCount: number;
+  observedCleanCount: number;
+
+  pendingSetObserved: number;
+  pendingClearedSameClub: number;
+  pendingClearedOpponent: number;
+  pendingClearedExpiry: number;
+  pendingClearedOther: number;
+  pendingSetInvisible: number;
+
+  totalRec: number;
   cleanRec: number;
   looseRec: number;
-  totalRec: number;
+
   durationMs: number;
 }
 
@@ -52,16 +67,31 @@ function runHarnessMatch(
   let transitions = 0;
   let previousStartedAt: number | null = null;
 
-  // onTick sadece tick sonunda çalıştığı için aynı tick içinde
-  // set edilip temizlenen pending durumunu göremez.
-  // Bu nedenle pendingSet doğrudan dirty tackle sayısından türetilir.
-  let pendingExpired = 0;
+  let pendingSetObserved = 0;
   let previousPendingClub: string | null = null;
+  let previousPendingExpiresAt = 0;
+
+  let pendingClearedSameClub = 0;
+  let pendingClearedOpponent = 0;
+  let pendingClearedExpiry = 0;
+  let pendingClearedOther = 0;
+
+  const cleanChances: number[] = [];
 
   const t0 = performance.now();
 
   const match = simulateMatchLive(home, away, data.players, {
     seed,
+
+    onTackleResolved: (outcome) => {
+      if (
+        outcome.type === 'won' &&
+        typeof outcome.debug?.cleanChance === 'number'
+      ) {
+        cleanChances.push(outcome.debug.cleanChance);
+      }
+    },
+
     onTick: (state) => {
       if (
         state.transition.counterPressClubId !== null &&
@@ -73,57 +103,114 @@ function runHarnessMatch(
 
       const pendingClub =
         state.transition.pendingLooseBallRecoveryClubId;
+      const pendingExpiresAt =
+        state.transition.expiresAt;
 
-      // Bu yalnızca en az bir tick yaşayan pending'leri yakalar.
-      // Aynı tick içinde set -> resolve/expire olan pending onTick'te
-      // görünmez; bu yüzden sonuç "gözlemlenen expiry" olarak yorumlanır.
+      if (
+        pendingClub !== null &&
+        previousPendingClub === null
+      ) {
+        pendingSetObserved += 1;
+      }
+
       if (
         previousPendingClub !== null &&
-        pendingClub === null &&
-        state.ball.ownerId === null
+        pendingClub === null
       ) {
-        pendingExpired += 1;
+        const ownerId = state.ball.ownerId;
+
+        if (ownerId !== null) {
+          const owner = state.players[ownerId];
+
+          if (owner?.clubId === previousPendingClub) {
+            pendingClearedSameClub += 1;
+          } else if (owner) {
+            pendingClearedOpponent += 1;
+          } else {
+            pendingClearedOther += 1;
+          }
+        } else if (state.time >= previousPendingExpiresAt) {
+          pendingClearedExpiry += 1;
+        } else {
+          pendingClearedOther += 1;
+        }
       }
 
       previousPendingClub = pendingClub;
+      previousPendingExpiresAt = pendingExpiresAt;
     },
   });
 
   const t1 = performance.now();
 
   const stats = match.stats;
-  const dirtyTackles =
-    stats.counterPressTackleWins -
-    stats.counterPressCleanRecoveries;
+
+  const wins = stats.counterPressTackleWins;
+  const clean = stats.counterPressCleanRecoveries;
+  const dirty = wins - clean;
+
+  const expectedCleanCount = cleanChances.reduce(
+    (sum, chance) => sum + chance,
+    0,
+  );
+
+  const totalObservedCleared =
+    pendingClearedSameClub +
+    pendingClearedOpponent +
+    pendingClearedExpiry +
+    pendingClearedOther;
+
+  const pendingSetInvisible =
+    dirty - pendingSetObserved;
 
   return {
     seed,
     ticks: stats.ticks,
+
     transitions,
     attempts: stats.counterPressAttempts,
     rolls: stats.counterPressRollsPassed,
-    wins: stats.counterPressTackleWins,
+
+    wins,
     failures: stats.counterPressTackleFailures,
     fouls: stats.counterPressTackleFouls,
-    dirtyTackles,
-    // Her dirty tackle applyTackleWon() içinde pending recovery context
-    // kurar. Production lifecycle'ını değiştirmeden bunu en güvenilir
-    // şekilde wins - cleanRecoveries üzerinden ölçüyoruz.
-    pendingSet: dirtyTackles,
-    pendingExpired,
+
+    clean,
+    dirty,
+
+    cleanChances,
+    expectedCleanCount,
+    observedCleanCount: clean,
+
+    pendingSetObserved,
+    pendingClearedSameClub,
+    pendingClearedOpponent,
+    pendingClearedExpiry,
+    pendingClearedOther,
+    pendingSetInvisible,
+
+    totalRec: stats.counterPressRecoveries,
     cleanRec: stats.counterPressCleanRecoveries,
     looseRec: stats.counterPressLooseBallRecoveries,
-    totalRec: stats.counterPressRecoveries,
+
     durationMs: t1 - t0,
   };
 }
 
 function mean(values: number[]): number {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  if (values.length === 0) return 0;
+
+  return (
+    values.reduce((sum, value) => sum + value, 0) /
+    values.length
+  );
 }
 
 function populationStdDev(values: number[]): number {
+  if (values.length === 0) return 0;
+
   const m = mean(values);
+
   return Math.sqrt(
     mean(values.map((value) => (value - m) ** 2)),
   );
@@ -157,219 +244,323 @@ function maxField(
   );
 }
 
-describe.skipIf(!RUN)('Live transition statistical harness', () => {
-  it(
-    MATCH_COUNT + ' tam maçta transition istatistikleri',
-    () => {
-      // Diagnostic harness ile aynı fixture yaklaşımı:
-      // tek kez generateGameData(), her maç öncesi oyuncular resetlenir.
-      // Böylece 50 maç arasındaki ana kontrollü değişken seed olur.
-      const data = generateGameData();
-      const results: HarnessMatchResult[] = [];
+describe.skipIf(!RUN)(
+  'Live transition statistical harness v2',
+  () => {
+    it(
+      MATCH_COUNT +
+        ' tam maçta clean/dirty ve pending lifecycle',
+      () => {
+        const data = generateGameData();
+        const results: HarnessMatchResult[] = [];
 
-      for (
-        let seed = SEED_START;
-        seed < SEED_START + MATCH_COUNT;
-        seed += 1
-      ) {
-        results.push(runHarnessMatch(data, seed));
-      }
+        for (
+          let seed = SEED_START;
+          seed < SEED_START + MATCH_COUNT;
+          seed += 1
+        ) {
+          results.push(runHarnessMatch(data, seed));
+        }
 
-      const durationValues = results.map((r) => r.durationMs);
-      const transitionValues = results.map((r) => r.transitions);
-      const attemptValues = results.map((r) => r.attempts);
-      const rollValues = results.map((r) => r.rolls);
-      const winValues = results.map((r) => r.wins);
-      const dirtyValues = results.map((r) => r.dirtyTackles);
-      const pendingSetValues = results.map((r) => r.pendingSet);
-      const pendingExpiredValues = results.map((r) => r.pendingExpired);
-      const looseRecValues = results.map((r) => r.looseRec);
+        const totalWins = sumField(results, 'wins');
+        const totalClean = sumField(results, 'clean');
+        const totalDirty = sumField(results, 'dirty');
 
-      console.log('');
-      console.log(
-        '=== LIVE TRANSITION HARNESS — ' + MATCH_COUNT + ' TAM MAÇ ===',
-      );
-      console.log('');
-      console.log(
-        'Toplam süre:       ' +
-          (sumField(results, 'durationMs') / 1000).toFixed(1) +
-          ' sn',
-      );
-      console.log(
-        'Maç başı süre:     ' +
-          (mean(durationValues) / 1000).toFixed(2) +
-          ' sn ± ' +
-          (populationStdDev(durationValues) / 1000).toFixed(2),
-      );
-      console.log(
-        'Maç başı tick:     ' +
-          mean(results.map((r) => r.ticks)).toFixed(0),
-      );
+        const allCleanChances = results.flatMap(
+          (result) => result.cleanChances,
+        );
 
-      console.log('');
-      console.log('--- TOPLAM ---');
-      console.log(
-        'transitionStarts:   ' + sumField(results, 'transitions'),
-      );
-      console.log('attempts:           ' + sumField(results, 'attempts'));
-      console.log('rolls:              ' + sumField(results, 'rolls'));
-      console.log('wins:               ' + sumField(results, 'wins'));
-      console.log('failures:           ' + sumField(results, 'failures'));
-      console.log('fouls:              ' + sumField(results, 'fouls'));
-      console.log(
-        'dirtyTackles:       ' + sumField(results, 'dirtyTackles'),
-      );
-      console.log(
-        'pendingSet:         ' + sumField(results, 'pendingSet'),
-      );
-      console.log(
-        'pendingExpired*:    ' + sumField(results, 'pendingExpired'),
-      );
-      console.log('cleanRec:           ' + sumField(results, 'cleanRec'));
-      console.log('looseRec:           ' + sumField(results, 'looseRec'));
-      console.log('totalRec:           ' + sumField(results, 'totalRec'));
+        const totalExpectedClean = sumField(
+          results,
+          'expectedCleanCount',
+        );
 
-      console.log('');
-      console.log('--- MAÇ BAŞINA ORTALAMA ± STD ---');
-      console.log(
-        'transitions:        ' +
-          mean(transitionValues).toFixed(2) +
-          ' ± ' +
-          populationStdDev(transitionValues).toFixed(2),
-      );
-      console.log(
-        'attempts:           ' +
-          mean(attemptValues).toFixed(2) +
-          ' ± ' +
-          populationStdDev(attemptValues).toFixed(2),
-      );
-      console.log(
-        'rolls:              ' +
-          mean(rollValues).toFixed(2) +
-          ' ± ' +
-          populationStdDev(rollValues).toFixed(2),
-      );
-      console.log(
-        'wins:               ' +
-          mean(winValues).toFixed(2) +
-          ' ± ' +
-          populationStdDev(winValues).toFixed(2),
-      );
-      console.log(
-        'dirtyTackles:       ' +
-          mean(dirtyValues).toFixed(2) +
-          ' ± ' +
-          populationStdDev(dirtyValues).toFixed(2),
-      );
-      console.log(
-        'pendingSet:         ' +
-          mean(pendingSetValues).toFixed(2) +
-          ' ± ' +
-          populationStdDev(pendingSetValues).toFixed(2),
-      );
-      console.log(
-        'pendingExpired*:    ' +
-          mean(pendingExpiredValues).toFixed(2) +
-          ' ± ' +
-          populationStdDev(pendingExpiredValues).toFixed(2),
-      );
-      console.log(
-        'cleanRec:           ' +
-          mean(results.map((r) => r.cleanRec)).toFixed(2) +
-          ' ± ' +
-          populationStdDev(results.map((r) => r.cleanRec)).toFixed(2),
-      );
-      console.log(
-        'looseRec:           ' +
-          mean(looseRecValues).toFixed(2) +
-          ' ± ' +
-          populationStdDev(looseRecValues).toFixed(2),
-      );
-      console.log(
-        'totalRec:           ' +
-          mean(results.map((r) => r.totalRec)).toFixed(2) +
-          ' ± ' +
-          populationStdDev(results.map((r) => r.totalRec)).toFixed(2),
-      );
+        const observedCleanRate =
+          totalWins > 0
+            ? totalClean / totalWins
+            : 0;
 
-      console.log('');
-      console.log('--- MIN / MAX ---');
-      console.log(
-        'wins:               ' +
-          minField(results, 'wins') +
-          ' / ' +
-          maxField(results, 'wins'),
-      );
-      console.log(
-        'dirtyTackles:       ' +
-          minField(results, 'dirtyTackles') +
-          ' / ' +
-          maxField(results, 'dirtyTackles'),
-      );
-      console.log(
-        'pendingSet:         ' +
-          minField(results, 'pendingSet') +
-          ' / ' +
-          maxField(results, 'pendingSet'),
-      );
-      console.log(
-        'pendingExpired*:    ' +
-          minField(results, 'pendingExpired') +
-          ' / ' +
-          maxField(results, 'pendingExpired'),
-      );
-      console.log(
-        'looseRec:           ' +
-          minField(results, 'looseRec') +
-          ' / ' +
-          maxField(results, 'looseRec'),
-      );
+        const expectedCleanRate =
+          totalWins > 0
+            ? totalExpectedClean / totalWins
+            : 0;
 
-      console.log('');
-      console.log(
-        '* pendingExpired onTick ile gözlemlenen expiry sayısıdır; aynı tick içinde set edilip temizlenen pending durumları görünmez.',
-      );
-      console.log('');
+        const expectedObservedCountDelta =
+          totalClean - totalExpectedClean;
 
-      console.table(results);
+        const pendingSetObserved = sumField(
+          results,
+          'pendingSetObserved',
+        );
 
-      // İstatistiksel harness outcome threshold koymaz.
-      // Yalnızca production lifecycle sözleşmesini kontrol eder.
-      expect(results).toHaveLength(MATCH_COUNT);
-      expect(results.every((result) => result.ticks > 0)).toBe(true);
-      expect(results.every((result) => result.dirtyTackles >= 0)).toBe(true);
-      expect(
-        results.every(
-          (result) => result.pendingSet === result.dirtyTackles,
-        ),
-      ).toBe(true);
-      expect(
-        results.every(
-          (result) =>
-            result.cleanRec + result.looseRec === result.totalRec,
-        ),
-      ).toBe(true);
-      expect(
-        results.every(
-          (result) => result.looseRec <= result.dirtyTackles,
-        ),
-      ).toBe(true);
-      expect(
-        results.every(
-          (result) => result.cleanRec <= result.wins,
-        ),
-      ).toBe(true);
-      expect(
-        results.every(
-          (result) => result.wins <= result.rolls,
-        ),
-      ).toBe(true);
-      expect(
-        results.every(
-          (result) => result.rolls <= result.attempts,
-        ),
-      ).toBe(true);
-    },
-    60 * 60 * 1000,
-  );
-});
+        const pendingClearedSameClub = sumField(
+          results,
+          'pendingClearedSameClub',
+        );
+
+        const pendingClearedOpponent = sumField(
+          results,
+          'pendingClearedOpponent',
+        );
+
+        const pendingClearedExpiry = sumField(
+          results,
+          'pendingClearedExpiry',
+        );
+
+        const pendingClearedOther = sumField(
+          results,
+          'pendingClearedOther',
+        );
+
+        const pendingSetInvisible = sumField(
+          results,
+          'pendingSetInvisible',
+        );
+
+        const totalCleared =
+          pendingClearedSameClub +
+          pendingClearedOpponent +
+          pendingClearedExpiry +
+          pendingClearedOther;
+
+        console.log('');
+        console.log(
+          '=== LIVE HARNESS v2 — ' +
+            MATCH_COUNT +
+            ' TAM MAÇ ===',
+        );
+        console.log('');
+
+        console.log(
+          'Toplam süre:       ' +
+            (
+              sumField(results, 'durationMs') /
+              1000
+            ).toFixed(1) +
+            ' sn',
+        );
+
+        console.log(
+          'Maç başı süre:     ' +
+            (
+              mean(
+                results.map(
+                  (result) => result.durationMs,
+                ),
+              ) / 1000
+            ).toFixed(2) +
+            ' sn ± ' +
+            (
+              populationStdDev(
+                results.map(
+                  (result) => result.durationMs,
+                ),
+              ) / 1000
+            ).toFixed(2),
+        );
+
+        console.log(
+          'Maç başı tick:     ' +
+            mean(
+              results.map(
+                (result) => result.ticks,
+              ),
+            ).toFixed(0),
+        );
+
+        console.log('');
+        console.log('--- TACKLE / CLEAN-DIRTY ---');
+        console.log('wins:              ' + totalWins);
+        console.log('clean:             ' + totalClean);
+        console.log('dirty:             ' + totalDirty);
+
+        console.log(
+          'observedCleanRate: ' +
+            observedCleanRate.toFixed(4),
+        );
+
+        console.log(
+          'expectedCleanRate: ' +
+            expectedCleanRate.toFixed(4),
+        );
+
+        console.log(
+          'meanCleanChance:   ' +
+            (
+              mean(allCleanChances)
+            ).toFixed(4),
+        );
+
+        console.log(
+          'expectedCleanCount:' +
+            totalExpectedClean.toFixed(3),
+        );
+
+        console.log(
+          'observedCleanCount:' +
+            totalClean,
+        );
+
+        console.log(
+          'observed-expected:' +
+            expectedObservedCountDelta.toFixed(3),
+        );
+
+        console.log('');
+        console.log('--- PENDING LIFECYCLE ---');
+        console.log(
+          'dirtyTackles:           ' +
+            totalDirty,
+        );
+
+        console.log(
+          'pendingSetObserved:     ' +
+            pendingSetObserved,
+        );
+
+        console.log(
+          'pendingSetInvisible*:   ' +
+            pendingSetInvisible,
+        );
+
+        console.log(
+          'pendingClearedSameClub: ' +
+            pendingClearedSameClub,
+        );
+
+        console.log(
+          'pendingClearedOpponent: ' +
+            pendingClearedOpponent,
+        );
+
+        console.log(
+          'pendingClearedExpiry:   ' +
+            pendingClearedExpiry,
+        );
+
+        console.log(
+          'pendingClearedOther:    ' +
+            pendingClearedOther,
+        );
+
+        console.log(
+          'totalCleared:           ' +
+            totalCleared,
+        );
+
+        console.log(
+          'dirty - totalCleared:   ' +
+            (
+              totalDirty - totalCleared
+            ),
+        );
+
+        console.log('');
+        console.log('--- RECOVERY ---');
+        console.log(
+          'cleanRec:               ' +
+            sumField(results, 'cleanRec'),
+        );
+        console.log(
+          'looseRec:               ' +
+            sumField(results, 'looseRec'),
+        );
+        console.log(
+          'totalRec:               ' +
+            sumField(results, 'totalRec'),
+        );
+
+        console.log('');
+        console.log(
+          '* pendingSetObserved yalnızca en az bir tick yaşayan pending durumlarını gösterir.',
+        );
+        console.log(
+          '* pendingSetInvisible = dirty - observed pending set; aynı tick içinde set edilip temizlenen pending olaylarını temsil eder.',
+        );
+        console.log(
+          '* pendingClearedExpiry, onTick sonunda owner yokken sürenin dolduğunun görüldüğü olaydır.',
+        );
+        console.log('');
+
+        console.table(results);
+
+        expect(results).toHaveLength(MATCH_COUNT);
+        expect(
+          results.every(
+            (result) => result.ticks > 0,
+          ),
+        ).toBe(true);
+
+        expect(
+          results.every(
+            (result) => result.dirty >= 0,
+          ),
+        ).toBe(true);
+
+        expect(
+          results.every(
+            (result) =>
+              result.cleanChances.length ===
+              result.wins,
+          ),
+        ).toBe(true);
+
+        expect(
+          results.every(
+            (result) =>
+              Number.isFinite(
+                result.expectedCleanCount,
+              ),
+          ),
+        ).toBe(true);
+
+        expect(
+          results.every(
+            (result) =>
+              result.cleanRec + result.looseRec ===
+              result.totalRec,
+          ),
+        ).toBe(true);
+
+        expect(
+          results.every(
+            (result) =>
+              result.looseRec <= result.dirty,
+          ),
+        ).toBe(true);
+
+        expect(
+          results.every(
+            (result) =>
+              result.cleanRec <= result.wins,
+          ),
+        ).toBe(true);
+
+        expect(
+          results.every(
+            (result) =>
+              result.wins <= result.rolls,
+          ),
+        ).toBe(true);
+
+        expect(
+          results.every(
+            (result) =>
+              result.rolls <= result.attempts,
+          ),
+        ).toBe(true);
+
+        expect(
+          pendingSetObserved +
+            pendingSetInvisible,
+        ).toBe(totalDirty);
+
+        expect(
+          totalCleared,
+        ).toBe(pendingSetObserved);
+      },
+      60 * 60 * 1000,
+    );
+  },
+);
