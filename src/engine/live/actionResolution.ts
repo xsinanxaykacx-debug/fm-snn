@@ -243,19 +243,40 @@ export function resolvePassAction(
     tactic.directness === 'direct' ? 1.06 :
     tactic.directness === 'short' ? 0.97 : 1;
 
-  const raw =
-    (passingSkill / 100) *
-    (0.55 + lane * 0.45) *
-    pressureSkill *
-    distancePenalty *
+  const baseProbability = passingSkill / 100;
+
+  // Pass quality is primarily driven by the passer's effective skill.
+  // Contextual factors reduce that base probability additively so several
+  // moderate difficulties do not collapse the result through multiplication.
+  const lanePenalty = (1 - lane) * 0.35;
+  const distanceFactor = distancePenalty;
+  const distancePenaltyContribution = (1 - distanceFactor) * 0.25;
+  const pressurePenalty = pressure * 0.30;
+
+  const tacticFactor =
     attackingModifier *
     tempo *
     role *
     directness *
     (0.94 + pressing * 0.06);
 
+  // Tactical settings have deliberately small influence at resolution time;
+  // they should shape pass risk without overpowering player skill.
+  const tacticPenalty = Math.max(0, 1 - tacticFactor) * 0.20;
+
+  const totalPenalty = clamp(
+    lanePenalty +
+      distancePenaltyContribution +
+      pressurePenalty +
+      tacticPenalty,
+    0,
+    0.65
+  );
+
+  const raw = baseProbability * (1 - totalPenalty);
+
   return {
-    probability: clamp(raw, 0.10, 0.96),
+    probability: clamp(raw, 0.15, 0.92),
     quality: clamp(
       (passingSkill / 100) *
       lane *
