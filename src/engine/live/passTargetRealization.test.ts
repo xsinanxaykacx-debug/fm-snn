@@ -8,7 +8,7 @@ import {
   type DeterministicRandomHandle,
 } from './diagnostics/deterministicFixture';
 import { generateGameData } from '../data/generateData';
-import type { LiveMatchState, MatchEvent, Vec2, Vec3 } from '../types';
+import type { LiveMatchState, Vec2, Vec3 } from '../types';
 
 const MATCH_SEED = 1000;
 const MATCH_TICKS = 54_000;
@@ -314,11 +314,21 @@ describe('Pass Target Realization Diagnostic V9', () => {
         onTick: (state: LiveMatchState) => {
           currentTick = state.tick;
 
-          if (active === null || active.outcome !== 'none') {
+          if (active === null) {
             return;
           }
 
           const ticksSinceApply = state.tick - active.applyTick + 1;
+
+          // Terminal event aynı tick içinde boundary/control spy'da görülür.
+          // Buna rağmen o tick'in onTick snapshot'ı alınmalı; aksi halde
+          // minimum mesafe / hedef geçişi terminal tick'te kaybolur.
+          if (
+            active.outcome !== 'none' &&
+            active.terminalTick !== state.tick
+          ) {
+            return;
+          }
 
           if (
             ticksSinceApply < 1 ||
@@ -349,16 +359,13 @@ describe('Pass Target Realization Diagnostic V9', () => {
 
           active.samples.push(sample);
 
-          if (ticksSinceApply === TRACE_TICKS) {
-            active.outcome = 'none';
-            active.terminalTick = null;
-          }
+          // 50 tick penceresi dolduysa outcome "none" olarak kalır.
+          // Terminal outcome varsa terminal tick zaten kaydedildi ve korunur.
         },
       });
 
-      // Yukarıdaki aktif-trace modeli terminal olayla erken kapanır.
-      // Terminal olmayan son paslar için zaten 50 tick'e kadar sample alınmıştır.
-      // Şimdi her trace'in realization ölçülerini hesaplıyoruz.
+      // Her pas için terminal tick dahil olmak üzere en fazla 50 tick
+      // snapshot'ı toplandı. Şimdi realization ölçülerini hesaplıyoruz.
       for (const trace of traces) {
         const realization = classifyRealization(trace);
         trace.minDistance = realization.minDistance;
@@ -423,7 +430,7 @@ describe('Pass Target Realization Diagnostic V9', () => {
       console.log('');
       console.log('=== V9 PASS TARGET REALIZATION ===');
       console.log(`seed=${MATCH_SEED} ticks=${MATCH_TICKS}`);
-      console.log(`traceWindow=${TRACE_TICKS} ticks`);
+      console.log(`traceWindow=${TRACE_TICKS} ticks after applyPass (terminal tick included)`);
       console.log(`total applyPass calls=${traces.length}`);
       console.log('');
       console.log('--- speed / direction integrity ---');
@@ -496,7 +503,7 @@ describe('Pass Target Realization Diagnostic V9', () => {
           `  samples=${trace.samples.length} sampleOverflow=${trace.sampleOverflow}`
         );
 
-        for (const sample of trace.samples.slice(0, TRACE_TICKS)) {
+        for (const sample of trace.samples) {
           console.log(
             `    t=${sample.tick} pos=${formatVec(sample.position)} v=${formatVec(sample.velocity)} d=${sample.distanceToTarget.toFixed(3)} proj=${sample.projectionAlongTarget.toFixed(3)}`
           );
