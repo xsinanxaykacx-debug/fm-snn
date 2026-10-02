@@ -262,10 +262,12 @@ export function resolvePassAction(
   const tacticPenalty = Math.max(0, 1 - tacticFactor) * 0.20;
 
   const totalPenalty = clamp(
-    lanePenalty +
+    (
+      lanePenalty +
       distancePenaltyContribution +
       pressurePenalty +
-      tacticPenalty,
+      tacticPenalty
+    ) * 0.6,
     0,
     0.35
   );
