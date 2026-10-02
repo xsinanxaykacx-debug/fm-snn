@@ -321,7 +321,6 @@ export {
 
   computeOpenness,
 
-  computeCheapPerception,
   computeFullPerception,
 
   computeSpaceMap,
@@ -429,14 +428,12 @@ export type {
   Intent,
 
   // Perception
-  CheapPerception,
   Perception,
   PerceivedBall,
   PerceivedPlayer,
   PassOption,
   SpaceMap,
   ZoneType,
-  PerceptionCacheEntry,
 
   // Set-piece
   SetPieceState as SetPieceStateType,
