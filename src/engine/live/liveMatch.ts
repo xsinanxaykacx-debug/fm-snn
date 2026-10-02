@@ -55,6 +55,7 @@ import type {
   Player,
   PitchDimensions,
   SetPieceState,
+  SpaceMap,
   TackleOutcome,
   Vec2,
 } from '../types';
@@ -80,6 +81,7 @@ import {
   TACKLE_KNOCK_TRANSFER,
   TACKLE_KNOCK_MIN,
   TACKLE_KNOCK_MAX,
+  SPACE_GRID_SIZE,
 } from './config';
 
 import {
@@ -94,7 +96,7 @@ import {
 } from './ball';
 
 import {
-  computeCheapPerception,
+  computeSpaceMap,
 } from './perception';
 
 import {
@@ -240,8 +242,7 @@ export function simulateMatchLive(
     sequences: [],
 
     rng,
-    perceptionCache: {},
-
+  
     lastBallOwnerId: null,
 
     transition: {
@@ -487,11 +488,27 @@ export function runTick(
   updateMatchFatigue(state);
   applyHalftimeRecovery(state);
 
-  // ─── 3. Perception cache ───
-  updatePerceptionCaches(state);
+  // ─── 3. Team-shared space maps ───
+  const homeSpaceMap = computeSpaceMap(
+    state.home.club.id,
+    state.players,
+    state.pitch,
+    SPACE_GRID_SIZE
+  );
+
+  const awaySpaceMap = computeSpaceMap(
+    state.away.club.id,
+    state.players,
+    state.pitch,
+    SPACE_GRID_SIZE
+  );
 
   // ─── 4. Kararlar ───
-  const decisionState = buildDecisionState(state);
+  const decisionState = buildDecisionState(
+    state,
+    homeSpaceMap,
+    awaySpaceMap
+  );
 
   const { decisions, debugs } = computeAllDecisions(decisionState);
 
@@ -825,34 +842,14 @@ function getYOffsetForPosition(
 }
 
 // ═══════════════════════════════════════════════
-// PERCEPTION CACHE
-// ═══════════════════════════════════════════════
-
-function updatePerceptionCaches(state: LiveMatchState): void {
-  for (const id of Object.keys(state.players).sort()) {
-    const player = state.players[id];
-
-    const cheap = computeCheapPerception(player, {
-      ball: state.ball,
-      players: state.players,
-      pitch: state.pitch,
-    });
-
-    const existing = state.perceptionCache[id];
-
-    state.perceptionCache[id] = {
-      cheap,
-      full: existing?.full ?? null,
-      fullAt: existing?.fullAt ?? 0,
-    };
-  }
-}
-
-// ═══════════════════════════════════════════════
 // DECISION STATE
 // ═══════════════════════════════════════════════
 
-function buildDecisionState(state: LiveMatchState): DecisionState {
+function buildDecisionState(
+  state: LiveMatchState,
+  homeSpaceMap: SpaceMap,
+  awaySpaceMap: SpaceMap
+): DecisionState {
   return {
     ball: state.ball,
     players: state.players,
@@ -864,6 +861,8 @@ function buildDecisionState(state: LiveMatchState): DecisionState {
     },
     setPiece: state.setPiece,
     transition: state.transition,
+    homeSpaceMap,
+    awaySpaceMap,
   };
 }
 

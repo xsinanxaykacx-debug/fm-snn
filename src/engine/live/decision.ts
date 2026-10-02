@@ -47,6 +47,7 @@ import type {
   PlayerPhysicsConfig,
   TransitionState,
   RngState,
+  SpaceMap,
   SetPieceState,
   Vec2,
 } from '../types';
@@ -1373,6 +1374,8 @@ export interface DecisionState {
   playerPhysics: Pick<PlayerPhysicsConfig, 'tackleRadius'>;
   setPiece: SetPieceState | null;
   transition: TransitionState;
+  homeSpaceMap: SpaceMap;
+  awaySpaceMap: SpaceMap;
 }
 
 // ============================================================
@@ -1395,6 +1398,10 @@ export function decideForPlayer(
     state.pitch
   );
 
+  const spaceMap = self.isHome
+    ? state.homeSpaceMap
+    : state.awaySpaceMap;
+
   const perception = computeFullPerception(
     self,
     {
@@ -1402,7 +1409,8 @@ export function decideForPlayer(
       players: state.players,
       pitch: state.pitch,
       time: state.time,
-    }
+    },
+    spaceMap
   );
 
   const ball = state.ball;

@@ -14,7 +14,7 @@
  *  - Stat güncelleme
  *
  * KONTRAT:
- *  - İki katman: CHEAP (her tick), FULL (karar zamanı).
+ *  - FULL perception yalnızca karar zamanı gelen oyuncu için hesaplanır.
  *  - Aynı state + aynı oyuncu konumu → aynı perception.
  *  - Angle relatif: bearing - self.facing, [-180, 180].
  *  - RNG yok.
@@ -23,7 +23,6 @@
 
 import type {
   Ball,
-  CheapPerception,
   LivePlayer,
   PassOption,
   Perception,
@@ -47,7 +46,6 @@ import {
   PASS_PROBABILITY_MIN,
   PRESSURE_PER_OPPONENT,
   PRESSURE_RADIUS,
-  SPACE_GRID_SIZE,
   SPACE_OPPONENT_PENALTY,
   SPACE_OPPONENT_RADIUS,
 } from './config';
@@ -228,71 +226,6 @@ export function computeOpenness(
 }
 
 // ═══════════════════════════════════════════════
-// CHEAP PERCEPTION
-// ═══════════════════════════════════════════════
-
-/**
- * Ucuz algılama — her tick çağrılır.
- *
- * KONTRAT:
- *  • Yalnızca top, mesafeler ve zone.
- *  • RNG yok.
- *  • Deterministik.
- */
-export function computeCheapPerception(
-  self: LivePlayer,
-  state: {
-    ball: Ball;
-    players: Record<string, LivePlayer>;
-    pitch: PitchDimensions;
-  }
-): CheapPerception {
-  const ball = state.ball;
-  const ballPos2: Vec2 = { x: ball.position.x, y: ball.position.y };
-
-  const distance = computeDistance(self.position, ballPos2);
-  const angle = computeRelativeAngle(
-    self.position,
-    ballPos2,
-    self.facing
-  );
-
-  const ownerIsTeammate =
-    ball.ownerId !== null &&
-    state.players[ball.ownerId]?.clubId === self.clubId;
-
-  const perceivedBall: PerceivedBall = {
-    position: { ...ball.position },
-    velocity: { ...ball.velocity },
-    distance,
-    angle,
-    airborne: ball.position.z > 0.5,
-    ownerId: ball.ownerId,
-    ownerIsTeammate,
-  };
-
-  // Yakın mesafeler — tüm oyuncular (kendisi hariç)
-  const nearbyDistances: Record<string, number> = {};
-  for (const id of Object.keys(state.players).sort()) {
-    if (id === self.player.id) continue;
-    const other = state.players[id];
-    nearbyDistances[id] = computeDistance(
-      self.position,
-      other.position
-    );
-  }
-
-  const attackDirection: 1 | -1 = self.isHome ? 1 : -1;
-
-  return {
-    ball: perceivedBall,
-    nearbyDistances,
-    ballZone: zoneOf(ballPos2, state.pitch, attackDirection),
-    selfZone: zoneOf(self.position, state.pitch, attackDirection),
-  };
-}
-
-// ═══════════════════════════════════════════════
 // FULL PERCEPTION
 // ═══════════════════════════════════════════════
 
@@ -314,7 +247,8 @@ export function computeFullPerception(
     players: Record<string, LivePlayer>;
     pitch: PitchDimensions;
     time: number;
-  }
+  },
+  spaceMap: SpaceMap
 ): Perception {
   const ball = state.ball;
   const ballPos2: Vec2 = { x: ball.position.x, y: ball.position.y };
@@ -405,12 +339,7 @@ export function computeFullPerception(
     }));
 
   // ─── Space map ───
-  const space = computeSpaceMap(
-    self,
-    state.players,
-    state.pitch,
-    SPACE_GRID_SIZE
-  );
+  const space = spaceMap;
 
   // ─── Pressure ───
   const pressure = computePressure(self, state.players);
@@ -454,7 +383,7 @@ export function computeFullPerception(
  *  • RNG yok.
  */
 export function computeSpaceMap(
-  self: LivePlayer,
+  selfClubId: string,
   players: Record<string, LivePlayer>,
   pitch: PitchDimensions,
   gridSize: number
@@ -467,7 +396,7 @@ export function computeSpaceMap(
   const opponents: Vec2[] = [];
   for (const id of Object.keys(players).sort()) {
     const p = players[id];
-    if (p.clubId !== self.clubId) {
+    if (p.clubId !== selfClubId) {
       opponents.push(p.position);
     }
   }

@@ -868,7 +868,7 @@ export interface LivePlayer {
 }
 
 // ═══════════════════════════════════════════════
-// PERCEPTION — CHEAP
+// PERCEPTION
 // ═══════════════════════════════════════════════
 
 export interface PerceivedBall {
@@ -882,15 +882,6 @@ export interface PerceivedBall {
 
   ownerId: string | null;
   ownerIsTeammate: boolean;
-}
-
-export interface CheapPerception {
-  ball: PerceivedBall;
-
-  nearbyDistances: Record<string, number>;
-
-  ballZone: ZoneType;
-  selfZone: ZoneType;
 }
 
 // ═══════════════════════════════════════════════
@@ -988,18 +979,6 @@ export interface Perception {
     self: ZoneType;
     attackDirection: 1 | -1;
   };
-}
-
-// ═══════════════════════════════════════════════
-// PERCEPTION CACHE
-// ═══════════════════════════════════════════════
-
-export interface PerceptionCacheEntry {
-  cheap: CheapPerception;
-
-  full: Perception | null;
-
-  fullAt: number;
 }
 
 // ═══════════════════════════════════════════════
@@ -1309,8 +1288,6 @@ export interface LiveMatchState {
   sequences: AttackSequence[];
 
   rng: RngState;
-
-  perceptionCache: Record<string, PerceptionCacheEntry>;
 
   lastBallOwnerId: string | null;
   transition: TransitionState;
