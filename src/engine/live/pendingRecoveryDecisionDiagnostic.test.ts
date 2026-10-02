@@ -28,7 +28,8 @@
 // Bu dosya production kodunu değiştirmez.
 
 import { describe, it, expect } from 'vitest';
-import { simulateMatchLive } from './index';
+import { simulateMatchLive } from './liveMatch';
+import { generateGameData } from '../data/generateData';
 import type { LiveMatchState, LivePlayer } from '../types';
 
 const RUN = process.env.RUN_LIVE_DIAGNOSTIC === '1';
@@ -310,7 +311,15 @@ describe('Pending recovery decision diagnostic (v5)', () => {
         }
       };
 
-      simulateMatchLive(SEED, { onTick });
+      const data = generateGameData();
+      const clubs = Object.values(data.clubs);
+      const home = clubs[0];
+      const away = clubs[1];
+
+      simulateMatchLive(home, away, data.players, {
+        seed: SEED,
+        onTick,
+      });
 
       // ---------------------------------------------------------------------
       // RAPOR
