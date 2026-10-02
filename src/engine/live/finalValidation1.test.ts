@@ -4,11 +4,11 @@ import { generateGameData } from '../data/generateData';
 import { simulateMatchLive } from './liveMatch';
 
 const SEED = 1000;
-const MATCH_TICKS = 108_000;
+const MATCH_TICKS = 54_000;
 const MATCH_SECONDS = 5_400;
 
 it(
-  'tek maç — 90:00 / 108.000 tick',
+  'tek maç — 90:00 / 54.000 tick',
   () => {
     const baseline = generateGameData();
     const data = structuredClone(baseline);
