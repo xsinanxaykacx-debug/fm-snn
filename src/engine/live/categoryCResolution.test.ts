@@ -18,6 +18,7 @@ import {
   CTransitionDiagnostic,
   DEFAULT_MAX_TICKS,
   type CClass,
+  type C5SubClassification,
 } from './diagnostics/cTransitionDiagnostic';
 
 import type {
@@ -86,6 +87,16 @@ describe.skipIf(!RUN)('C-transition diagnostic', () => {
 
       let totalC = 0;
 
+      const c5SubAggregate: Record<C5SubClassification, number> = {
+        LIKELY_LOOSE_BALL: 0,
+        C5_UNEXPLAINED_UNCHANGED: 0,
+        C5_UNEXPLAINED_CHANGED: 0,
+        C5_UNEXPLAINED_LOST: 0,
+      };
+
+      let c5UpperBoundWithinRadius = 0;
+      let c5UpperBoundOutsideRadius = 0;
+
       for (const seed of SEEDS) {
         const data = cloneData(baseline);
         resetPlayers(data.players);
@@ -120,12 +131,30 @@ describe.skipIf(!RUN)('C-transition diagnostic', () => {
         for (const key of Object.keys(aggregate) as CClass[]) {
           aggregate[key] += report.dist[key];
         }
+
+        for (const key of Object.keys(c5SubAggregate) as C5SubClassification[]) {
+          c5SubAggregate[key] += report.c5SubDist[key];
+        }
+
+        c5UpperBoundWithinRadius +=
+          report.c5DistanceStats.withinRadiusByUpperBound;
+        c5UpperBoundOutsideRadius +=
+          report.c5DistanceStats.outsideRadiusByUpperBound;
       }
 
       console.log('');
       console.log('=== AGGREGATE ACROSS 10 SEEDS ===');
       console.log('total C transitions: ' + totalC);
       console.table(aggregate);
+
+      console.log('=== AGGREGATE C5 SUBCLASSIFICATION ===');
+      console.table(c5SubAggregate);
+      console.log(
+        'C5 upperBound<=ballControlRadius: ' +
+        c5UpperBoundWithinRadius +
+        ' | >radius: ' +
+        c5UpperBoundOutsideRadius,
+      );
 
       const c5 = aggregate.C5_unexplained;
 
