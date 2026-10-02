@@ -1,19 +1,48 @@
-import type { LiveMatchState, Vec3, MatchEvent } from '../../types';
+// src/engine/live/diagnostics/goalBoundaryTickTraceDiagnostic.ts
+//
+// Goal Boundary Tick Trace V5
+// ===========================
+//
+// Goal boundary etrafındaki ±WINDOW tick'leri izler.
+// Yalnızca DEĞİŞİM olan tick'leri raporlar.
+//
+// Kontrat:
+//   - Production koduna dokunmaz.
+//   - detectBoundaryOutcome spy aynen kullanılır.
+//   - onTick snapshot aynen kullanılır.
+//   - Map<tick, snapshot> kullanılır.
+//   - owner + owner.position + ownerDist
+//   - lastTouch + lastTouch.position + lastTouchDist
+//   - event / owner Δ / lastTouch Δ / pos-velocity Δ ayrıştırılır.
+//   - Bu V5 raporunda yalnızca stationary goal'ler gösterilir.
+
+import type { LiveMatchState, MatchEvent } from '../../types';
 import type { BoundaryOutcome, DetectEventInput } from '../events';
+
+interface PlayerPos {
+  x: number;
+  y: number;
+  clubId: string;
+}
 
 interface TickSnapshotV5 {
   tick: number;
-  ballPosition: Vec3;
-  ballVelocity: Vec3;
-  ballOwnerId: string | null;
-  ballLastTouchId: string | null;
-  ballLastTouchClubId: string | null;
+  ballX: number;
+  ballY: number;
+  ballZ: number;
+  ballVx: number;
+  ballVy: number;
+  ballVz: number;
   ballIsMoving: boolean;
+  ownerId: string | null;
+  ownerPos: PlayerPos | null;
+  ownerDistToBall: number | null;
+  lastTouchId: string | null;
+  lastTouchPos: PlayerPos | null;
+  lastTouchDistToBall: number | null;
   setPieceType: string | null;
   setPieceStatus: string | null;
   setPieceTakerId: string | null;
-  ownerPosition: { x: number; y: number; clubId: string } | null;
-  lastTouchPosition: { x: number; y: number; clubId: string } | null;
   eventsLength: number;
   newEvents: MatchEvent[];
 }
@@ -21,25 +50,20 @@ interface TickSnapshotV5 {
 export interface GoalTickTrace {
   goalIndex: number;
   boundaryTick: number | null;
-  prevBallPos: Vec3;
-  nextBallPos: Vec3;
+  prevBallPos: { x: number; y: number; z: number };
+  nextBallPos: { x: number; y: number; z: number };
   lastTouchIdAtBoundary: string | null;
   lastTouchClubIdAtBoundary: string | null;
   scorerSide: string;
   ownGoal: boolean;
+  stationary: boolean;
   window: TickSnapshotV5[];
 }
 
 export interface GoalTickTraceReport {
   goals: GoalTickTrace[];
   N: number;
-}
-
-function distance2D(
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+  stationaryGoals: number;
 }
 
 export class GoalBoundaryTickTraceDiagnostic {
@@ -48,60 +72,67 @@ export class GoalBoundaryTickTraceDiagnostic {
   private lastEventsLength = 0;
   private readonly windowSize: number;
 
-  constructor(windowSize: number = 20) {
+  constructor(windowSize = 20) {
     this.windowSize = windowSize;
   }
 
   onTick(state: LiveMatchState, boundaryCallCount: number): void {
-    const ownerPosition = state.ball.ownerId
-      ? state.players[state.ball.ownerId]
-        ? {
-            x: state.players[state.ball.ownerId].position.x,
-            y: state.players[state.ball.ownerId].position.y,
-            clubId: state.players[state.ball.ownerId].clubId,
-          }
-        : null
-      : null;
-
-    const lastTouchPosition = state.ball.lastTouchId
-      ? state.players[state.ball.lastTouchId]
-        ? {
-            x: state.players[state.ball.lastTouchId].position.x,
-            y: state.players[state.ball.lastTouchId].position.y,
-            clubId: state.players[state.ball.lastTouchId].clubId,
-          }
-        : null
-      : null;
-
     const newEvents: MatchEvent[] = [];
+
     if (state.events.length > this.lastEventsLength) {
       for (let i = this.lastEventsLength; i < state.events.length; i++) {
         newEvents.push(state.events[i]);
       }
     }
+
     this.lastEventsLength = state.events.length;
+
+    const ownerId = state.ball.ownerId;
+    const owner = ownerId ? state.players[ownerId] : undefined;
+    const ownerPos = owner
+      ? { x: owner.position.x, y: owner.position.y, clubId: owner.clubId }
+      : null;
+    const ownerDistToBall = owner
+      ? Math.hypot(
+          owner.position.x - state.ball.position.x,
+          owner.position.y - state.ball.position.y,
+        )
+      : null;
+
+    const lastTouchId = state.ball.lastTouchId;
+    const lastTouch = lastTouchId ? state.players[lastTouchId] : undefined;
+    const lastTouchPos = lastTouch
+      ? {
+          x: lastTouch.position.x,
+          y: lastTouch.position.y,
+          clubId: lastTouch.clubId,
+        }
+      : null;
+    const lastTouchDistToBall = lastTouch
+      ? Math.hypot(
+          lastTouch.position.x - state.ball.position.x,
+          lastTouch.position.y - state.ball.position.y,
+        )
+      : null;
 
     this.snapshots.set(state.tick, {
       tick: state.tick,
-      ballPosition: {
-        x: state.ball.position.x,
-        y: state.ball.position.y,
-        z: state.ball.position.z,
-      },
-      ballVelocity: {
-        x: state.ball.velocity.x,
-        y: state.ball.velocity.y,
-        z: state.ball.velocity.z,
-      },
-      ballOwnerId: state.ball.ownerId,
-      ballLastTouchId: state.ball.lastTouchId,
-      ballLastTouchClubId: state.ball.lastTouchClubId,
+      ballX: state.ball.position.x,
+      ballY: state.ball.position.y,
+      ballZ: state.ball.position.z,
+      ballVx: state.ball.velocity.x,
+      ballVy: state.ball.velocity.y,
+      ballVz: state.ball.velocity.z,
       ballIsMoving: state.ball.isMoving,
+      ownerId,
+      ownerPos,
+      ownerDistToBall,
+      lastTouchId,
+      lastTouchPos,
+      lastTouchDistToBall,
       setPieceType: state.setPiece?.type ?? null,
       setPieceStatus: state.setPiece?.status ?? null,
       setPieceTakerId: state.setPiece?.takerId ?? null,
-      ownerPosition,
-      lastTouchPosition,
       eventsLength: state.events.length,
       newEvents,
     });
@@ -113,8 +144,10 @@ export class GoalBoundaryTickTraceDiagnostic {
   }
 
   private tickForBoundaryCall(callIndex: number): number | null {
-    for (const rec of this.tickLog) {
-      if (rec.boundaryCallCountAtTickEnd > callIndex) return rec.tick;
+    for (const record of this.tickLog) {
+      if (record.boundaryCallCountAtTickEnd > callIndex) {
+        return record.tick;
+      }
     }
     return null;
   }
@@ -130,19 +163,28 @@ export class GoalBoundaryTickTraceDiagnostic {
 
     for (let i = 0; i < boundaryCalls.length; i++) {
       const { input, result } = boundaryCalls[i];
+
       if (result.type !== 'goal') continue;
 
       goalIndex++;
+
       const boundaryTick = this.tickForBoundaryCall(i);
       if (boundaryTick === null) continue;
 
+      const dx = input.nextBallPos.x - input.prevBallPos.x;
+      const dy = input.nextBallPos.y - input.prevBallPos.y;
+      const dz = input.nextBallPos.z - input.prevBallPos.z;
+      const moveDist = Math.hypot(dx, dy, dz);
+      const stationary = moveDist < 0.3;
+
       const window: TickSnapshotV5[] = [];
+
       for (
-        let t = boundaryTick - this.windowSize;
-        t <= boundaryTick + this.windowSize;
-        t++
+        let tick = boundaryTick - this.windowSize;
+        tick <= boundaryTick + this.windowSize;
+        tick++
       ) {
-        const snapshot = this.snapshots.get(t);
+        const snapshot = this.snapshots.get(tick);
         if (snapshot) window.push(snapshot);
       }
 
@@ -155,129 +197,147 @@ export class GoalBoundaryTickTraceDiagnostic {
         lastTouchClubIdAtBoundary: input.lastTouchClubId,
         scorerSide: result.scorerSide,
         ownGoal: result.ownGoal,
+        stationary,
         window,
       });
     }
 
+    const stationaryGoals = goals.filter(goal => goal.stationary).length;
+
     console.log('=== GOAL BOUNDARY TICK TRACE V5 ===');
     console.log(`window size: ±${this.windowSize} ticks`);
+    console.log(`stationary goals only: ${stationaryGoals}`);
 
     for (const goal of goals) {
+      if (!goal.stationary) continue;
+
       console.log('');
       console.log(
-        `──── GOAL #${goal.goalIndex} boundaryTick=${goal.boundaryTick} ownGoal=${goal.ownGoal} scorerSide=${goal.scorerSide}`,
+        `──── GOAL #${goal.goalIndex} ` +
+        `boundaryTick=${goal.boundaryTick} ` +
+        `ownGoal=${goal.ownGoal} ` +
+        `scorerSide=${goal.scorerSide}`,
       );
       console.log(
-        `  boundary input: prev=(${goal.prevBallPos.x.toFixed(2)},${goal.prevBallPos.y.toFixed(2)},${goal.prevBallPos.z.toFixed(2)}) ` +
+        `  boundary input: ` +
+        `prev=(${goal.prevBallPos.x.toFixed(2)},${goal.prevBallPos.y.toFixed(2)},${goal.prevBallPos.z.toFixed(2)}) ` +
         `next=(${goal.nextBallPos.x.toFixed(2)},${goal.nextBallPos.y.toFixed(2)},${goal.nextBallPos.z.toFixed(2)}) ` +
-        `lastTouch=${goal.lastTouchIdAtBoundary ?? 'N/A'}(${goal.lastTouchClubIdAtBoundary ?? '?'})`,
+        `lastTouch@boundary=${goal.lastTouchIdAtBoundary ?? 'N/A'}(${goal.lastTouchClubIdAtBoundary ?? '?'})`,
       );
 
-      let prev: TickSnapshotV5 | null = null;
+      let previous: TickSnapshotV5 | null = null;
 
       for (const snapshot of goal.window) {
-        const changes: string[] = [];
         const isBoundary = snapshot.tick === goal.boundaryTick;
+        const changes: string[] = [];
 
-        if (prev) {
-          if (prev.ballOwnerId !== snapshot.ballOwnerId) {
-            changes.push(`owner:${prev.ballOwnerId ?? 'null'}→${snapshot.ballOwnerId ?? 'null'}`);
-          }
-          if (prev.ballLastTouchId !== snapshot.ballLastTouchId) {
-            changes.push(`lastTouch:${prev.ballLastTouchId ?? 'null'}→${snapshot.ballLastTouchId ?? 'null'}`);
-          }
-
-          const posChanged =
-            Math.abs(prev.ballPosition.x - snapshot.ballPosition.x) > 0.05 ||
-            Math.abs(prev.ballPosition.y - snapshot.ballPosition.y) > 0.05 ||
-            Math.abs(prev.ballPosition.z - snapshot.ballPosition.z) > 0.05;
-          if (posChanged) {
+        if (previous) {
+          if (previous.ownerId !== snapshot.ownerId) {
             changes.push(
-              `pos:(${prev.ballPosition.x.toFixed(2)},${prev.ballPosition.y.toFixed(2)})→(${snapshot.ballPosition.x.toFixed(2)},${snapshot.ballPosition.y.toFixed(2)})`,
+              `A-owner:${previous.ownerId ?? 'null'}→${snapshot.ownerId ?? 'null'}`,
             );
           }
 
-          const prevSpeed = Math.hypot(prev.ballVelocity.x, prev.ballVelocity.y, prev.ballVelocity.z);
-          const currentSpeed = Math.hypot(snapshot.ballVelocity.x, snapshot.ballVelocity.y, snapshot.ballVelocity.z);
-          if (Math.abs(prevSpeed - currentSpeed) > 0.1) {
-            changes.push(`speed:${prevSpeed.toFixed(2)}→${currentSpeed.toFixed(2)}`);
-          }
-
-          if (prev.ballIsMoving !== snapshot.ballIsMoving) {
-            changes.push(`moving:${prev.ballIsMoving}→${snapshot.ballIsMoving}`);
-          }
-
-          if (prev.setPieceType !== snapshot.setPieceType) {
-            changes.push(`setPiece:${prev.setPieceType ?? 'null'}→${snapshot.setPieceType ?? 'null'}`);
-          }
-          if (prev.setPieceStatus !== snapshot.setPieceStatus) {
-            changes.push(`spStatus:${prev.setPieceStatus ?? 'null'}→${snapshot.setPieceStatus ?? 'null'}`);
-          }
-          if (prev.setPieceTakerId !== snapshot.setPieceTakerId) {
-            changes.push(`spTaker:${prev.setPieceTakerId ?? 'null'}→${snapshot.setPieceTakerId ?? 'null'}`);
-          }
-
-          const ownerChanged =
-            prev.ownerPosition?.x !== snapshot.ownerPosition?.x ||
-            prev.ownerPosition?.y !== snapshot.ownerPosition?.y;
-          if (ownerChanged && snapshot.ownerPosition) {
+          if (previous.lastTouchId !== snapshot.lastTouchId) {
             changes.push(
-              `ownerPos:(${prev.ownerPosition?.x.toFixed(2) ?? 'null'},${prev.ownerPosition?.y.toFixed(2) ?? 'null'})→(${snapshot.ownerPosition.x.toFixed(2)},${snapshot.ownerPosition.y.toFixed(2)})`,
+              `B-lt:${previous.lastTouchId ?? 'null'}→${snapshot.lastTouchId ?? 'null'}`,
             );
           }
 
-          const lastTouchChanged =
-            prev.lastTouchPosition?.x !== snapshot.lastTouchPosition?.x ||
-            prev.lastTouchPosition?.y !== snapshot.lastTouchPosition?.y;
-          if (lastTouchChanged && snapshot.lastTouchPosition) {
+          if (
+            Math.abs(previous.ballX - snapshot.ballX) > 0.05 ||
+            Math.abs(previous.ballY - snapshot.ballY) > 0.05 ||
+            Math.abs(previous.ballZ - snapshot.ballZ) > 0.05
+          ) {
             changes.push(
-              `ltPos:(${prev.lastTouchPosition?.x.toFixed(2) ?? 'null'},${prev.lastTouchPosition?.y.toFixed(2) ?? 'null'})→(${snapshot.lastTouchPosition.x.toFixed(2)},${snapshot.lastTouchPosition.y.toFixed(2)})`,
+              `C-pos:(${previous.ballX.toFixed(2)},${previous.ballY.toFixed(2)})→(${snapshot.ballX.toFixed(2)},${snapshot.ballY.toFixed(2)})`,
+            );
+          }
+
+          const previousSpeed = Math.hypot(
+            previous.ballVx,
+            previous.ballVy,
+            previous.ballVz,
+          );
+          const currentSpeed = Math.hypot(
+            snapshot.ballVx,
+            snapshot.ballVy,
+            snapshot.ballVz,
+          );
+
+          if (Math.abs(previousSpeed - currentSpeed) > 0.1) {
+            changes.push(
+              `C-speed:${previousSpeed.toFixed(2)}→${currentSpeed.toFixed(2)}`,
+            );
+          }
+
+          if (previous.ballIsMoving !== snapshot.ballIsMoving) {
+            changes.push(
+              `C-moving:${previous.ballIsMoving}→${snapshot.ballIsMoving}`,
+            );
+          }
+
+          if (previous.setPieceType !== snapshot.setPieceType) {
+            changes.push(
+              `sp-type:${previous.setPieceType ?? 'null'}→${snapshot.setPieceType ?? 'null'}`,
+            );
+          }
+
+          if (previous.setPieceStatus !== snapshot.setPieceStatus) {
+            changes.push(
+              `sp-status:${previous.setPieceStatus ?? 'null'}→${snapshot.setPieceStatus ?? 'null'}`,
+            );
+          }
+
+          if (previous.setPieceTakerId !== snapshot.setPieceTakerId) {
+            changes.push(
+              `sp-taker:${previous.setPieceTakerId ?? 'null'}→${snapshot.setPieceTakerId ?? 'null'}`,
             );
           }
         }
 
         const newEventsStr = snapshot.newEvents.length > 0
-          ? snapshot.newEvents.map(event => {
-              const id = event.playerId ?? 'N/A';
-              const club = event.clubId ?? '?';
-              return `${event.type}(${id}/${club})`;
-            }).join(',')
+          ? snapshot.newEvents
+              .map(event =>
+                `${event.type}${event.playerId ? `(${event.playerId}/${event.clubId ?? '?'})` : ''}`,
+              )
+              .join(',')
           : '';
 
-        const marker = isBoundary ? ' ← BOUNDARY' : '';
-
-        if (changes.length > 0 || snapshot.newEvents.length > 0 || isBoundary) {
-          const owner = snapshot.ownerPosition
-            ? `(${snapshot.ownerPosition.x.toFixed(2)},${snapshot.ownerPosition.y.toFixed(2)})`
-            : 'N/A';
-          const ownerDist = snapshot.ownerPosition
-            ? distance2D(snapshot.ownerPosition, snapshot.ballPosition).toFixed(2)
-            : 'N/A';
-          const lastTouch = snapshot.lastTouchPosition
-            ? `(${snapshot.lastTouchPosition.x.toFixed(2)},${snapshot.lastTouchPosition.y.toFixed(2)})`
-            : 'N/A';
-          const lastTouchDist = snapshot.lastTouchPosition
-            ? distance2D(snapshot.lastTouchPosition, snapshot.ballPosition).toFixed(2)
-            : 'N/A';
-
-          console.log(
-            `  tick=${snapshot.tick}` +
-            ` pos=(${snapshot.ballPosition.x.toFixed(2)},${snapshot.ballPosition.y.toFixed(2)},${snapshot.ballPosition.z.toFixed(2)})` +
-            ` v=(${snapshot.ballVelocity.x.toFixed(2)},${snapshot.ballVelocity.y.toFixed(2)},${snapshot.ballVelocity.z.toFixed(2)})` +
-            ` owner=${snapshot.ballOwnerId ?? 'null'} ownerPos=${owner} ownerDist=${ownerDist}` +
-            ` lt=${snapshot.ballLastTouchId ?? 'null'} ltPos=${lastTouch} ltDist=${lastTouchDist}` +
-            ` moving=${snapshot.ballIsMoving}` +
-            ` sp=${snapshot.setPieceType ?? '-'}/${snapshot.setPieceStatus ?? '-'}` +
-            (newEventsStr ? ` events=[${newEventsStr}]` : '') +
-            (changes.length > 0 ? ` Δ[${changes.join(' | ')}]` : '') +
-            marker,
-          );
+        if (changes.length === 0 && snapshot.newEvents.length === 0 && !isBoundary) {
+          previous = snapshot;
+          continue;
         }
 
-        prev = snapshot;
+        const ownerStr = snapshot.ownerId
+          ? `${snapshot.ownerId}@(${snapshot.ownerPos?.x.toFixed(2) ?? '?'},${snapshot.ownerPos?.y.toFixed(2) ?? '?'})d=${snapshot.ownerDistToBall?.toFixed(2) ?? '?'}`
+          : 'null';
+
+        const lastTouchStr = snapshot.lastTouchId
+          ? `${snapshot.lastTouchId}@(${snapshot.lastTouchPos?.x.toFixed(2) ?? '?'},${snapshot.lastTouchPos?.y.toFixed(2) ?? '?'})d=${snapshot.lastTouchDistToBall?.toFixed(2) ?? '?'}`
+          : 'null';
+
+        console.log(
+          `  tick=${snapshot.tick}` +
+          ` pos=(${snapshot.ballX.toFixed(2)},${snapshot.ballY.toFixed(2)},${snapshot.ballZ.toFixed(2)})` +
+          ` v=(${snapshot.ballVx.toFixed(2)},${snapshot.ballVy.toFixed(2)},${snapshot.ballVz.toFixed(2)})` +
+          ` moving=${snapshot.ballIsMoving}` +
+          ` owner=${ownerStr}` +
+          ` lt=${lastTouchStr}` +
+          ` sp=${snapshot.setPieceType ?? '-'}/${snapshot.setPieceStatus ?? '-'}/${snapshot.setPieceTakerId ?? '-'}` +
+          (newEventsStr ? ` events=[${newEventsStr}]` : '') +
+          (changes.length > 0 ? ` Δ[${changes.join(' | ')}]` : '') +
+          (isBoundary ? ' ← BOUNDARY' : ''),
+        );
+
+        previous = snapshot;
       }
     }
 
-    return { goals, N: this.windowSize };
+    return {
+      goals,
+      N: this.windowSize,
+      stationaryGoals,
+    };
   }
 }
