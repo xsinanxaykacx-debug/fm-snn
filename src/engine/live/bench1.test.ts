@@ -193,6 +193,17 @@ function localConditionFactor(player: LivePlayer): number {
   return conditionFactor * fatiguePenalty;
 }
 
+function localLaneProjectionWeight(projection: number): number {
+  if (projection <= 0.25) return 0.10;
+  if (projection <= 0.50) {
+    return 0.10 + ((projection - 0.25) / 0.25) * 0.25;
+  }
+  if (projection <= 0.75) {
+    return 0.35 + ((projection - 0.50) / 0.25) * 0.35;
+  }
+  return 0.70 + ((projection - 0.75) / 0.25) * 0.30;
+}
+
 function localLaneClarity(
   owner: LivePlayer,
   target: { x: number; y: number },
@@ -221,8 +232,10 @@ function localLaneClarity(
       opponent.position.y - closestY
     );
 
-    if (lateral < 1.5) interference += 0.55;
-    else if (lateral < 3) interference += 0.20;
+    const projectionWeight = localLaneProjectionWeight(projection);
+
+    if (lateral < 1.5) interference += 0.55 * projectionWeight;
+    else if (lateral < 3) interference += 0.20 * projectionWeight;
   }
 
   return localClamp(1 - interference, 0.05, 1);
@@ -280,11 +293,13 @@ function localLaneClarityWithCount(
       opponent.position.y - closestY
     );
 
+    const projectionWeight = localLaneProjectionWeight(projection);
+
     if (lateral < 1.5) {
-      interference += 0.55;
+      interference += 0.55 * projectionWeight;
       oppInInner += 1;
     } else if (lateral < 3) {
-      interference += 0.20;
+      interference += 0.20 * projectionWeight;
       oppInOuter += 1;
     }
   }
