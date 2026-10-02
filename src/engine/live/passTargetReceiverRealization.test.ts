@@ -70,6 +70,7 @@ interface ResolutionRecord {
   receiverId: string | null;
   receiverPosAtApply: Vec2 | null;
   receiverMissingReason: PassTrace['receiverMissingReason'];
+  probability: number;
   applyMatched: boolean;
   trace: PassTrace | null;
 }
@@ -225,6 +226,7 @@ describe('Pass Target Receiver Realization Diagnostic V9.1', () => {
             receiverId,
             receiverPosAtApply,
             receiverMissingReason,
+            probability: result.probability,
             applyMatched: false,
             trace: null,
           };
@@ -297,7 +299,7 @@ describe('Pass Target Receiver Realization Diagnostic V9.1', () => {
 
             if (resolution) {
               resolution.trace = trace;
-              trace.resolutionProbability = null;
+              trace.resolutionProbability = resolution.probability;
             }
 
             return result;
@@ -492,7 +494,7 @@ describe('Pass Target Receiver Realization Diagnostic V9.1', () => {
       const outcomeCounts: Record<PassOutcome, number> = {
         boundary: 0,
         possession: 0,
-        interception: 0,
+        interception: interceptedResolutions.length,
         none: 0,
       };
 
