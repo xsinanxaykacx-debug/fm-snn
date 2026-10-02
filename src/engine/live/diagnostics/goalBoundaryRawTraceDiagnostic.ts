@@ -149,7 +149,6 @@ export class GoalBoundaryRawTraceDiagnostic {
     boundaryCalls: readonly { input: DetectEventInput; result: BoundaryOutcome }[]
   ): RawTraceReport {
     let goalIndex = 0;
-    let targetCallIndex = -1;
     let targetBoundaryTick: number | null = null;
     let targetInput: DetectEventInput | null = null;
     let targetResult: BoundaryOutcome | null = null;
@@ -159,7 +158,6 @@ export class GoalBoundaryRawTraceDiagnostic {
       if (result.type !== 'goal') continue;
       goalIndex++;
       if (goalIndex === this.targetGoalIndex) {
-        targetCallIndex = i;
         targetBoundaryTick = this.tickForBoundaryCall(i);
         targetInput = input;
         targetResult = result;
