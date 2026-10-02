@@ -1,11 +1,28 @@
-import { describe, it } from 'vitest';
+import { describe, it, beforeEach, afterEach } from 'vitest';
 import { simulateMatchLive } from './liveMatch';
 import { generateGameData } from '../data/generateData';
+import {
+  installDeterministicRandom,
+  DEFAULT_FIXTURE_SEED,
+} from './diagnostics/deterministicFixture';
 
 const SEED = 1000;
 const MATCH_TICKS = 54_000;
 
 describe('single match bench', () => {
+  let handle: ReturnType<typeof installDeterministicRandom> | null = null;
+
+  beforeEach(() => {
+    handle = installDeterministicRandom(DEFAULT_FIXTURE_SEED);
+  });
+
+  afterEach(() => {
+    if (handle) {
+      handle.restore();
+      handle = null;
+    }
+  });
+
   it(`seed=${SEED}`, () => {
     const data = generateGameData();
     const clubs = Object.values(data.clubs);
@@ -26,6 +43,8 @@ describe('single match bench', () => {
       s.passesCompleted.home + s.passesCompleted.away;
 
     console.log('=== BENCH ===');
+    console.log('fixtureSeed:', DEFAULT_FIXTURE_SEED);
+    console.log('matchSeed:', SEED);
     console.log('elapsedSec:', (elapsedMs / 1000).toFixed(2));
     console.log('ticks:', s.ticks);
     console.log('score:', result.homeScore + '-' + result.awayScore);
