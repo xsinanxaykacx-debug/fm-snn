@@ -23,6 +23,7 @@ vi.mock('./ball', async (importOriginal) => {
       clubId: Parameters<typeof actual.controlBall>[2],
     ) => {
       const stack = new Error().stack ?? '';
+
       recordControlBallTrace(
         ownerId,
         clubId,
@@ -31,6 +32,7 @@ vi.mock('./ball', async (importOriginal) => {
         ball.ownerId,
         stack,
       );
+
       return actual.controlBall(ball, ownerId, clubId);
     },
   };
@@ -81,12 +83,19 @@ function getFixture(data: {
     );
   }
 
-  return { home: clubs[0], away: clubs[1] };
+  return {
+    home: clubs[0],
+    away: clubs[1],
+  };
 }
 
 describe.skipIf(!RUN)('C-transition diagnostic v4', () => {
   it(
-    'runs ' + SEEDS.length + ' seeds x ' + MAX_TICKS_PER_SEED + ' ticks',
+    'runs ' +
+      SEEDS.length +
+      ' seeds x ' +
+      MAX_TICKS_PER_SEED +
+      ' ticks',
     () => {
       const baseline = generateGameData();
 
@@ -98,11 +107,11 @@ describe.skipIf(!RUN)('C-transition diagnostic v4', () => {
         C5_unexplained: 0,
       };
 
-      const c5Aggregate = {
+      const subclassAggregate = {
         LIKELY_LOOSE_BALL: 0,
-        C5_UNEXPLAINED_UNCHANGED: 0,
-        C5_UNEXPLAINED_CHANGED: 0,
-        C5_UNEXPLAINED_LOST: 0,
+        UNCHANGED: 0,
+        CHANGED: 0,
+        LOST: 0,
       };
 
       const callerAggregate = {
@@ -123,6 +132,7 @@ describe.skipIf(!RUN)('C-transition diagnostic v4', () => {
 
         const data = cloneData(baseline);
         resetPlayers(data.players);
+
         const { home, away } = getFixture(data);
 
         const diagnostic =
@@ -131,59 +141,90 @@ describe.skipIf(!RUN)('C-transition diagnostic v4', () => {
             MAX_TICKS_PER_SEED,
           );
 
-        simulateMatchLive(home, away, data.players, {
-          seed,
-          maxTicks: MAX_TICKS_PER_SEED,
-          onTackleResolved: outcome => {
-            diagnostic.onTackleResolved(outcome);
+        simulateMatchLive(
+          home,
+          away,
+          data.players,
+          {
+            seed,
+            maxTicks: MAX_TICKS_PER_SEED,
+            onTackleResolved: () => {
+              // v4 classification uses same-tick snapshot deltas.
+              // Callback is intentionally not used as category evidence.
+            },
+            onTick: state => {
+              diagnostic.onTick(state);
+            },
           },
-          onTick: state => {
-            diagnostic.onTick(state);
-          },
-        });
+        );
 
         const report = diagnostic.report();
 
         totalC += report.totalC;
 
-        for (const key of Object.keys(aggregate) as Array<keyof typeof aggregate>) {
+        for (
+          const key of Object.keys(aggregate) as Array<
+            keyof typeof aggregate
+          >
+        ) {
           aggregate[key] += report.dist[key];
         }
 
-        for (const key of Object.keys(c5Aggregate) as Array<keyof typeof c5Aggregate>) {
-          c5Aggregate[key] += report.c5SubDist[key];
+        for (
+          const key of Object.keys(subclassAggregate) as Array<
+            keyof typeof subclassAggregate
+          >
+        ) {
+          subclassAggregate[key] += report.sub[key];
         }
 
-        for (const key of Object.keys(callerAggregate) as Array<keyof typeof callerAggregate>) {
+        for (
+          const key of Object.keys(callerAggregate) as Array<
+            keyof typeof callerAggregate
+          >
+        ) {
           callerAggregate[key] += report.callerDist[key];
         }
 
-        for (const [type, count] of Object.entries(report.setPieceMutationTypes)) {
-          setPieceAggregate[type] = (setPieceAggregate[type] ?? 0) + count;
+        for (
+          const [type, count] of Object.entries(
+            report.updateSetPieceStatusByType,
+          )
+        ) {
+          setPieceAggregate[type] =
+            (setPieceAggregate[type] ?? 0) + count;
         }
       }
 
       console.log('');
       console.log('=== AGGREGATE ACROSS 10 SEEDS ===');
-      console.log('total C transitions: ' + totalC);
+      console.log('total C: ' + totalC);
       console.table(aggregate);
 
-      console.log('=== AGGREGATE C5 LIFECYCLE (rapor; karar kanıtı değil) ===');
-      console.table(c5Aggregate);
+      console.log('=== AGGREGATE SUBCLASS ===');
+      console.table(subclassAggregate);
 
       console.log('=== AGGREGATE CONTROL-BALL CALLER ===');
       console.table(callerAggregate);
 
-      console.log('=== AGGREGATE updateSetPieceStatus × T-1 setPieceType ===');
+      console.log(
+        '=== AGGREGATE updateSetPieceStatus × T-1 setPieceType ===',
+      );
       console.table(setPieceAggregate);
 
       console.log('=== KARAR NOKTASI ===');
-      console.log(
-        'Mutation trace birincil kanıt. Geometri yalnızca yardımcı bilgi.',
-      );
-      console.log(
-        'Final C5: ' + aggregate.C5_unexplained,
-      );
+
+      if (aggregate.C5_unexplained === 0) {
+        console.log(
+          'Tüm C geçişleri mutation/lifecycle kanıtı ile açıklandı. Production patch YOK.',
+        );
+      } else {
+        console.log(
+          'C5_unexplained = ' +
+            aggregate.C5_unexplained +
+            '. Kalan kayıtları T-1/T/T+1 lifecycle ile incele.',
+        );
+      }
 
       expect(totalC).toBeGreaterThanOrEqual(0);
     },
