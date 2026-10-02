@@ -1999,3 +1999,162 @@ function updateSetPieceStatus(state: LiveMatchState): void {
 // ═══════════════════════════════════════════════
 
 function checkPhaseTransition(state: LiveMatchState): void {
+  if (state.setPiece !== null) return;
+
+  if (state.phase === 'kickoff' || state.phase === 'goal') {
+    state.phase = state.time < HALF_DURATION_SECONDS
+      ? 'first_half'
+      : 'second_half';
+    return;
+  }
+
+  if (
+    state.phase === 'first_half' &&
+    state.time >= HALF_DURATION_SECONDS
+  ) {
+    state.phase = 'half_time';
+
+    state.events.push({
+      minute: 45,
+      type: 'halftime',
+      description: 'İlk yarı sonu',
+    });
+
+    return;
+  }
+
+  if (state.phase === 'half_time') {
+    state.phase = 'second_half';
+    return;
+  }
+
+  if (
+    state.phase === 'second_half' &&
+    state.time >= MATCH_DURATION_SECONDS
+  ) {
+    state.phase = 'full_time';
+    state.isFinished = true;
+
+    state.events.push({
+      minute: 90,
+      type: 'fulltime',
+      description: 'Maç sonu',
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════
+// POSSESSION / OWNERSHIP
+// ═══════════════════════════════════════════════
+
+function syncMatchOwnershipState(state: LiveMatchState): void {
+  const ownerId = state.ball.ownerId;
+
+  state.lastBallOwnerId = ownerId;
+
+  state.home.hasPossession =
+    ownerId !== null &&
+    state.players[ownerId]?.isHome === true;
+
+  state.away.hasPossession =
+    ownerId !== null &&
+    state.players[ownerId]?.isHome === false;
+}
+
+// ═══════════════════════════════════════════════
+// CAREER STATS
+// ═══════════════════════════════════════════════
+
+function updateCareerStatsAfterMatch(
+  state: LiveMatchState,
+  players: Record<string, Player>
+): void {
+  const minutesPlayed = Math.floor(state.time / 60);
+
+  for (const id of Object.keys(state.players)) {
+    const p = players[id];
+    if (!p) continue;
+
+    const isStarter =
+      state.home.players.includes(id) ||
+      state.away.players.includes(id);
+
+    if (!isStarter) continue;
+
+    p.careerStats.appearances += 1;
+    p.careerStats.seasonAppearances += 1;
+    p.careerStats.minutesPlayed += minutesPlayed;
+    p.careerStats.seasonMinutesPlayed += minutesPlayed;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// YARDIMCILAR
+// ═══════════════════════════════════════════════
+
+function getCenterPoint(pitch: PitchDimensions): Vec2 {
+  return { x: pitch.length / 2, y: pitch.width / 2 };
+}
+
+function createEmptyStats(): LiveMatchStats {
+  return {
+    possession: { home: 50, away: 50 },
+    shots: { home: 0, away: 0 },
+    onTarget: { home: 0, away: 0 },
+    chances: { home: 0, away: 0 },
+    xG: { home: 0, away: 0 },
+    passes: { home: 0, away: 0 },
+    passesCompleted: { home: 0, away: 0 },
+    dribbles: { home: 0, away: 0 },
+    dribblesSuccess: { home: 0, away: 0 },
+    crosses: { home: 0, away: 0 },
+    crossesSuccess: { home: 0, away: 0 },
+    dangerousAttacks: { home: 0, away: 0 },
+    recoveries: { home: 0, away: 0 },
+    counterPressAttempts: 0,
+    counterPressRecoveries: 0,
+    counterPressRollsPassed: 0,
+    counterPressTackleWins: 0,
+    counterPressTackleFailures: 0,
+    counterPressTackleFouls: 0,
+    counterPressCleanRecoveries: 0,
+    counterPressLooseBallRecoveries: 0,
+    counterPressTackleWinChanceSum: 0,
+    counterPressTackleWinChanceMin: 1,
+    counterPressTackleWinChanceMax: 0,
+    counterPressTackleRelativeSpeedSum: 0,
+    counterPressTackleDistanceSum: 0,
+    fouls: { home: 0, away: 0 },
+    yellowCards: { home: 0, away: 0 },
+    redCards: { home: 0, away: 0 },
+    corners: { home: 0, away: 0 },
+    throwIns: { home: 0, away: 0 },
+    goalKicks: { home: 0, away: 0 },
+    offsides: { home: 0, away: 0 },
+    ticks: 0,
+    simulationSeconds: 0,
+  };
+}
+
+function convertToMatch(
+  state: LiveMatchState,
+  home: Club,
+  away: Club,
+  week: number | undefined
+): Match {
+  state.stats.ticks = state.tick;
+  state.stats.simulationSeconds = state.time;
+
+  return {
+    id: `match_live_${home.id}_${away.id}`,
+    week,
+    homeId: home.id,
+    awayId: away.id,
+    homeScore: state.score.home,
+    awayScore: state.score.away,
+    events: state.events,
+    sequences: state.sequences,
+    stats: state.stats,
+    played: true,
+  };
+}
