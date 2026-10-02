@@ -160,6 +160,7 @@ export function LiveMatchScreen() {
   const [result, setResult] = useState<Match | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveEvents, setLiveEvents] = useState<LiveFrame['latestEvent'][]>([]);
   const workerRef = useRef<Worker | null>(null);
 
   const fixture = useMemo(() => state.fixtures.find(m =>
@@ -187,6 +188,7 @@ export function LiveMatchScreen() {
     setFrame(null);
     setResult(null);
     setError(null);
+    setLiveEvents([]);
     setRunning(true);
 
     window.__LIVE_MATCH_DEBUG__ = undefined;
@@ -203,6 +205,13 @@ export function LiveMatchScreen() {
 
       if (message.type === 'frame') {
         setFrame(message);
+        if (message.latestEvent) {
+          setLiveEvents(previous => {
+            const last = previous[previous.length - 1];
+            if (last?.minute === message.latestEvent?.minute && last?.description === message.latestEvent?.description) return previous;
+            return [...previous, message.latestEvent].slice(-14);
+          });
+        }
         return;
       }
 
@@ -336,7 +345,31 @@ export function LiveMatchScreen() {
           </div>
         </div>
 
-        <div className="glass-panel rounded-xl p-4 space-y-4">
+        <div className="space-y-4">
+          <div className="glass-panel rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-xs text-slate-500 uppercase tracking-widest">Maç Akışı</div>
+                <div className="text-white font-bold mt-1">Canlı yorum</div>
+              </div>
+              <div className="text-xs text-slate-500">{liveEvents.length} olay</div>
+            </div>
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {liveEvents.length === 0 && <div className="text-sm text-slate-500 py-6 text-center">Başlama vuruşu bekleniyor...</div>}
+              {[...liveEvents].reverse().map((event, index) => (
+                <div key={event?.minute + '-' + event?.description + '-' + index} className="flex gap-3 p-2 rounded-lg bg-pitch-800/80 border border-pitch-700">
+                  <div className="text-accent font-black text-xs tabular-nums w-9">{event?.minute}'</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-300 uppercase">{event?.type?.replace('_', ' ')}</div>
+                    <div className="text-sm text-white leading-snug">{event?.description}</div>
+                    {event?.xG !== undefined && <div className="text-[10px] text-slate-500 mt-1">xG {event.xG.toFixed(2)}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="glass-panel rounded-xl p-4 space-y-4">
           <div>
             <div className="text-xs text-slate-500 uppercase">Motor</div>
             <div className="text-white font-bold mt-1">LIVE ENGINE 1.0</div>
@@ -356,9 +389,11 @@ export function LiveMatchScreen() {
             </div>
           </div>
 
-          <div className="text-xs text-slate-500">
-            Oyuncu noktaları gerçek motor koordinatlarından çiziliyor: 104 × 64 m.
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Faz</div><div className="text-white font-bold mt-1">{frame?.phase ?? 'kickoff'}</div></div>
+            <div className="bg-pitch-800 rounded p-3"><div className="text-slate-500">Motor</div><div className="text-white font-bold mt-1">10 Hz</div></div>
           </div>
+          <div className="text-xs text-slate-500">104 × 64 m gerçek saha koordinatları • oyuncu ve top hareketi doğrudan canlı motordan gelir.</div>
 
           {error && (
             <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
@@ -382,6 +417,53 @@ export function LiveMatchScreen() {
           )}
         </div>
       </div>
+      {result && (
+        <div className="glass-panel rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-accent">Maç Sonu</div>
+              <div className="text-2xl font-black text-white mt-1">{home.name} {result.homeScore} — {result.awayScore} {away.name}</div>
+            </div>
+            <button onClick={saveResult} className="btn-primary px-5 py-3 font-bold">✓ SONUCU KAYDET</button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+            {[
+              ['Şut', result.stats.shots.home, result.stats.shots.away],
+              ['İsabet', result.stats.onTarget.home, result.stats.onTarget.away],
+              ['xG', result.stats.xG?.home ?? 0, result.stats.xG?.away ?? 0],
+              ['Pas', result.stats.passes?.home ?? 0, result.stats.passes?.away ?? 0],
+              ['Başarılı Pas', result.stats.passesCompleted?.home ?? 0, result.stats.passesCompleted?.away ?? 0],
+              ['Çalım', result.stats.dribbles?.home ?? 0, result.stats.dribbles?.away ?? 0],
+              ['Korner', result.stats.corners?.home ?? 0, result.stats.corners?.away ?? 0],
+              ['Faul', result.stats.fouls?.home ?? 0, result.stats.fouls?.away ?? 0],
+            ].map(([label, h, a]) => (
+              <div key={String(label)} className="bg-pitch-800 rounded-lg p-3 text-center">
+                <div className="text-[10px] text-slate-500 uppercase">{label}</div>
+                <div className="text-white font-black mt-1">{typeof h === 'number' ? h.toFixed(label === 'xG' ? 2 : 0) : h} <span className="text-slate-600">—</span> {typeof a === 'number' ? a.toFixed(label === 'xG' ? 2 : 0) : a}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid lg:grid-cols-2 gap-3">
+            <div className="bg-pitch-800 rounded-lg p-3">
+              <div className="text-xs text-slate-500 uppercase mb-2">Maç raporu</div>
+              <div className="space-y-1 max-h-52 overflow-y-auto">
+                {result.events.slice(-18).reverse().map((event, index) => (
+                  <div key={event.minute + '-' + event.type + '-' + index} className="text-sm text-slate-300"><span className="text-accent font-bold">{event.minute}'</span> {event.description}</div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-pitch-800 rounded-lg p-3">
+              <div className="text-xs text-slate-500 uppercase mb-2">Pas verimliliği</div>
+              <div className="text-3xl font-black text-white">
+                {(result.stats.passes?.home ?? 0) + (result.stats.passes?.away ?? 0) > 0
+                  ? (((result.stats.passesCompleted?.home ?? 0) + (result.stats.passesCompleted?.away ?? 0)) / ((result.stats.passes?.home ?? 0) + (result.stats.passes?.away ?? 0)) * 100).toFixed(1)
+                  : '0.0'}%
+              </div>
+              <div className="text-xs text-slate-500 mt-1">toplam başarılı pas / toplam pas</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
