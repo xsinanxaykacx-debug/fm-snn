@@ -151,7 +151,7 @@ function getBallSpeed(state: LiveMatchState): number {
   );
 }
 
-function takeSnapshot(state: LiveMatchState): TickSnapshot {
+export function takeSnapshot(state: LiveMatchState): TickSnapshot {
   const players: TickSnapshot['players'] = [];
 
   for (const id of Object.keys(state.players).sort()) {
@@ -195,7 +195,7 @@ function takeSnapshot(state: LiveMatchState): TickSnapshot {
   };
 }
 
-function sliceEvents(
+export function sliceEvents(
   state: LiveMatchState,
   fromLength: number,
   toLength: number,
