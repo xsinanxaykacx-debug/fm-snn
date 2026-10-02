@@ -22,8 +22,16 @@ const RUN =
 
 describe.skipIf(!RUN)('Goal provenance diagnostic B', () => {
   it(`seed ${SEED} — goal provenance`, () => {
-    const { home, away, players } = generateGameData();
-    const clonedPlayers = structuredClone(players);
+    const data = generateGameData();
+    const clubs = Object.values(data.clubs);
+
+    if (clubs.length < 2) {
+      throw new Error('Goal provenance diagnostic için en az iki kulüp gerekli.');
+    }
+
+    const home = structuredClone(clubs[0]);
+    const away = structuredClone(clubs[1]);
+    const clonedPlayers = structuredClone(data.players);
 
     const diagnostic = new GoalProvenanceDiagnostic();
 
