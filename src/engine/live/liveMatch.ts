@@ -152,6 +152,8 @@ export interface SimulateMatchLiveOptions {
   userLineup?: string[];
   pitchDimensions?: PitchDimensions;
   onTick?: (state: LiveMatchState) => void;
+  /** @internal Harness/debug gözlem kanalı; oyun davranışını değiştirmez. */
+  onTackleResolved?: (outcome: TackleOutcome) => void;
   maxTicks?: number;
 }
 
@@ -523,7 +525,8 @@ export function runTick(
   const tackleChangedPossession = applyTackleOutcomes(
     tackleOutcomes,
     state,
-    players
+    players,
+    options.onTackleResolved
   );
 
   // ─── 8. Top hareketi ───
@@ -870,9 +873,12 @@ function buildDecisionState(state: LiveMatchState): DecisionState {
 function applyTackleOutcomes(
   outcomes: TackleOutcome[],
   state: LiveMatchState,
-  players: Record<string, Player>
+  players: Record<string, Player>,
+  onTackleResolved?: (outcome: TackleOutcome) => void
 ): boolean {
   for (const outcome of outcomes) {
+    onTackleResolved?.(outcome);
+
     if (outcome.type === 'failed') continue;
 
     if (outcome.type === 'won') {
