@@ -1,7 +1,7 @@
 // src/engine/live/diagnostics/controlBallTrace.ts
 //
-// Diagnostic-only shared trace buffer for the v3 C-transition harness.
-// No production module imports this file.
+// DIAGNOSTIC ONLY — controlBall mutation trace.
+// Production modülleri bu dosyayı import etmez.
 
 export type ControlBallCaller =
   | 'resolveLooseBallControl'
@@ -9,7 +9,8 @@ export type ControlBallCaller =
   | 'updateSetPieceStatus'
   | 'handlePassAction'
   | 'kickoff'
-  | 'other';
+  | 'other'
+  | 'NONE';
 
 export interface ControlBallTrace {
   seq: number;
@@ -26,7 +27,7 @@ const CALLER_PATTERNS: Array<[ControlBallCaller, RegExp]> = [
   ['applyTackleWon', /applyTackleWon/],
   ['updateSetPieceStatus', /updateSetPieceStatus/],
   ['handlePassAction', /handlePassAction/],
-  ['kickoff', /(?:kickoff|createSetPieceForMatch)/],
+  ['kickoff', /(?:kickoff|createSetPieceForMatch|handleGoal)/],
 ];
 
 export function detectCallerFromStack(stack: string): ControlBallCaller {
@@ -37,7 +38,7 @@ export function detectCallerFromStack(stack: string): ControlBallCaller {
 }
 
 export class ControlBallTraceBuffer {
-  private nextSequence = 0;
+  private seq = 0;
   private readonly calls: ControlBallTrace[] = [];
 
   record(
@@ -49,7 +50,7 @@ export class ControlBallTraceBuffer {
     stack: string,
   ): void {
     this.calls.push({
-      seq: this.nextSequence++,
+      seq: this.seq++,
       ownerId,
       clubId,
       caller: detectCallerFromStack(stack),
@@ -59,17 +60,17 @@ export class ControlBallTraceBuffer {
     });
   }
 
-  getSince(sequenceExclusive: number): readonly ControlBallTrace[] {
+  drainAfter(sequenceExclusive: number): readonly ControlBallTrace[] {
     return this.calls.filter(call => call.seq > sequenceExclusive);
   }
 
-  getLastSequence(): number {
-    return this.nextSequence - 1;
+  getLastSeq(): number {
+    return this.seq - 1;
   }
 
   clear(): void {
     this.calls.length = 0;
-    this.nextSequence = 0;
+    this.seq = 0;
   }
 }
 
