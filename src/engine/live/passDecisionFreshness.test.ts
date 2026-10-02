@@ -164,6 +164,7 @@ describe('Pass Decision Freshness Diagnostic V9.2', () => {
       random = installDeterministicRandom(DEFAULT_FIXTURE_SEED);
 
       const traces: PassTrace[] = [];
+      const tracesByTick = new Map<number, PassTrace[]>();
       const pendingByTick = new Map<number, PendingResolution[]>();
       let currentTick = 0;
 
@@ -209,6 +210,10 @@ describe('Pass Decision Freshness Diagnostic V9.2', () => {
 
           expect(Number.isInteger(decisionAgeTicks)).toBe(true);
           expect(decisionAgeTicks).toBeGreaterThanOrEqual(0);
+
+                  if (decision.target === null) {
+            return result;
+          }
 
           const target = { ...decision.target };
 
@@ -294,6 +299,9 @@ describe('Pass Decision Freshness Diagnostic V9.2', () => {
             };
 
             traces.push(trace);
+            const traceBucket = tracesByTick.get(applyTick) ?? [];
+            traceBucket.push(trace);
+            tracesByTick.set(applyTick, traceBucket);
             pending.trace = trace;
 
             return result;
@@ -313,15 +321,13 @@ describe('Pass Decision Freshness Diagnostic V9.2', () => {
            * applyPass with currentTick + 1, state.tick === applyTick
            * is the receiver@apply snapshot we want.
            */
-          const tracesAtTick = traces.filter(
-            trace =>
-              trace.applyTick === state.tick &&
-              trace.receiverId !== null &&
-              trace.receiverPosAtApply === null
-          );
+          const tracesAtTick =
+            tracesByTick.get(state.tick) ?? [];
 
           for (const trace of tracesAtTick) {
-            const receiver = state.players[trace.receiverId!];
+            if (trace.receiverId === null) continue;
+
+            const receiver = state.players[trace.receiverId];
 
             if (!receiver) continue;
 
