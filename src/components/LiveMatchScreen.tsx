@@ -170,7 +170,6 @@ export function LiveMatchScreen() {
   const [error, setError] = useState<string | null>(null);
   const [liveEvents, setLiveEvents] = useState<LiveFrame['latestEvent'][]>([]);
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 4>(2);
-  const playbackSpeedRef = useRef<1 | 2 | 4>(2);
   const workerRef = useRef<Worker | null>(null);
   const frameQueueRef = useRef<LiveFrame[]>([]);
   const pendingResultRef = useRef<Match | null>(null);
@@ -377,7 +376,6 @@ export function LiveMatchScreen() {
                     key={speed}
                     onClick={() => {
                       const nextSpeed = speed as 1 | 2 | 4;
-                      playbackSpeedRef.current = nextSpeed;
                       setPlaybackSpeed(nextSpeed);
                     }}
                     className={`px-2.5 py-2 text-xs font-bold ${
