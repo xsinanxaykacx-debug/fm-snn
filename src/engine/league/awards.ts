@@ -104,14 +104,13 @@ export function calculateSeasonAwards(state: GameState): Award[] {
     valueLabel: 'ortalama',
   });
 
-  // ═══ 5. EN İYİ GENÇ — 21 yaş altı en iyi reyting ═══
   // ═══ 5. EN İYİ GENÇ — 23 yaş altı, en az 3 maç ═══
-const bestYoung = allPlayers
-  .filter(p =>
-    p.age <= 25 &&                                    // 25 yaşa çıkar
-    (p.careerStats?.seasonAppearances ?? 0) >= 1 &&   // 1 maç yeter
-    (p.careerStats?.seasonAvgRating ?? 0) > 0
-  )
+  const bestYoung = allPlayers
+    .filter(p =>
+      p.age <= 23 &&
+      (p.careerStats?.seasonAppearances ?? 0) >= 3 &&
+      (p.careerStats?.seasonAvgRating ?? 0) > 0
+    )
   .sort((a, b) => {
     // Önce reyting, sonra yaş (genç olan önce)
     const ratingDiff = (b.careerStats?.seasonAvgRating ?? 0) - (a.careerStats?.seasonAvgRating ?? 0);
