@@ -30,12 +30,18 @@ class MemoryStorage {
 
 describe('BUG-004 live match result persistence', () => {
   it('updates table, marks fixture played, advances week, and persists to storage', async () => {
+    const storage = new MemoryStorage();
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
-      value: new MemoryStorage(),
+      value: storage,
     });
 
     const { useGameStore } = await import('./gameStore');
+    useGameStore.persist.setOptions({ storage: {
+      getItem: key => storage.getItem(key),
+      setItem: (key, value) => storage.setItem(key, value),
+      removeItem: key => storage.removeItem(key),
+    }});
     useGameStore.getState().newGame();
 
     const before = useGameStore.getState();
@@ -66,7 +72,7 @@ describe('BUG-004 live match result persistence', () => {
 
     const after = useGameStore.getState();
     const savedFixture = after.fixtures.find(match => match.id === fixture.id);
-    const savedPayload = globalThis.localStorage.getItem('fm-clone-save');
+    const savedPayload = storage.getItem('fm-clone-save');
     const persisted = savedPayload ? JSON.parse(savedPayload).state : null;
 
     expect(after.table[before.userClubId].points).toBe(previousPoints + 3);
