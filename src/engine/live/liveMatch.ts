@@ -1026,15 +1026,14 @@ export function applyTackleWon(
     state.ball.lastTouchClubId = tackler.clubId;
 
     // ── Loose ball knock (Model A) ──
-    // relativeSpeed'i mevcut oyuncu velocity'lerinden yeniden hesapla.
-    // Aynı tick içinde applyTackleWon çağrıldığı için
-    // resolveAllTackles sırasındaki değerle aynıdır.
+    // Tackle outcome aynı tick'in PhysicsSnapshot değerini taşıyor.
+    // Apply aşamasında world velocity'lerinden ikinci kez türetmek yerine
+    // outcome.debug.relativeSpeed kullanılır; böylece resolve → apply
+    // arasında fiziksel girdinin anlamı değişmez.
     const carrier = state.players[outcome.ballCarrierId];
 
     if (carrier) {
-      const relVx = tackler.velocity.x - carrier.velocity.x;
-      const relVy = tackler.velocity.y - carrier.velocity.y;
-      const relativeSpeed = Math.hypot(relVx, relVy);
+      const relativeSpeed = outcome.debug?.relativeSpeed ?? 0;
 
       const knockSpeed = Math.max(
         TACKLE_KNOCK_MIN,
