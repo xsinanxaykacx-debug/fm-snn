@@ -398,7 +398,12 @@ function applyHalftimeRecovery(state: LiveMatchState): void {
  // TRANSITION
  // ═══════════════════════════════════════════════
 
-function updateTransitionState(
+/**
+ * @internal
+ * Ownership gözlemcisi tarafından çağrılır. Bir tick içinde birden fazla
+ * possession değişimini sırayla kaydetmek için previousOwnerId çağırana aittir.
+ */
+export function updateTransitionState(
   state: LiveMatchState,
   previousOwnerId: string | null
 ): void {
