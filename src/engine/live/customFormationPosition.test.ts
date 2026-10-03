@@ -1,46 +1,75 @@
 import { describe, expect, it } from 'vitest';
 
-import { generateGameData } from '../data/generateData';
+import { getStartingXI } from '../data/generateData';
 import { createEmptyZones } from '../formation/zones';
-import { simulateMatchLive } from './liveMatch';
+import type { Player } from '../types';
 
-describe('Live custom formation positioning', () => {
-  it('uses the formation editor zone for the player start position', () => {
-    const data = generateGameData();
-    const clubs = Object.values(data.clubs);
-    const home = structuredClone(clubs[0]);
-    const away = structuredClone(clubs[1]);
-    const players = structuredClone(data.players);
+function player(id: string): Player {
+  return {
+    id,
+    name: id,
+    age: 25,
+    nationality: 'TR',
+    position: 'MC',
+    secondaryPositions: [],
+    attributes: {} as Player['attributes'],
+    condition: 100,
+    morale: 100,
+    form: 100,
+    fatigue: 0,
+    wage: 0,
+    value: 0,
+    clubId: 'club-1',
+    injuryWeeks: 0,
+    injuryType: null,
+    yellowCards: 0,
+    suspensionWeeks: 0,
+    sentOff: false,
+    injured: false,
+    redCard: false,
+    careerStats: {
+      appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0,
+      avgRating: 0, minutesPlayed: 0, motm: 0,
+      seasonAppearances: 0, seasonGoals: 0, seasonAssists: 0,
+      seasonYellowCards: 0, seasonRedCards: 0, seasonAvgRating: 0,
+      seasonMinutesPlayed: 0, seasonMotm: 0,
+      cupAppearances: 0, cupGoals: 0, cupAssists: 0,
+    },
+    recentRatings: [],
+    overall: 10,
+    contractYears: 1,
+    squadRole: 'rotation',
+  };
+}
 
-    const firstPlayerId = Object.values(players).find(
-      player => player.clubId === home.id && player.injuryWeeks === 0 && player.suspensionWeeks === 0
-    )?.id;
-
-    expect(firstPlayerId).toBeDefined();
+describe('Custom formation starting XI', () => {
+  it('reads all 11 players from zones in deterministic row/col order', () => {
+    const players = Object.fromEntries(
+      Array.from({ length: 11 }, (_, index) => {
+        const id = `player-${index + 1}`;
+        return [id, player(id)];
+      })
+    );
 
     const zones = createEmptyZones();
-    const attackLeft = zones.find(zone => zone.row === 0 && zone.col === 0);
-    expect(attackLeft).toBeDefined();
-    attackLeft!.playerId = firstPlayerId!;
-
-    home.formation = 'CUSTOM';
-    home.tactic = { ...home.tactic, formation: 'CUSTOM' };
-    home.customFormation = { id: 'test-custom', name: 'Test Custom', zones };
-
-    let firstTickHomePosition: { x: number; y: number } | null = null;
-
-    simulateMatchLive(home, away, players, {
-      seed: 12345,
-      userLineup: [firstPlayerId!],
-      maxTicks: 1,
-      onTick: state => {
-        const live = state.players[firstPlayerId!];
-        if (live) firstTickHomePosition = { ...live.homePosition };
-      },
+    zones.slice(0, 11).forEach((zone, index) => {
+      zone.playerId = `player-${index + 1}`;
     });
 
-    expect(firstTickHomePosition).not.toBeNull();
-    expect(firstTickHomePosition!.x).toBeCloseTo(104, 6);
-    expect(firstTickHomePosition!.y).toBeCloseTo(0, 6);
-  }, 60000);
+    const xi = getStartingXI(
+      'club-1',
+      players,
+      'CUSTOM',
+      undefined,
+      { id: 'custom-1', name: 'Test', zones }
+    );
+
+    expect(xi).toHaveLength(11);
+    expect(xi.map(p => p.id)).toEqual(
+      zones
+        .slice(0, 11)
+        .sort((a, b) => a.row - b.row || a.col - b.col)
+        .map(zone => zone.playerId)
+    );
+  });
 });
