@@ -5,6 +5,7 @@ import type {
   CareerStats,
   Club,
   Formation,
+  PitchZone,
   Player,
   Position,
   Tactic,
@@ -683,8 +684,8 @@ export function getStartingXI(
   // 🆕 Custom formasyon varsa zones üzerinden al; CustomFormation'ın gerçek veri modeli zones'tur.
   if (customFormation && customFormation.zones) {
     const filledZones = customFormation.zones
-      .filter(z => z.playerId !== null)
-      .sort((a, b) => {
+      .filter((z: PitchZone) => z.playerId !== null)
+      .sort((a: PitchZone, b: PitchZone) => {
         // Deterministik sıra: satır ASC, sütun ASC
         if (a.row !== b.row) return a.row - b.row;
         return a.col - b.col;
