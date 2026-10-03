@@ -1104,6 +1104,49 @@ function handleShootAction(
 
   const resolution = resolveShotAction(owner, decision, state);
   const shotXG = resolution.xG;
+  const goalkeeperPenalty = 1 - resolution.goalkeeperSkill * 0.25;
+  const goalChance = Math.max(
+    0.01,
+    Math.min(0.65, shotXG * goalkeeperPenalty)
+  );
+  const scored = nextBool(state.rng, goalChance);
+  const side = owner.isHome ? 'home' : 'away';
+
+  state.stats.shots[side] += 1;
+  state.stats.xG[side] += shotXG;
+  state.stats.chances[side] += 1;
+  state.pendingShot = {
+    shooterId: owner.player.id,
+    clubId: owner.clubId,
+    xG: shotXG,
+    resolvedOutcome: scored ? 'goal' : 'miss',
+  };
+
+  state.events.push({
+    minute: Math.floor(state.time / 60),
+    type: 'shot',
+    playerId: owner.player.id,
+    clubId: owner.clubId,
+    xG: shotXG,
+    description: `Şut: ${owner.player.name}`,
+  });
+
+  if (scored) {
+    handleGoal(
+      {
+        type: 'goal',
+        scorerSide: owner.isHome ? 'HOME' : 'AWAY',
+        ownGoal: false,
+        point: decision.target,
+      },
+      state,
+      Object.fromEntries(
+        Object.keys(state.players).map(id => [id, state.players[id].player])
+      )
+    );
+    state.pendingShot = null;
+    return;
+  }
 
   state.ball = applyShot(
     state.ball,
@@ -1120,27 +1163,7 @@ function handleShootAction(
   );
 
   syncBallOwnerFlags(state);
-
-  const side = owner.isHome ? 'home' : 'away';
-  state.stats.shots[side] += 1;
-  state.stats.xG[side] += shotXG;
-  state.stats.chances[side] += 1;
-  state.pendingShot = {
-    shooterId: owner.player.id,
-    clubId: owner.clubId,
-    xG: shotXG,
-  };
-
-  state.events.push({
-    minute: Math.floor(state.time / 60),
-    type: 'shot',
-    playerId: owner.player.id,
-    clubId: owner.clubId,
-    xG: shotXG,
-    description: `Şut: ${owner.player.name}`,
-  });
 }
-
 function handleCrossAction(
   owner: LivePlayer,
   decision: Decision,
@@ -1308,6 +1331,12 @@ function resolveGoalkeeperSave(
 
   if (!goalkeeper) {
     return false;
+  }
+
+  if (pendingShot.resolvedOutcome === 'miss') {
+    // The shot outcome was already resolved at shot time. A physical goal-mouth
+    // crossing after a miss must not create a second chance from the same shot.
+    return true;
   }
 
   const shotXG = Math.max(0.01, Math.min(0.5, pendingShot.xG));
