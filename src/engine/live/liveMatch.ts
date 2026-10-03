@@ -327,7 +327,7 @@ export function simulateMatchLive(
   }
 
   // ─── Physics shadow report ───
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
     printShadowReport();
   }
 
@@ -673,7 +673,7 @@ export function runTick(
   // can therefore produce A -> null -> B within one tick without being
   // collapsed into a historical A -> B comparison.
   if (state.ball.ownerId !== observedOwnerId) {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
       const previousOwner = observedOwnerId
         ? state.players[observedOwnerId]
         : null;
@@ -1462,7 +1462,7 @@ export function resolveCounterPressContest(
     !pressingPlayer ||
     pressingPlayer.clubId !== transition.counterPressClubId
   ) {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
       console.log(
         '[CP-CHECK] tick=' + state.tick +
         ' reason=NO_RUNNER' +
@@ -1484,7 +1484,7 @@ export function resolveCounterPressContest(
   const tackleRadius =
     DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.tackleRadius;
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
     console.log(
       '[CP-CHECK] tick=' + state.tick +
       ' runner=' + pressingPlayer.player.id +
@@ -1498,7 +1498,7 @@ export function resolveCounterPressContest(
   // Bu transition penceresinde yalnızca ilk fiziksel contest için bir hak var.
   // Ancak runner henüz fiziksel erişim mesafesinde değilse bu hakkı tüketmeyiz.
   if (distance > tackleRadius) {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
       console.log('[CP-CHECK] tick=' + state.tick + ' reason=TOO_FAR');
     }
     return false;
@@ -1507,7 +1507,7 @@ export function resolveCounterPressContest(
   transition.hasAttemptedCounterPress = true;
   state.stats.counterPressAttempts += 1;
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
     console.log(
       '[CP-CHECK] tick=' + state.tick +
       ' reason=ATTEMPT' +
