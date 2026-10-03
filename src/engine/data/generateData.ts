@@ -636,7 +636,7 @@ function defaultTactic(formation: Formation): Tactic {
   };
 }
 
-export function generateGameData(): {
+export function generateGameData(seed?: number): {
   clubs: Record<string, Club>;
   players: Record<string, Player>;
 } {
