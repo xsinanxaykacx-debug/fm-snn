@@ -1145,9 +1145,20 @@ function applyTackleFoul(
   );
 }
 
-function syncBallOwnerFlags(state: LiveMatchState): void {
+/**
+ * @internal
+ * Ball owner flaglerini senkronize eder ve son NULL olmayan sahibi hafızada
+ * tutar. Bu ikinci alan, pass/shot/cross gibi aksiyonlarda top kısa süreli
+ * loose olduğunda bir sonraki recovery'nin gerçek önceki sahibini kaybetmemek
+ * için gereklidir.
+ */
+export function syncBallOwnerFlags(state: LiveMatchState): void {
   for (const id of Object.keys(state.players)) {
     state.players[id].isBallOwner = state.ball.ownerId === id;
+  }
+
+  if (state.ball.ownerId !== null) {
+    state.lastBallOwnerId = state.ball.ownerId;
   }
 }
 
@@ -2246,7 +2257,11 @@ function checkPhaseTransition(state: LiveMatchState): void {
 function syncMatchOwnershipState(state: LiveMatchState): void {
   const ownerId = state.ball.ownerId;
 
-  state.lastBallOwnerId = ownerId;
+  // lastBallOwnerId = "last non-null owner" hafızasıdır; loose ball / restart
+  // sırasında null ile ezilmez.
+  if (ownerId !== null) {
+    state.lastBallOwnerId = ownerId;
+  }
 
   state.home.hasPossession =
     ownerId !== null &&
