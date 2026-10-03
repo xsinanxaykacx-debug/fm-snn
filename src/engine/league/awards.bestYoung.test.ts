@@ -60,7 +60,7 @@ function youngCandidate(
 }
 
 describe('calculateSeasonAwards — best young', () => {
-  it('requires age <= 23, at least 3 appearances, and a positive rating', () => {
+  it('enforces all three best young eligibility thresholds', () => {
     const state = {
       season: 1,
       userClubId: 'club-1',
