@@ -34,6 +34,22 @@ function formatMoney(val: number): string {
   return `£${(val / 1_000_000).toFixed(2)}M`;
 }
 
+export function selectFilteredMessage(
+  messages: InboxMessage[],
+  selectedMessageId: string | null,
+  filter: MessageCategory | 'ALL'
+): InboxMessage | undefined {
+  const filtered =
+    filter === 'ALL'
+      ? messages
+      : messages.filter(message => message.category === filter);
+
+  return (
+    filtered.find(message => message.id === selectedMessageId) ??
+    filtered[0]
+  );
+}
+
 export function InboxView() {
   const messages = useInboxStore(s => s.messages);
   const selectedMessageId = useInboxStore(s => s.selectedMessageId);
@@ -53,8 +69,11 @@ export function InboxView() {
     ? messages
     : messages.filter((m) => m.category === filter);
 
-  const selectedMessage =
-    messages.find((m) => m.id === selectedMessageId) || filtered[0] || messages[0];
+  const selectedMessage = selectFilteredMessage(
+    messages,
+    selectedMessageId,
+    filter
+  );
 
   const handleAcceptOffer = (messageId: string) => {
     const msg = messages.find((m) => m.id === messageId);
