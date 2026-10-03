@@ -1270,12 +1270,8 @@ function applyBoundaryOutcome(
   }
 
   if (state.pendingShot !== null) {
-    const side = state.pendingShot.clubId === state.home.club.id ? 'home' : 'away';
+    // Any non-goal boundary ends the active shot sequence.
     state.pendingShot = null;
-    if (outcome.type === 'goal_kick' || outcome.type === 'corner' || outcome.type === 'throw_in') {
-      // Boundary outcome already ends the active shot sequence.
-      void side;
-    }
   }
 
   if (outcome.type === 'corner') {
