@@ -60,6 +60,7 @@ function findCausalChain(
   const { home, away } = getFixture(data);
 
   let observedTick = 0;
+  let lastObservedRecoveryCount = 0;
   let dirtyTackle: {
     tick: number;
     tacklerId: string;
@@ -92,11 +93,13 @@ function findCausalChain(
         tacklerClubId: tackler.clubId ?? '',
         carrierId: outcome.ballCarrierId,
       };
+      recoveriesBeforeDirty = lastObservedRecoveryCount;
     },
     onTick: state => {
       observedTick = state.tick;
 
       if (chain !== null || dirtyTackle === null) {
+        lastObservedRecoveryCount = state.stats.counterPressLooseBallRecoveries;
         return;
       }
 
@@ -113,27 +116,34 @@ function findCausalChain(
         )
       ) {
         dirtyTackleLooseObserved = true;
-        recoveriesBeforeDirty = state.stats.counterPressLooseBallRecoveries;
       }
 
       if (!dirtyTackleLooseObserved) {
+        lastObservedRecoveryCount =
+          state.stats.counterPressLooseBallRecoveries;
         return;
       }
 
       const recoveriesNow = state.stats.counterPressLooseBallRecoveries;
       if (recoveriesNow <= recoveriesBeforeDirty) {
+        lastObservedRecoveryCount = recoveriesNow;
         return;
       }
 
       const recoveredOwnerId = state.ball.ownerId;
       if (recoveredOwnerId === null) {
+        lastObservedRecoveryCount = recoveriesNow;
         return;
       }
 
       const recoveredOwner = state.players[recoveredOwnerId];
-      if (!recoveredOwner) return;
+      if (!recoveredOwner) {
+        lastObservedRecoveryCount = recoveriesNow;
+        return;
+      }
 
       if (recoveredOwner.clubId === dirtyTackle.tacklerClubId) {
+        lastObservedRecoveryCount = recoveriesNow;
         return;
       }
 
@@ -143,6 +153,7 @@ function findCausalChain(
         state.transition.breakClubId === recoveredOwner.clubId;
 
       if (!transitionMatchesRecovery) {
+        lastObservedRecoveryCount = recoveriesNow;
         return;
       }
 
@@ -156,6 +167,8 @@ function findCausalChain(
         transitionFromClubId: state.transition.counterPressClubId,
         transitionToClubId: state.transition.breakClubId,
       };
+
+      lastObservedRecoveryCount = recoveriesNow;
     },
   });
 
@@ -187,6 +200,7 @@ describe("C' acceptance — live causal chain", () => {
       const { home, away } = getFixture(data);
 
       let lastObservedOwnerId: string | null = null;
+      let lastObservedRecoveryCount = 0;
       let ownershipChanges = 0;
       let fullMatchChain: ChainObservation | null = null;
       let pendingDirty: {
@@ -216,6 +230,7 @@ describe("C' acceptance — live causal chain", () => {
             tacklerId: outcome.tacklerId,
             tacklerClubId: tackler.clubId ?? '',
           };
+          recoveriesBefore = lastObservedRecoveryCount;
         },
         onTick: state => {
           if (state.ball.ownerId !== lastObservedOwnerId) {
@@ -235,7 +250,6 @@ describe("C' acceptance — live causal chain", () => {
             )
           ) {
             looseObserved = true;
-            recoveriesBefore = state.stats.counterPressLooseBallRecoveries;
           }
 
           if (
@@ -271,6 +285,8 @@ describe("C' acceptance — live causal chain", () => {
           }
 
           lastObservedOwnerId = state.ball.ownerId;
+          lastObservedRecoveryCount =
+            state.stats.counterPressLooseBallRecoveries;
         },
       });
 
