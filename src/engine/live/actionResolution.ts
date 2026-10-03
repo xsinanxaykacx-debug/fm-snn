@@ -546,10 +546,11 @@ export function resolveShotAction(
     quality,
     pressure,
     defenderId: goalkeeper?.player.id ?? null,
+    // xG describes the shot itself; goalkeeper skill is resolved at
+    // the goal-boundary / goalkeeper stage, not baked into the shot quality.
     xG: clamp(
       quality *
-      (0.62 + shooterSkill / 300) *
-      (1 - goalkeeperSkill * 0.20),
+      (0.62 + shooterSkill / 300),
       0.02,
       0.75
     ),
