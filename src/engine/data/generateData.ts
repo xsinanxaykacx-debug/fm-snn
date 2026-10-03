@@ -11,6 +11,24 @@ import type {
   Tactic,
 } from '../types';
 
+// Deterministic RNG is opt-in for reproducible game-data generation.
+let activeRandom: (() => number) | null = null;
+
+function randomValue(): number {
+  return activeRandom ? activeRandom() : Math.random();
+}
+
+function seededRng(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6D2B79F5;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // ═══════════════════════════════════════════════
 // SABİTLER
 // ═══════════════════════════════════════════════
@@ -40,22 +58,22 @@ const NATIONALITIES = ['TR', 'EN', 'DE', 'FR', 'ES', 'IT', 'BR', 'AR', 'NL', 'PT
 // ═══════════════════════════════════════════════
 
 function randomBetween(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  return Math.floor(randomValue() * (max - min + 1)) + min;
 }
 
 function fmRandom(avg = 10, spread = 3): number {
-  const base = avg + (Math.random() - 0.5) * spread * 2;
+  const base = avg + (randomValue() - 0.5) * spread * 2;
   return Math.max(1, Math.min(20, Math.round(base)));
 }
 
 function randomName(): string {
-  const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
-  const last = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+  const first = FIRST_NAMES[Math.floor(randomValue() * FIRST_NAMES.length)];
+  const last = LAST_NAMES[Math.floor(randomValue() * LAST_NAMES.length)];
   return `${first} ${last}`;
 }
 
 function randomNationality(): string {
-  return NATIONALITIES[Math.floor(Math.random() * NATIONALITIES.length)];
+  return NATIONALITIES[Math.floor(randomValue() * NATIONALITIES.length)];
 }
 
 // ═══════════════════════════════════════════════
@@ -63,13 +81,13 @@ function randomNationality(): string {
 // ═══════════════════════════════════════════════
 
 function generateAge(): number {
-  const roll = Math.random();
-  if (roll < 0.10) return 15 + Math.floor(Math.random() * 3);
-  if (roll < 0.30) return 18 + Math.floor(Math.random() * 4);
-  if (roll < 0.55) return 22 + Math.floor(Math.random() * 4);
-  if (roll < 0.80) return 26 + Math.floor(Math.random() * 4);
-  if (roll < 0.95) return 30 + Math.floor(Math.random() * 3);
-  return 33 + Math.floor(Math.random() * 3);
+  const roll = randomValue();
+  if (roll < 0.10) return 15 + Math.floor(randomValue() * 3);
+  if (roll < 0.30) return 18 + Math.floor(randomValue() * 4);
+  if (roll < 0.55) return 22 + Math.floor(randomValue() * 4);
+  if (roll < 0.80) return 26 + Math.floor(randomValue() * 4);
+  if (roll < 0.95) return 30 + Math.floor(randomValue() * 3);
+  return 33 + Math.floor(randomValue() * 3);
 }
 
 function ageAttributeBias(age: number): number {
@@ -122,8 +140,8 @@ const SECONDARY_POSITION_MAP: Record<Position, Position[]> = {
 function generateSecondaryPositions(position: Position): Position[] {
   const candidates = SECONDARY_POSITION_MAP[position] ?? [];
   if (candidates.length === 0) return [];
-  const count = Math.random() < 0.6 ? 1 : Math.random() < 0.3 ? 2 : 0;
-  const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+  const count = randomValue() < 0.6 ? 1 : randomValue() < 0.3 ? 2 : 0;
+  const shuffled = [...candidates].sort(() => randomValue() - 0.5);
   return shuffled.slice(0, count);
 }
 
@@ -443,7 +461,7 @@ export function generatePlayer(position: Position, clubId: string, index: number
 
   const ageFactor = Math.max(0, age - 15);
   const initialApps = ageFactor * randomBetween(10, 25);
-  const initialAvgRating = ageFactor > 0 ? Math.round((5.8 + Math.random() * 1.2) * 100) / 100 : 0;
+  const initialAvgRating = ageFactor > 0 ? Math.round((5.8 + randomValue() * 1.2) * 100) / 100 : 0;
 
   const careerStats: CareerStats = {
   appearances: initialApps, goals: 0, assists: 0, yellowCards: 0, redCards: 0,
@@ -498,7 +516,7 @@ export function generateYouthPlayer(
     'ML', 'MC', 'MR', 'AML', 'AMC', 'AMR',
     'KFL', 'GF', 'KFR', 'ST',
   ];
-  const pos = position ?? positions[Math.floor(Math.random() * positions.length)];
+  const pos = position ?? positions[Math.floor(randomValue() * positions.length)];
   const nat = nationality ?? randomNationality();
   const age = randomBetween(15, 18);
 
@@ -507,7 +525,7 @@ export function generateYouthPlayer(
   const value = calculateValue(overall, age);
 
   return {
-    id: `youth_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: `youth_${Date.now()}_${randomValue().toString(36).slice(2, 8)}`,
     name: randomName(),
     age,
     nationality: nat,
@@ -618,18 +636,22 @@ function defaultTactic(formation: Formation): Tactic {
   };
 }
 
-export function generateGameData(): {
+export function generateGameData(seed?: number): {
   clubs: Record<string, Club>;
   players: Record<string, Player>;
 } {
-  const clubs: Record<string, Club> = {};
-  const players: Record<string, Player> = {};
+  const previousRandom = activeRandom;
+  activeRandom = seed === undefined ? null : seededRng(seed);
 
-  let playerIndex = 0;
+  try {
+    const clubs: Record<string, Club> = {};
+    const players: Record<string, Player> = {};
 
-  CLUB_DATA.forEach((data, i) => {
+    let playerIndex = 0;
+
+    CLUB_DATA.forEach((data, i) => {
     const clubId = `club_${i + 1}`;
-    const formation = FORMATIONS[Math.floor(Math.random() * FORMATIONS.length)];
+    const formation = FORMATIONS[Math.floor(randomValue() * FORMATIONS.length)];
 
     const club: Club = {
       id: clubId,
@@ -650,9 +672,12 @@ export function generateGameData(): {
       const player = generatePlayer(pos, clubId, playerIndex++);
       players[player.id] = player;
     }
-  });
+    });
 
-  return { clubs, players };
+    return { clubs, players };
+  } finally {
+    activeRandom = previousRandom;
+  }
 }
 
 // ═══════════════════════════════════════════════
