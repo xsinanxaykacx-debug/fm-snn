@@ -475,8 +475,14 @@ export function runTick(
   onTick?: (state: LiveMatchState) => void,
   onTackleResolved?: (outcome: TackleOutcome) => void
 ): void {
-  // ─── 1. prevBallPos ───
+  // ─── 1. ownership observation baseline ───
+  // Ownership can change more than once inside one tick:
+  // tackle/loose-ball resolution may change it before the ball action,
+  // then interception/counter-press may change it again during the action.
+  // Keep a local observation cursor so every intra-tick ownership change
+  // is registered exactly once.
   const previousOwnerId = state.lastBallOwnerId;
+  let observedOwnerId = previousOwnerId;
 
   const prevBallPos = {
     x: state.ball.position.x,
@@ -585,11 +591,20 @@ export function runTick(
     );
   }
 
-  updateTransitionState(state, previousOwnerId);
+  updateTransitionState(state, observedOwnerId);
+  observedOwnerId = state.ball.ownerId;
 
   // ─── 8c. Ball actions ───
   if (!tackleChangedPossession) {
     applyBallActions(state, decisions, players, onTackleResolved, physics);
+  }
+
+  // Ball action itself can change ownership (for example interception or
+  // counter-press tackle). Register that second transition against the
+  // ownership state observed immediately before the action.
+  if (state.ball.ownerId !== observedOwnerId) {
+    updateTransitionState(state, observedOwnerId);
+    observedOwnerId = state.ball.ownerId;
   }
 
   // ─── 9. Sınır geçişi ───
