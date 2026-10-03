@@ -65,6 +65,11 @@ describe('Counter-press loose-ball recovery lifecycle', () => {
     state.ball.ownerId = null;
     state.ball.isMoving = true;
 
+    // The captured state can still carry the kickoff set-piece from the
+    // one-tick bootstrap. This scenario explicitly models a real loose ball,
+    // so set-piece positioning must not participate in the recovery test.
+    state.setPiece = null;
+
     runner!.position = { ...ballPosition };
     runner!.velocity = { x: 0, y: 0 };
 
@@ -97,6 +102,7 @@ describe('Counter-press loose-ball recovery lifecycle', () => {
       isRecoveryContestActive: false,
       pendingLooseBallRecoveryClubId: runner!.clubId,
       pendingLooseBallRecoveryPlayerId: runner!.player.id,
+      pendingLooseBallTransitionOwnerId: null,
     };
 
     const recoveriesBefore = state.stats.counterPressLooseBallRecoveries;
