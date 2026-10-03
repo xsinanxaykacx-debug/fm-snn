@@ -211,7 +211,7 @@ function WeekBlock({ week, matches, isActive, isPast, onPlay }: WeekBlockProps) 
 // ANA COMPONENT
 // ═══════════════════════════════════════════════
 
-export function Fixtures() {
+export function Fixtures({ onNavigate }: { onNavigate: (tab: 'liveMatch') => void }) {
   const state = useGameStore();
   const playWeek = useGameStore(s => s.playWeek);
   const userClub = state.clubs[state.userClubId];
@@ -337,7 +337,7 @@ export function Fixtures() {
         </div>
 
         <button
-          onClick={playWeek}
+          onClick={() => onNavigate('liveMatch')}
           className="w-full py-4 rounded-md font-bold text-white text-lg transition-all hover:scale-[1.02] animate-pulse-glow"
           style={{
             backgroundColor: '#22c55e',
@@ -507,7 +507,7 @@ export function Fixtures() {
             matches={state.fixtures.filter(m => m.week === state.currentWeek)}
             isActive={true}
             isPast={false}
-            onPlay={playWeek}
+            onPlay={() => onNavigate('liveMatch')}
           />
         )}
 
