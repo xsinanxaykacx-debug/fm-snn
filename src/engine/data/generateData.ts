@@ -5,6 +5,7 @@ import type {
   CareerStats,
   Club,
   Formation,
+  PitchZone,
   Player,
   Position,
   Tactic,
@@ -680,18 +681,28 @@ export function getStartingXI(
   userLineup?: string[],
   customFormation?: any
 ): Player[] {
-  // 🆕 Custom formasyon varsa oradan al
-  if (customFormation && customFormation.slots && customFormation.slots.length === 11) {
-    const customXI: Player[] = [];
-    for (const slot of customFormation.slots) {
-      if (slot.playerId) {
-        const p = players[slot.playerId];
+  // 🆕 Custom formasyon varsa zones üzerinden al; CustomFormation'ın gerçek veri modeli zones'tur.
+  if (customFormation && customFormation.zones) {
+    const filledZones = customFormation.zones
+      .filter((z: PitchZone) => z.playerId !== null)
+      .sort((a: PitchZone, b: PitchZone) => {
+        // Deterministik sıra: satır ASC, sütun ASC
+        if (a.row !== b.row) return a.row - b.row;
+        return a.col - b.col;
+      });
+
+    if (filledZones.length === 11) {
+      const customXI: Player[] = [];
+      for (const zone of filledZones) {
+        const playerId = zone.playerId;
+        if (playerId === null) continue;
+        const p = players[playerId];
         if (p && p.clubId === clubId && p.injuryWeeks === 0 && p.suspensionWeeks === 0) {
           customXI.push(p);
         }
       }
+      if (customXI.length === 11) return customXI;
     }
-    if (customXI.length === 11) return customXI;
   }
 
   const clubPlayers = Object.values(players).filter(
