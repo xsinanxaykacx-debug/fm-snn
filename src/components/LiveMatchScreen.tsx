@@ -153,6 +153,16 @@ function installDebugConsole(): void {
   };
 }
 
+export function bindLiveMatchToFixture(result: Match, fixture: Match): Match {
+  return {
+    ...result,
+    id: fixture.id,
+    week: fixture.week,
+    homeId: fixture.homeId,
+    awayId: fixture.awayId,
+  };
+}
+
 export function LiveMatchScreen() {
   const state = useGameStore();
   const applyLiveMatchResult = useGameStore(s => s.applyLiveMatchResult);
@@ -241,9 +251,11 @@ export function LiveMatchScreen() {
   }
 
   function saveResult() {
-    if (!result) return;
+    if (!result || !fixture) return;
 
-    applyLiveMatchResult(result);
+    // The live engine creates its own result id. The fixture store must retain
+    // the original fixture identity so the completed match replaces that row.
+    applyLiveMatchResult(bindLiveMatchToFixture(result, fixture));
     setResult(null);
     setRunning(false);
   }
