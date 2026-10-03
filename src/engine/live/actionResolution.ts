@@ -500,21 +500,21 @@ export function resolveShotAction(
 
   const conversion =
     quality *
-    (0.55 + shooterSkill / 600) *
-    (1 - goalkeeperSkill * 0.55) *
+    (0.70 + shooterSkill / 500) *
+    (1 - goalkeeperSkill * 0.42) *
     defensiveLine;
 
   return {
-    probability: clamp(conversion, 0.01, 0.35),
+    probability: clamp(conversion, 0.02, 0.70),
     quality,
     pressure,
     defenderId: goalkeeper?.player.id ?? null,
     xG: clamp(
       quality *
-      (0.55 + shooterSkill / 500) *
-      (1 - goalkeeperSkill * 0.25),
-      0.01,
-      0.50
+      (0.62 + shooterSkill / 300) *
+      (1 - goalkeeperSkill * 0.20),
+      0.02,
+      0.75
     ),
     goalkeeperSkill,
   };
