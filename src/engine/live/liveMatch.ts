@@ -1329,9 +1329,6 @@ function resolveGoalkeeperSave(
     return false;
   }
 
-  const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
-  state.stats.onTarget[side] += 1;
-
   state.events.push({
     minute: Math.floor(state.time / 60),
     type: 'goal_kick',
@@ -1399,9 +1396,6 @@ function handleGoal(
   } else {
     state.score.away += 1;
   }
-
-  const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
-  state.stats.onTarget[side] += 1;
 
   // CareerStats — own goal hariç
   if (!outcome.ownGoal && scorerId && players[scorerId]) {
