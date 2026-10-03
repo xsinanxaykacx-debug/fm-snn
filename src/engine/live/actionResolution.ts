@@ -548,9 +548,15 @@ export function resolveShotAction(
     defenderId: goalkeeper?.player.id ?? null,
     // xG describes the shot itself; goalkeeper skill is resolved at
     // the goal-boundary / goalkeeper stage, not baked into the shot quality.
-    // xG is the pre-shot chance quality. Finishing skill is resolved
-    // at shot execution / goal-boundary time, so it must not scale xG itself.
-    xG: clamp(targetQuality, 0.02, 0.75),
+    // Attributes are 1-20 in the game model. The player-specific shot
+    // quality is therefore normalized against that same scale instead of
+    // dividing a 1-20 rating by 100.
+    // Goalkeeper skill is still resolved separately at the goal boundary.
+    xG: clamp(
+      targetQuality * (shooterSkill / 20),
+      0.02,
+      0.75
+    ),
     goalkeeperSkill,
   };
 }
