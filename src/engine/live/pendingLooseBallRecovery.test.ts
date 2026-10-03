@@ -184,6 +184,35 @@ describe('pendingLooseBallRecovery lifecycle', () => {
     expect(state.transition.pendingLooseBallRecoveryPlayerId).toBeNull();
   });
 
+  it('pending runner yerine aynı kulüpten takım arkadaşı alırsa recovery sayılmaz', () => {
+    const { state, runner } = makeCounterPressState();
+
+    const teammate = makePlayer('teammate', runner.clubId, { x: 0, y: 0 });
+    state.players.teammate = teammate;
+
+    state.ball.ownerId = null;
+    state.ball.velocity = { x: 0, y: 0, z: 0 };
+    state.ball.isMoving = false;
+    state.ball.position = { x: 0, y: 0, z: 0.11 };
+
+    state.transition.pendingLooseBallRecoveryClubId = runner.clubId;
+    state.transition.pendingLooseBallRecoveryPlayerId = runner.player.id;
+
+    runner.position = { x: 5, y: 0, z: 0 };
+    teammate.position = { x: 0, y: 0, z: 0 };
+
+    resolveLooseBallControl(state);
+
+    expect(state.ball.ownerId).toBe(teammate.player.id);
+
+    resolvePendingLooseBallRecovery(state);
+
+    expect(state.stats.counterPressLooseBallRecoveries).toBe(0);
+    expect(state.stats.counterPressRecoveries).toBe(0);
+    expect(state.transition.pendingLooseBallRecoveryClubId).toBeNull();
+    expect(state.transition.pendingLooseBallRecoveryPlayerId).toBeNull();
+  });
+
   it('pending → transition expiry sonrası temizlenir', () => {
     const { state, runner } = makeCounterPressState({
       expiresAt: 5,
