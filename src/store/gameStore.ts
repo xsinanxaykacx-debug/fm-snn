@@ -554,7 +554,11 @@ export const useGameStore = create<Store>()(
               ? state.userLineup
               : undefined;
 
-          const result = useLive
+          const useLiveForMatch =
+            useLive &&
+            (m.homeId === state.userClubId || m.awayId === state.userClubId);
+
+          const result = useLiveForMatch
             ? simulateMatchLive(home, away, newPlayers, {
                 week: m.week,
                 userLineup: lineup,
