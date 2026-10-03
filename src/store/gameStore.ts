@@ -103,7 +103,7 @@ interface Store extends GameState {
 
   newGame: () => void;
   playWeek: () => void;
-  applyLiveMatchResult: (match: Match) => void;
+  applyLiveMatchResult: (match: Match, updatedPlayers?: Record<string, Player>) => void;
   setTactic: (tactic: Partial<Club['tactic']>) => void;
   advanceSeason: () => void;
   transferBuy: (playerId: string) => void;
@@ -473,7 +473,7 @@ export const useGameStore = create<Store>()(
 
       clearPendingPress: () => set({ pendingPressMatch: null }),
 
-      applyLiveMatchResult: (match) => {
+      applyLiveMatchResult: (match, updatedPlayers) => {
         const state = get();
         if (match.played !== true) return;
 
@@ -507,7 +507,17 @@ export const useGameStore = create<Store>()(
         set({
           fixtures,
           table,
+          players: updatedPlayers ?? state.players,
           news: news.slice(0, 30),
+          pendingPressMatch: isUserMatch
+            ? {
+                homeScore: match.homeScore,
+                awayScore: match.awayScore,
+                opponentName: opponent?.name ?? 'Rakip',
+                opponentId: opponentId ?? '',
+                isHome,
+              }
+            : state.pendingPressMatch,
         });
       },
 
@@ -775,7 +785,7 @@ export const useGameStore = create<Store>()(
           currentWeek: seasonOver ? state.currentWeek : nextWeek,
           news: news.slice(0, 30),
           seasonOver,
-          pendingPressMatch: userMatch,
+          pendingPressMatch: userMatch ?? state.pendingPressMatch,
           cup: newCup,
         });
 
