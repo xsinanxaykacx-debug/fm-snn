@@ -183,10 +183,12 @@ scope.onmessage = (event) => {
     scope.postMessage({
       type: 'complete',
       result,
+      players: data.players,
       debug,
     } satisfies {
       type: 'complete';
       result: Match;
+      players: Record<string, Player>;
       debug: DebugRecording;
     });
   } catch (error) {
