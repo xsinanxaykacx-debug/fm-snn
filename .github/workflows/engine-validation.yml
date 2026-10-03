@@ -39,6 +39,7 @@ jobs:
           src/engine/live/physics.test.ts
           src/engine/live/transitionIntegration.test.ts
           src/engine/live/shotGoalkeeperSeparation.test.ts
+          src/engine/live/customFormationPosition.test.ts
 
       - name: Core match-engine tests
         run: >
