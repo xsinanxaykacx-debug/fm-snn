@@ -168,7 +168,11 @@ export function LiveMatchScreen() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [liveEvents, setLiveEvents] = useState<LiveFrame['latestEvent'][]>([]);
+  const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 4>(2);
   const workerRef = useRef<Worker | null>(null);
+  const frameQueueRef = useRef<LiveFrame[]>([]);
+  const pendingResultRef = useRef<Match | null>(null);
+  const playbackTimerRef = useRef<number | null>(null);
 
   const fixture = useMemo(() => state.fixtures.find(m =>
     m.week === state.currentWeek &&
@@ -184,6 +188,9 @@ export function LiveMatchScreen() {
 
     return () => {
       workerRef.current?.terminate();
+      if (playbackTimerRef.current !== null) {
+        window.clearInterval(playbackTimerRef.current);
+      }
     };
   }, []);
 
@@ -198,6 +205,12 @@ export function LiveMatchScreen() {
     setLiveEvents([]);
     setRunning(true);
 
+    frameQueueRef.current = [];
+    pendingResultRef.current = null;
+    if (playbackTimerRef.current !== null) {
+      window.clearInterval(playbackTimerRef.current);
+    }
+
     window.__LIVE_MATCH_DEBUG__ = undefined;
 
     const worker = new Worker(
@@ -211,14 +224,7 @@ export function LiveMatchScreen() {
       const message = event.data;
 
       if (message.type === 'frame') {
-        setFrame(message);
-        if (message.latestEvent) {
-          setLiveEvents(previous => {
-            const last = previous[previous.length - 1];
-            if (last?.minute === message.latestEvent?.minute && last?.description === message.latestEvent?.description) return previous;
-            return [...previous, message.latestEvent].slice(-14);
-          });
-        }
+        frameQueueRef.current.push(message);
         return;
       }
 
@@ -229,8 +235,7 @@ export function LiveMatchScreen() {
           `LIVE MATCH DEBUG hazır: ${message.debug.frames.length} frame, ilk ${message.debug.maxSimulationSeconds} saniye.`
         );
 
-        setResult(message.result);
-        setRunning(false);
+        pendingResultRef.current = message.result;
         return;
       }
 
@@ -254,6 +259,42 @@ export function LiveMatchScreen() {
       userLineup: state.userLineup,
       seed: Date.now(),
     });
+
+    // The engine simulates faster than real time. Keep the simulation
+    // authoritative, but play its frames back in order so the user can
+    // actually watch the 2D match instead of seeing the final frame flash.
+    const playbackIntervalMs = 125 / playbackSpeed;
+    playbackTimerRef.current = window.setInterval(() => {
+      const next = frameQueueRef.current.shift();
+
+      if (next) {
+        setFrame(next);
+        if (next.latestEvent) {
+          setLiveEvents(previous => {
+            const last = previous[previous.length - 1];
+            if (
+              last?.minute === next.latestEvent?.minute &&
+              last?.description === next.latestEvent?.description
+            ) {
+              return previous;
+            }
+            return [...previous, next.latestEvent].slice(-14);
+          });
+        }
+        return;
+      }
+
+      if (pendingResultRef.current) {
+        setResult(pendingResultRef.current);
+        pendingResultRef.current = null;
+        setRunning(false);
+
+        if (playbackTimerRef.current !== null) {
+          window.clearInterval(playbackTimerRef.current);
+          playbackTimerRef.current = null;
+        }
+      }
+    }, playbackIntervalMs);
   }
 
   function saveResult() {
@@ -299,8 +340,25 @@ export function LiveMatchScreen() {
           )}
 
           {running && (
-            <div className="px-4 py-2 rounded bg-green-500/10 border border-green-500/30 text-green-400 font-bold">
-              ● CANLI
+            <div className="flex items-center gap-2">
+              <div className="px-4 py-2 rounded bg-green-500/10 border border-green-500/30 text-green-400 font-bold">
+                ● CANLI
+              </div>
+              <div className="flex rounded overflow-hidden border border-pitch-600">
+                {[1, 2, 4].map(speed => (
+                  <button
+                    key={speed}
+                    onClick={() => setPlaybackSpeed(speed as 1 | 2 | 4)}
+                    className={`px-2.5 py-2 text-xs font-bold ${
+                      playbackSpeed === speed
+                        ? 'bg-accent text-slate-950'
+                        : 'bg-pitch-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {speed}×
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
