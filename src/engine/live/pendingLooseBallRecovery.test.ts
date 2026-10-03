@@ -75,6 +75,7 @@ function makeCounterPressState(
       lastTouchClubId: owner.clubId,
       isMoving: false,
     },
+    setPiece: null,
     transition: {
       counterPressClubId: runner.clubId,
       counterPressPlayerId: runner.player.id,
