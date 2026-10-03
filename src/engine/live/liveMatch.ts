@@ -57,6 +57,7 @@ import type {
   SetPieceState,
   SpaceMap,
   TackleOutcome,
+  PitchZone,
   Vec2,
 } from '../types';
 
@@ -641,7 +642,64 @@ function buildTeamState(
 ): LiveTeamState {
   let roster: string[];
 
-  if (isUserClub && userLineup && userLineup.length > 0) {
+  const customZones: PitchZone[] =
+    club.formation === 'CUSTOM'
+      ? (club.customFormation?.zones ?? []).filter(
+          (zone): zone is PitchZone => zone.playerId !== null
+        )
+      : [];
+
+  const customPlayerIds = customZones
+    .map(zone => zone.playerId)
+    .filter((id): id is string => id !== null);
+
+  if (isUserClub && customPlayerIds.length > 0) {
+    // CUSTOM formation is authoritative for player-to-zone assignment.
+    // userLineup remains a fallback for any unfilled zones.
+    roster = customPlayerIds.filter(id => {
+      const p = players[id];
+      return (
+        p !== undefined &&
+        p.clubId === club.id &&
+        p.injuryWeeks === 0 &&
+        p.suspensionWeeks === 0
+      );
+    });
+
+    const used = new Set(roster);
+    if (userLineup) {
+      for (const id of userLineup) {
+        if (roster.length >= 11) break;
+        if (used.has(id)) continue;
+        const p = players[id];
+        if (
+          p &&
+          p.clubId === club.id &&
+          p.injuryWeeks === 0 &&
+          p.suspensionWeeks === 0
+        ) {
+          roster.push(id);
+          used.add(id);
+        }
+      }
+    }
+
+    if (roster.length < 11) {
+      const fill = Object.values(players)
+        .filter(p => p.clubId === club.id)
+        .filter(p => p.squadRole !== 'u21')
+        .filter(p => p.injuryWeeks === 0)
+        .filter(p => p.suspensionWeeks === 0)
+        .filter(p => !used.has(p.id))
+        .sort((a, b) => b.overall - a.overall);
+
+      for (const p of fill) {
+        if (roster.length >= 11) break;
+        roster.push(p.id);
+        used.add(p.id);
+      }
+    }
+  } else if (isUserClub && userLineup && userLineup.length > 0) {
     // Kullanıcı kadrosu — geçerli oyuncular
     roster = userLineup.filter(id => {
       const p = players[id];
@@ -695,7 +753,7 @@ function buildTeamState(
     hasPossession: false,
     isHome,
     attackingDirection: isHome ? 1 : -1,
-    formationZones: [],
+    formationZones: customZones,
   };
 }
 
@@ -704,7 +762,16 @@ function createLivePlayer(
   team: LiveTeamState,
   pitch: PitchDimensions
 ): LivePlayer {
-  const homePosition = computeHomePosition(player, team, pitch);
+  const formationZone = team.formationZones.find(
+    zone => zone.playerId === player.id
+  );
+
+  const homePosition = computeHomePosition(
+    player,
+    team,
+    pitch,
+    formationZone
+  );
 
   const livePlayer: LivePlayer = {
     player,
@@ -723,7 +790,11 @@ function createLivePlayer(
 
     clubId: team.club.id,
     isHome: team.isHome,
-    role: normalizeRole(player.position),
+    role: normalizeRole(
+      formationZone?.customLabel ??
+      formationZone?.suggestedPosition ??
+      player.position
+    ),
 
     homePosition,
 
@@ -769,8 +840,21 @@ function normalizeRole(position: string): LivePlayer['role'] {
 function computeHomePosition(
   player: Player,
   team: LiveTeamState,
-  pitch: PitchDimensions
+  pitch: PitchDimensions,
+  formationZone?: PitchZone
 ): Vec2 {
+  if (team.formation === 'CUSTOM' && formationZone) {
+    // Formation editor uses a 7×5 tactical grid:
+    // row 0 = highest, row 6 = deepest; col 0..4 = left..right.
+    const depth = (6 - formationZone.row) / 6;
+    const x = pitch.length * (
+      team.isHome ? depth : 1 - depth
+    );
+    const y = pitch.width * (formationZone.col / 4);
+
+    return { x, y };
+  }
+
   const xBase = team.isHome ? 0 : pitch.length;
   const direction = team.isHome ? 1 : -1;
 
