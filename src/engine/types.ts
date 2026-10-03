@@ -1277,6 +1277,12 @@ export interface LiveMatchState {
 
   lastBallOwnerId: string | null;
 
+  pendingShot: {
+    shooterId: string;
+    clubId: string;
+    xG: number;
+  } | null;
+
   isStopped: boolean;
   isFinished: boolean;
 }
