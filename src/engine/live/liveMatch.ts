@@ -1143,6 +1143,11 @@ function syncBallOwnerFlags(state: LiveMatchState): void {
 export function resolveLooseBallControl(state: LiveMatchState): void {
   if (state.ball.ownerId !== null) return;
 
+  // Set-piece positioning sırasında top "loose ball" değildir.
+  // Set-piece kendi taker/pozisyonlama state machine'i tarafından
+  // sahiplenilene kadar normal recovery resolver topa dokunamaz.
+  if (state.setPiece !== null) return;
+
   // Topun "hareket ediyor" bayrağı ile "oyuncunun kontrol edebileceği hız"
   // aynı şey değildir. Yavaşlayan bir top hâlâ isMoving olabilir.
   const ballSpeed = Math.hypot(
@@ -1197,6 +1202,10 @@ export function resolveLooseBallControl(state: LiveMatchState): void {
  */
 export function resolvePendingLooseBallRecovery(state: LiveMatchState): void {
   const transition = state.transition;
+
+  // Pending recovery de normal loose-ball ownership gibi set-piece
+  // positioning sırasında çözülemez.
+  if (state.setPiece !== null) return;
 
   if (transition.pendingLooseBallRecoveryClubId === null) {
     return;
