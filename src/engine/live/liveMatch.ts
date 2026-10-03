@@ -1302,13 +1302,11 @@ function resolveGoalkeeperSave(
 
   // xG artık sadece istatistik değil, gerçek gol çözümlemesinin de
   // girdisidir. Goal-mouth'a ulaşan her şut otomatik gol olamaz.
+  // xG is already reduced by goalkeeper quality in the shot resolver.
+  // Do not multiply it again by a second GK conversion factor.
   const goalChance = Math.max(
     0.01,
-    Math.min(
-      0.45,
-      shotXG *
-        (0.65 + gkSkill * 0.15)
-    )
+    Math.min(0.35, shotXG)
   );
 
   if (nextBool(state.rng, goalChance)) {
