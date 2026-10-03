@@ -1724,11 +1724,19 @@ function resolveGoalkeeperSave(
 
   state.events.push({
     minute: Math.floor(state.time / 60),
+    type: 'save',
+    playerId: goalkeeper.player.id,
+    clubId: goalkeeper.clubId,
+    description: `Kurtarış: ${goalkeeper.player.name}`,
+  });
+
+  state.events.push({
+    minute: Math.floor(state.time / 60),
     type: 'goal_kick',
     clubId: defendingSide === 'HOME'
       ? state.home.club.id
       : state.away.club.id,
-    description: `Kurtarış: ${goalkeeper.player.name}`,
+    description: `Kale vuruşu: ${goalkeeper.player.name}`,
   });
 
   state.ball = releaseBall(state.ball);
