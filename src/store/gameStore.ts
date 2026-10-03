@@ -509,6 +509,11 @@ export const useGameStore = create<Store>()(
           table,
           news: news.slice(0, 30),
         });
+
+        // A manually completed live match closes the current week for the
+        // user. Simulate the remaining fixtures and advance the game state
+        // through the same canonical weekly transition used by Play Week.
+        get().playWeek();
       },
 
       // ═══════════════════════════════════════════════
