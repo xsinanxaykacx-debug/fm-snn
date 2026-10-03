@@ -1259,6 +1259,14 @@ export interface TransitionState {
    */
   pendingLooseBallRecoveryClubId: string | null;
   pendingLooseBallRecoveryPlayerId: string | null;
+
+  /**
+   * Dirty-tackle / loose-ball ownership observation.
+   * Set when a real non-null owner becomes null; consumed when a new
+   * non-null owner is observed. This keeps transition attribution tied
+   * to actual ownerId changes rather than historical owner memory.
+   */
+  pendingLooseBallTransitionOwnerId: string | null;
 }
 
 export interface LiveMatchState {
