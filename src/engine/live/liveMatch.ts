@@ -435,6 +435,8 @@ export function updateTransitionState(
     if (previousOwner) {
       state.transition.pendingLooseBallTransitionOwnerId =
         previousOwnerId;
+      state.transition.startedAt = state.time;
+      state.transition.expiresAt = state.time + 6;
     }
     return;
   }
