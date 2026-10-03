@@ -60,7 +60,7 @@ type DebugFrame = Omit<LiveFrame, 'type'> & {
 };
 
 type DebugRecording = {
-  version: 1;
+  version: 2;
   sampleEveryTicks: number;
   maxSimulationSeconds: number;
   startedAt: number;
