@@ -1692,12 +1692,16 @@ function resolveGoalkeeperSave(
   state: LiveMatchState,
   players: Record<string, Player>
 ): boolean {
-  const shotEvent = [...state.events]
-    .reverse()
-    .find(event =>
-      event.type === 'shot' &&
-      event.playerId === state.ball.lastTouchId
-    );
+  // Save yalnızca mevcut goal-boundary hareketinin doğrudan son aksiyonu
+  // bir şutsa geçerlidir. Eski bir shot event'ini geçmişten bulup yeni
+  // bir own-goal/cross/pass için "save" üretmek istatistikleri bozar.
+  const lastEvent = state.events[state.events.length - 1];
+
+  const shotEvent =
+    lastEvent?.type === 'shot' &&
+    lastEvent.playerId === state.ball.lastTouchId
+      ? lastEvent
+      : null;
 
   if (!shotEvent) {
     return false;
