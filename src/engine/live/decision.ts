@@ -1283,8 +1283,9 @@ function estimateXG(
     (distanceToGoal - SHOOT_XG_CLOSE_DISTANCE) *
       SHOOT_XG_DISTANCE_PENALTY;
 
+  // pressure is already normalized to [0, 1] by pressureAtOwner.
   const pressurePenalty =
-    clamp01(pressure / 100) *
+    clamp01(pressure) *
     SHOOT_XG_PRESSURE_PENALTY;
 
   return Math.max(
