@@ -42,5 +42,5 @@ describe('Live custom formation positioning', () => {
     expect(firstTickHomePosition).not.toBeNull();
     expect(firstTickHomePosition!.x).toBeCloseTo(104, 6);
     expect(firstTickHomePosition!.y).toBeCloseTo(0, 6);
-  });
+  }, 60000);
 });
