@@ -241,9 +241,11 @@ export function LiveMatchScreen() {
   }
 
   function saveResult() {
-    if (!result) return;
+    if (!result || !fixture) return;
 
-    applyLiveMatchResult(result);
+    // The live engine creates its own result id. The fixture store must retain
+    // the original fixture identity so the completed match replaces that row.
+    applyLiveMatchResult({ ...result, id: fixture.id });
     setResult(null);
     setRunning(false);
   }
