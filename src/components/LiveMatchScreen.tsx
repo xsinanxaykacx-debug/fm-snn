@@ -184,9 +184,11 @@ export function LiveMatchScreen() {
       window.clearInterval(playbackTimerRef.current);
     }
 
+    // Worker frames are emitted every 5 ticks = 0.5 match seconds.
+    // Keep the UI speed labels truthful: 1x = 0.5s/frame, 4x = 0.125s/frame.
     playbackTimerRef.current = window.setInterval(
       () => playbackStepRef.current?.(),
-      125 / playbackSpeed
+      500 / playbackSpeed
     );
 
     return () => {
