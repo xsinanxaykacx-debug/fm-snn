@@ -135,7 +135,7 @@ export default function App() {
 
       <main className="p-6 max-w-7xl mx-auto">
         {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
-        {tab === 'fixtures' && <Fixtures />}
+        {tab === 'fixtures' && <Fixtures onNavigate={setTab} />}
         {tab === 'liveMatch' && <LiveMatchScreen />}
         {tab === 'cup' && <Cup />}
         {tab === 'squad' && <Squad />}
