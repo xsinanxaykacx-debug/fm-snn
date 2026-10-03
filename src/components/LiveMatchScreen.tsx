@@ -289,7 +289,7 @@ export function LiveMatchScreen() {
     // The engine simulates faster than real time. Keep the simulation
     // authoritative, but play its frames back in order so the user can
     // actually watch the 2D match instead of seeing the final frame flash.
-    playbackTimerRef.current = window.setInterval(() => {
+    playbackStepRef.current = () => {
       const next = frameQueueRef.current.shift();
 
       if (next) {
@@ -319,7 +319,7 @@ export function LiveMatchScreen() {
           playbackTimerRef.current = null;
         }
       }
-    }, 125 / playbackSpeedRef.current);
+    };
   }
 
   function saveResult() {
