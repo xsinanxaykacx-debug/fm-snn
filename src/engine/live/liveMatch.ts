@@ -233,6 +233,8 @@ export function simulateMatchLive(
 
     lastBallOwnerId: null,
 
+    pendingShot: null,
+
     isStopped: false,
     isFinished: false,
   };
@@ -981,6 +983,9 @@ function applyBallActions(
   const owner = state.players[ownerId];
   if (!owner) return;
 
+  // A new action supersedes any previous shot that did not reach a boundary.
+  state.pendingShot = null;
+
   const decision = decisions[ownerId];
   if (!decision) return;
 
@@ -1120,6 +1125,11 @@ function handleShootAction(
   state.stats.shots[side] += 1;
   state.stats.xG[side] += shotXG;
   state.stats.chances[side] += 1;
+  state.pendingShot = {
+    shooterId: owner.player.id,
+    clubId: owner.clubId,
+    xG: shotXG,
+  };
 
   state.events.push({
     minute: Math.floor(state.time / 60),
@@ -1230,12 +1240,42 @@ function applyBoundaryOutcome(
   if (outcome.type === 'none') return;
 
   if (outcome.type === 'goal') {
+    const pendingShot = state.pendingShot;
+
+    if (pendingShot === null) {
+      // A pass, cross, clearance or restart crossing the goal mouth is not a
+      // goal. Treat it as a goal kick instead of reusing a stale shot event.
+      handleGoalKick(
+        {
+          type: 'goal_kick',
+          side: outcome.scorerSide === 'HOME' ? 'AWAY' : 'HOME',
+          point: outcome.point,
+        },
+        state,
+        players
+      );
+      return;
+    }
+
+    state.stats.onTarget[pendingShot.clubId === state.home.club.id ? 'home' : 'away'] += 1;
+
     if (resolveGoalkeeperSave(outcome, state, players)) {
+      state.pendingShot = null;
       return;
     }
 
     handleGoal(outcome, state, players);
+    state.pendingShot = null;
     return;
+  }
+
+  if (state.pendingShot !== null) {
+    const side = state.pendingShot.clubId === state.home.club.id ? 'home' : 'away';
+    state.pendingShot = null;
+    if (outcome.type === 'goal_kick' || outcome.type === 'corner' || outcome.type === 'throw_in') {
+      // Boundary outcome already ends the active shot sequence.
+      void side;
+    }
   }
 
   if (outcome.type === 'corner') {
@@ -1259,16 +1299,8 @@ function resolveGoalkeeperSave(
   state: LiveMatchState,
   players: Record<string, Player>
 ): boolean {
-  const shotEvent = [...state.events]
-    .reverse()
-    .find(event =>
-      event.type === 'shot' &&
-      event.playerId === state.ball.lastTouchId
-    );
-
-  if (!shotEvent) {
-    return false;
-  }
+  const pendingShot = state.pendingShot;
+  if (pendingShot === null) return false;
 
   const defendingSide = outcome.scorerSide === 'HOME' ? 'AWAY' : 'HOME';
   const goalkeeper = Object.values(state.players).find(
@@ -1282,9 +1314,7 @@ function resolveGoalkeeperSave(
     return false;
   }
 
-  const shotXG = typeof shotEvent.xG === 'number'
-    ? Math.max(0.02, Math.min(0.7, shotEvent.xG))
-    : 0.2;
+  const shotXG = Math.max(0.01, Math.min(0.5, pendingShot.xG));
 
   // xG artık sadece istatistik değil, gerçek gol çözümlemesinin de
   // girdisidir. Goal-mouth'a ulaşan her şut otomatik gol olamaz.
