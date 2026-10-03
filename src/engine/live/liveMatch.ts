@@ -956,26 +956,48 @@ function buildDecisionState(
 // TACKLE OUTCOMES
 // ═══════════════════════════════════════════════
 
-function applyTackleOutcomes(
+/**
+ * Aynı tick'te aynı top için birden fazla tackle outcome üretilebilir.
+ *
+ * Uygulama kuralı:
+ *   1. failed outcome'lar elenir.
+ *   2. Fiziksel olarak en yakın contest (küçük distance) önce gelir.
+ *   3. Eşit mesafede tacklerId deterministik tie-break'tir.
+ *
+ * Tüm outcome'lar aynı tick snapshot'ına karşı çözülmüş olabilir; state
+ * mutation yalnızca tek bir decisive outcome üzerinden yapılır.
+ * Böylece sonuç "outcomes dizisindeki ilk eleman" gibi incidental iteration
+ * sırasına bağlı değildir.
+ */
+export function applyTackleOutcomes(
   outcomes: TackleOutcome[],
   state: LiveMatchState,
   players: Record<string, Player>
 ): boolean {
-  for (const outcome of outcomes) {
-    if (outcome.type === 'failed') continue;
+  const decisiveOutcomes = outcomes
+    .filter((outcome) => outcome.type !== 'failed')
+    .slice()
+    .sort((a, b) => {
+      const aDistance = a.debug?.distance ?? Number.POSITIVE_INFINITY;
+      const bDistance = b.debug?.distance ?? Number.POSITIVE_INFINITY;
 
-    if (outcome.type === 'won') {
-      applyTackleWon(outcome, state);
-      return true;
-    }
+      if (aDistance !== bDistance) {
+        return aDistance - bDistance;
+      }
 
-    if (outcome.type === 'foul') {
-      applyTackleFoul(outcome, state, players);
-      return true;
-    }
+      return a.tacklerId.localeCompare(b.tacklerId);
+    });
+
+  const outcome = decisiveOutcomes[0];
+  if (!outcome) return false;
+
+  if (outcome.type === 'won') {
+    applyTackleWon(outcome, state);
+    return true;
   }
 
-  return false;
+  applyTackleFoul(outcome, state, players);
+  return true;
 }
 
 /**
@@ -1195,7 +1217,17 @@ export function resolvePendingLooseBallRecovery(state: LiveMatchState): void {
   const owner = state.players[ownerId];
   if (!owner) return;
 
-  if (owner.clubId === transition.pendingLooseBallRecoveryClubId) {
+  const pendingPlayerId =
+    transition.pendingLooseBallRecoveryPlayerId;
+
+  // Pending recovery player identity is authoritative. The club id is kept
+  // as transition context, but a teammate recovering the ball does not
+  // retroactively become the counter-press runner's recovery.
+  if (
+    pendingPlayerId !== null &&
+    owner.player.id === pendingPlayerId &&
+    owner.clubId === transition.pendingLooseBallRecoveryClubId
+  ) {
     state.stats.counterPressRecoveries += 1;
     state.stats.counterPressLooseBallRecoveries += 1;
   }
