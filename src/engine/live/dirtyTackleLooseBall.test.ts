@@ -82,7 +82,7 @@ describe('Dirty tackle loose-ball contract', () => {
 
     expect(state.ball.ownerId).toBeNull();
     expect(state.ball.isMoving).toBe(true);
-    expect(Math.hypot(state.ball.velocity.x, state.ball.velocity.y)).toBeCloseTo(4, 9);
+    // Knock artık tackle outcome'unun authoritative PhysicsSnapshot\n    // relativeSpeed değerinden türetilir: 4.0 * 0.8 = 3.2.\n    expect(Math.hypot(state.ball.velocity.x, state.ball.velocity.y)).toBeCloseTo(3.2, 9);
     expect(state.ball.lastTouchId).toBe('T1');
     expect(state.ball.lastTouchClubId).toBe('club_1');
   });
