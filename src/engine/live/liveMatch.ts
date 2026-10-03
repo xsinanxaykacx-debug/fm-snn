@@ -62,7 +62,7 @@ import type {
 } from '../types';
 
 import { DEFAULT_PITCH_DIMENSIONS } from './pitch';
-import { buildPhysicsSnapshot } from './physics';
+import { buildPhysicsSnapshot, pairKey, type PhysicsSnapshot } from './physics';
 import { printShadowReport } from './shadow';
 import type { TeamSide } from './pitch';
 
@@ -589,7 +589,7 @@ export function runTick(
 
   // ─── 8c. Ball actions ───
   if (!tackleChangedPossession) {
-    applyBallActions(state, decisions, players, onTackleResolved);
+    applyBallActions(state, decisions, players, onTackleResolved, physics);
   }
 
   // ─── 9. Sınır geçişi ───
@@ -1244,7 +1244,8 @@ function applyBallActions(
   state: LiveMatchState,
   decisions: Record<string, Decision>,
   players: Record<string, Player>,
-  onTackleResolved?: (outcome: TackleOutcome) => void
+  onTackleResolved?: (outcome: TackleOutcome) => void,
+  physics?: PhysicsSnapshot
 ): void {
   const ownerId = state.ball.ownerId;
   if (ownerId === null) return;
@@ -1259,7 +1260,15 @@ function applyBallActions(
   // Contest başarılı olsa bile possession doğrudan atanmaz; mevcut tackle
   // resolver fiziksel sonucu belirler. Böylece recovery gerçek top
   // sahipliği değişimi üzerinden gerçekleşir.
-  if (resolveCounterPressContest(state, owner, players, onTackleResolved)) {
+  if (
+    resolveCounterPressContest(
+      state,
+      owner,
+      players,
+      onTackleResolved,
+      physics,
+    )
+  ) {
     return;
   }
 
@@ -1294,7 +1303,8 @@ export function resolveCounterPressContest(
   state: LiveMatchState,
   owner: LivePlayer,
   players: Record<string, Player>,
-  onTackleResolved?: (outcome: TackleOutcome) => void
+  onTackleResolved?: (outcome: TackleOutcome) => void,
+  physics?: PhysicsSnapshot
 ): boolean {
   const transition = state.transition;
 
@@ -1327,9 +1337,13 @@ export function resolveCounterPressContest(
     return false;
   }
 
+  const pair = physics?.playerPairs.get(
+    pairKey(pressingPlayer.player.id, owner.player.id),
+  );
+
   const dx = pressingPlayer.position.x - owner.position.x;
   const dy = pressingPlayer.position.y - owner.position.y;
-  const distance = Math.hypot(dx, dy);
+  const distance = pair?.distance ?? Math.hypot(dx, dy);
   const tackleRadius =
     DEFAULT_LIVE_ENGINE_CONFIG.playerPhysics.tackleRadius;
 
@@ -1375,10 +1389,15 @@ export function resolveCounterPressContest(
   state.stats.counterPressRollsPassed += 1;
   transition.isRecoveryContestActive = true;
 
-  const relativeSpeed = Math.hypot(
-    pressingPlayer.velocity.x - owner.velocity.x,
-    pressingPlayer.velocity.y - owner.velocity.y
-  );
+  // Production runTick supplies the authoritative PhysicsSnapshot.
+  // Direct unit tests may omit it and retain the mathematically equivalent
+  // fallback for isolated resolver testing.
+  const relativeSpeed =
+    pair?.relativeSpeed ??
+    Math.hypot(
+      pressingPlayer.velocity.x - owner.velocity.x,
+      pressingPlayer.velocity.y - owner.velocity.y,
+    );
 
   const outcome = resolveTackle({
     tackler: pressingPlayer,
