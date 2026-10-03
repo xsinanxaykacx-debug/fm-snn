@@ -260,6 +260,7 @@ export function simulateMatchLive(
       isRecoveryContestActive: false,
       pendingLooseBallRecoveryClubId: null,
       pendingLooseBallRecoveryPlayerId: null,
+      pendingLooseBallTransitionOwnerId: null,
     },
 
     isStopped: false,
@@ -417,15 +418,81 @@ export function updateTransitionState(
     state.transition.isRecoveryContestActive = false;
     state.transition.pendingLooseBallRecoveryClubId = null;
     state.transition.pendingLooseBallRecoveryPlayerId = null;
+    state.transition.pendingLooseBallTransitionOwnerId = null;
   }
 
   const currentOwnerId = state.ball.ownerId;
 
-  if (
-    previousOwnerId === null ||
-    currentOwnerId === null ||
-    previousOwnerId === currentOwnerId
-  ) {
+  if (previousOwnerId === currentOwnerId) {
+    return;
+  }
+
+  // A real ownership change to loose ball is observed here. Keep the
+  // actual losing owner as pending causal context; do not infer this
+  // transition from lastBallOwnerId later.
+  if (previousOwnerId !== null && currentOwnerId === null) {
+    const previousOwner = state.players[previousOwnerId];
+    if (previousOwner) {
+      state.transition.pendingLooseBallTransitionOwnerId =
+        previousOwnerId;
+    }
+    return;
+  }
+
+  // Loose-ball recovery: finalize the transition from the owner that
+  // actually lost possession when ownerId became null. The historical
+  // lastBallOwnerId field is deliberately not consulted here.
+  if (previousOwnerId === null && currentOwnerId !== null) {
+    const pendingOwnerId =
+      state.transition.pendingLooseBallTransitionOwnerId;
+
+    if (pendingOwnerId === null) {
+      return;
+    }
+
+    const pendingOwner = state.players[pendingOwnerId];
+    const currentOwner = state.players[currentOwnerId];
+
+    state.transition.pendingLooseBallTransitionOwnerId = null;
+
+    if (!pendingOwner || !currentOwner) return;
+    if (pendingOwner.clubId === currentOwner.clubId) return;
+
+    const losingPlayers = Object.values(state.players).filter(
+      player => player.clubId === pendingOwner.clubId
+    );
+
+    const pressing = resolveCounterPress(
+      losingPlayers,
+      currentOwner.position,
+      state
+    );
+
+    const breakResolution = resolveBreakAction(
+      currentOwner,
+      state
+    );
+
+    state.transition = {
+      counterPressClubId: pendingOwner.clubId,
+      counterPressPlayerId: pressing.playerId,
+      breakClubId: currentOwner.clubId,
+      startedAt: state.time,
+      expiresAt: state.time + 6,
+      counterPressProbability: pressing.probability,
+      breakQuality: breakResolution.quality,
+      hasAttemptedCounterPress: false,
+      isRecoveryContestActive: false,
+      pendingLooseBallRecoveryClubId: null,
+      pendingLooseBallRecoveryPlayerId: null,
+      pendingLooseBallTransitionOwnerId: null,
+    };
+
+    return;
+  }
+
+  // Direct non-null → non-null ownership change.
+  if (previousOwnerId === null || currentOwnerId === null) {
     return;
   }
 
@@ -462,6 +529,7 @@ export function updateTransitionState(
     isRecoveryContestActive: false,
     pendingLooseBallRecoveryClubId: null,
     pendingLooseBallRecoveryPlayerId: null,
+    pendingLooseBallTransitionOwnerId: null,
   };
 }
 
@@ -486,8 +554,8 @@ export function runTick(
   // then interception/counter-press may change it again during the action.
   // Keep a local observation cursor so every intra-tick ownership change
   // is registered exactly once.
-  const previousOwnerId = state.lastBallOwnerId;
-  let observedOwnerId = previousOwnerId;
+  const tickStartOwnerId = state.ball.ownerId;
+  let observedOwnerId = tickStartOwnerId;
 
   const prevBallPos = {
     x: state.ball.position.x,
@@ -561,6 +629,14 @@ export function runTick(
     players
   );
 
+  // Observe the first ownership change immediately. This is important for
+  // dirty tackles: A -> null must be recorded before a same-tick recovery
+  // can turn null -> B.
+  if (state.ball.ownerId !== observedOwnerId) {
+    updateTransitionState(state, observedOwnerId);
+    observedOwnerId = state.ball.ownerId;
+  }
+
   // ─── 8. Top hareketi ───
   if (state.ball.ownerId === null) {
     state.ball = stepBall(
@@ -579,25 +655,29 @@ export function runTick(
   resolvePendingLooseBallRecovery(state);
 
   // ─── 8b. Transition state ───
-  // Possession değişimi bu tick içinde tackle/loose-ball sonucunda
-  // oluşmuşsa counter-press contest normal ball-action'dan ÖNCE
-  // kurulmalıdır. Aksi halde yeni sahip aynı tick'te aksiyonunu tüketir
-  // ve transition bir sonraki tick'e sarkarak fiziksel contest penceresini
-  // kaçırabilir.
-  if (import.meta.env.DEV && previousOwnerId !== state.ball.ownerId) {
-    const previousOwner = previousOwnerId ? state.players[previousOwnerId] : null;
-    const currentOwner = state.ball.ownerId ? state.players[state.ball.ownerId] : null;
-    console.log(
-      '[ownership-change] tick=' + state.tick +
-      ' prev=' + (previousOwnerId ?? 'null') +
-      ' prevClub=' + (previousOwner?.clubId ?? 'null') +
-      ' owner=' + (state.ball.ownerId ?? 'null') +
-      ' ownerClub=' + (currentOwner?.clubId ?? 'null'),
-    );
-  }
+  // Observe the post-recovery ownership state separately. A dirty tackle
+  // can therefore produce A -> null -> B within one tick without being
+  // collapsed into a historical A -> B comparison.
+  if (state.ball.ownerId !== observedOwnerId) {
+    if (import.meta.env.DEV) {
+      const previousOwner = observedOwnerId
+        ? state.players[observedOwnerId]
+        : null;
+      const currentOwner = state.ball.ownerId
+        ? state.players[state.ball.ownerId]
+        : null;
+      console.log(
+        '[ownership-change] tick=' + state.tick +
+        ' prev=' + (observedOwnerId ?? 'null') +
+        ' prevClub=' + (previousOwner?.clubId ?? 'null') +
+        ' owner=' + (state.ball.ownerId ?? 'null') +
+        ' ownerClub=' + (currentOwner?.clubId ?? 'null'),
+      );
+    }
 
-  updateTransitionState(state, observedOwnerId);
-  observedOwnerId = state.ball.ownerId;
+    updateTransitionState(state, observedOwnerId);
+    observedOwnerId = state.ball.ownerId;
+  }
 
   // ─── 8c. Ball actions ───
   if (!tackleChangedPossession) {
