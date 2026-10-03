@@ -30,7 +30,7 @@ export interface PairPhysics {
   /** A'nın B'ye göre kapanma hızı. Pozitif = yaklaşıyor. */
   closingSpeedAB: number;
 
-  /** = -closingSpeedAB. Yapısal invariant, tekrar hesaplanmaz. */
+  /** = closingSpeedAB. Aynı fiziksel mesafe kapanma hızının ters erişim yönündeki görünümüdür; yeniden hesaplanmaz. */
   closingSpeedBA: number;
 }
 
@@ -119,8 +119,10 @@ export function computePairPhysics(
  * Snapshot içindeki player pair'den, fromId → toId yönündeki
  * kapanma hızını okur.
  *
- * Yön semantiği korunur: getClosingSpeed(s, A, B)
- * === -getClosingSpeed(s, B, A).
+ * Pair tekilleştirilmiş olduğu için kapanma hızı erişim yönüne bağlı
+ * işaretli bir hız değil, iki varlık arasındaki mesafenin değişim hızıdır.
+ * Bu nedenle getClosingSpeed(s, A, B)
+ * === getClosingSpeed(s, B, A).
  * Pair mevcut değilse undefined döner; 0 ile karıştırılmaz.
  */
 export function getClosingSpeed(
