@@ -188,6 +188,42 @@ function createInitialState(): GameState & { useLiveEngine: boolean } {
 }
 
 // ═══════════════════════════════════════════════
+export function getPersistedGameState(state: Store) {
+  return {
+    season: state.season,
+    currentWeek: state.currentWeek,
+    userClubId: state.userClubId,
+    clubs: state.clubs,
+    players: state.players,
+    fixtures: state.fixtures.map(f => ({
+      id: f.id,
+      week: f.week,
+      homeId: f.homeId,
+      awayId: f.awayId,
+      homeScore: f.homeScore,
+      awayScore: f.awayScore,
+      events: f.events,
+      stats: f.stats,
+      played: f.played,
+      possession: f.possession,
+      isCup: f.isCup,
+      cupRound: f.cupRound,
+      penalties: f.penalties,
+      winnerId: f.winnerId,
+    })),
+    table: state.table,
+    transferList: state.transferList,
+    news: state.news,
+    seasonOver: state.seasonOver,
+    training: state.training,
+    userLineup: state.userLineup,
+    assistant: state.assistant,
+    academy: state.academy,
+    cup: state.cup,
+    useLiveEngine: state.useLiveEngine,
+  };
+}
+
 // INBOX YARDIMCILARI
 // ═══════════════════════════════════════════════
 
@@ -509,6 +545,11 @@ export const useGameStore = create<Store>()(
           table,
           news: news.slice(0, 30),
         });
+
+        // A manually completed live match closes the current week for the
+        // user. Simulate the remaining fixtures and advance the game state
+        // through the same canonical weekly transition used by Play Week.
+        get().playWeek();
       },
 
       // ═══════════════════════════════════════════════
@@ -1610,39 +1651,7 @@ export const useGameStore = create<Store>()(
     {
       name: 'fm-clone-save',
 
-      partialize: (state) => ({
-        season: state.season,
-        currentWeek: state.currentWeek,
-        userClubId: state.userClubId,
-        clubs: state.clubs,
-        players: state.players,
-        fixtures: state.fixtures.map(f => ({
-          id: f.id,
-          week: f.week,
-          homeId: f.homeId,
-          awayId: f.awayId,
-          homeScore: f.homeScore,
-          awayScore: f.awayScore,
-          events: f.events,
-          stats: f.stats,
-          played: f.played,
-          possession: f.possession,
-          isCup: f.isCup,
-          cupRound: f.cupRound,
-          penalties: f.penalties,
-          winnerId: f.winnerId,
-        })),
-        table: state.table,
-        transferList: state.transferList,
-        news: state.news,
-        seasonOver: state.seasonOver,
-        training: state.training,
-        userLineup: state.userLineup,
-        assistant: state.assistant,
-        academy: state.academy,
-        cup: state.cup,
-        useLiveEngine: state.useLiveEngine,
-      }),
+      partialize: getPersistedGameState,
 
       merge: (persistedState: any, currentState: Store) => {
         const merged = { ...currentState, ...persistedState };
