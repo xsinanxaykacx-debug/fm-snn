@@ -1577,9 +1577,9 @@ export function resolveCounterPressContest(
         transition.counterPressClubId;
       transition.pendingLooseBallRecoveryPlayerId =
         pressingPlayer.player.id;
-
-      resolveLooseBallControl(state);
-      resolvePendingLooseBallRecovery(state);
+      // Do not resolve recovery here. runTick must observe A -> null first;
+      // its authoritative loose-ball stage then resolves null -> B in the
+      // same tick so ownership history remains causally ordered.
     }
   } else if (outcome.type === 'foul') {
     state.stats.counterPressTackleFouls += 1;
