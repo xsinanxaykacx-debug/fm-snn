@@ -69,7 +69,7 @@ type DebugRecording = {
 
 type WorkerMessage =
   | LiveFrame
-  | { type: 'complete'; result: Match; debug: DebugRecording }
+  | { type: 'complete'; result: Match; players: Record<string, import('../engine/types').Player>; debug: DebugRecording }
   | { type: 'error'; message: string };
 
 declare global {
@@ -163,6 +163,7 @@ function installDebugConsole(): void {
 export function LiveMatchScreen() {
   const state = useGameStore();
   const applyLiveMatchResult = useGameStore(s => s.applyLiveMatchResult);
+  const playWeek = useGameStore(s => s.playWeek);
   const [frame, setFrame] = useState<LiveFrame | null>(null);
   const [result, setResult] = useState<Match | null>(null);
   const [running, setRunning] = useState(false);
@@ -173,6 +174,7 @@ export function LiveMatchScreen() {
   const workerRef = useRef<Worker | null>(null);
   const frameQueueRef = useRef<LiveFrame[]>([]);
   const pendingResultRef = useRef<Match | null>(null);
+  const pendingPlayersRef = useRef<Record<string, import('../engine/types').Player> | null>(null);
   const playbackTimerRef = useRef<number | null>(null);
 
   const fixture = useMemo(() => state.fixtures.find(m =>
@@ -237,6 +239,7 @@ export function LiveMatchScreen() {
         );
 
         pendingResultRef.current = message.result;
+        pendingPlayersRef.current = message.players;
         return;
       }
 
@@ -259,6 +262,7 @@ export function LiveMatchScreen() {
       week: state.currentWeek,
       userLineup: state.userLineup,
       seed: Date.now(),
+      matchId: fixture.id,
     });
 
     // The engine simulates faster than real time. Keep the simulation
@@ -300,9 +304,11 @@ export function LiveMatchScreen() {
   function saveResult() {
     if (!result) return;
 
-    applyLiveMatchResult(result);
+    applyLiveMatchResult(result, pendingPlayersRef.current ?? undefined);
+    pendingPlayersRef.current = null;
     setResult(null);
     setRunning(false);
+    playWeek();
   }
 
   if (!fixture || !home || !away) {
