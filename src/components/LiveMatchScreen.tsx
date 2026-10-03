@@ -169,7 +169,7 @@ export function LiveMatchScreen() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [liveEvents, setLiveEvents] = useState<LiveFrame['latestEvent'][]>([]);
-  const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 4>(2);
+  const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 4>(4);
   const workerRef = useRef<Worker | null>(null);
   const frameQueueRef = useRef<LiveFrame[]>([]);
   const pendingResultRef = useRef<Match | null>(null);
