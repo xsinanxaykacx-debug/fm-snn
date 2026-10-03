@@ -33,7 +33,7 @@ export function effectiveAttribute(
 const POSITION_GROUPS = {
   GK: ['GK'] as const,
   DEF: ['DC', 'DL', 'DR'] as const,
-  MID: ['DM', 'MC', 'ML', 'MR'] as const,
+  MID: ['DMC', 'MC', 'ML', 'MR'] as const,
   ATT: ['AMC', 'AML', 'AMR', 'ST'] as const,
   WING: ['ML', 'MR', 'AML', 'AMR', 'DL', 'DR'] as const,
 };
