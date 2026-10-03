@@ -19,12 +19,15 @@ describe('BUG-020 live score calibration', () => {
         home: match.homeScore,
         away: match.awayScore,
         total: match.homeScore + match.awayScore,
+        shots: match.stats.shots.home + match.stats.shots.away,
+        onTarget: match.stats.onTarget.home + match.stats.onTarget.away,
+        xG: match.stats.xG.home + match.stats.xG.away,
       };
     });
 
     const averageGoals =
       scores.reduce((sum, score) => sum + score.total, 0) / scores.length;
-    console.log('BUG-020 baseline scores:', scores);
+    console.log('BUG-020 diagnostic scores:', scores);
     console.log('BUG-020 baseline average:', averageGoals, 'max:', Math.max(...scores.map(score => score.total)));
     const maximumGoals = Math.max(...scores.map(score => score.total));
 
