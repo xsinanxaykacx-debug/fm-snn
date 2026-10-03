@@ -4,6 +4,7 @@ import type {
   Attributes,
   CareerStats,
   Club,
+  CustomFormation,
   Formation,
   PitchZone,
   Player,
@@ -704,7 +705,7 @@ export function getStartingXI(
   players: Record<string, Player>,
   formation: Formation,
   userLineup?: string[],
-  customFormation?: any
+  customFormation?: CustomFormation
 ): Player[] {
   // Custom formasyonun gerçek veri modeli zones'tur.
   if (customFormation && customFormation.zones) {
