@@ -71,7 +71,7 @@ import {
 } from './config';
 
 import { nextBool } from './rng';
-import { getClosingSpeed, type PhysicsSnapshot } from './physics';
+import { getClosingSpeed, pairKey, type PhysicsSnapshot } from './physics';
 import { recordShadow, recordShadowMiss } from './shadow';
 
 // ═══════════════════════════════════════════════
@@ -378,22 +378,27 @@ export function resolveAllTackles(
     // Carrier gerçekten top sahibi mi?
     if (!carrier.isBallOwner) continue;
 
-    // Mesafe
-    const dx = carrier.position.x - player.position.x;
-    const dy = carrier.position.y - player.position.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    // PhysicsSnapshot aynı tick'teki authoritative position/velocity
+    // ilişkisini taşır. Tackle artık bu değerleri world state'ten ikinci kez
+    // türetmez; böylece fizik projeksiyonu ile tackle girdisi aynı snapshot'a
+    // bağlanır.
+    const pair = physics.playerPairs.get(
+      pairKey(player.player.id, carrier.player.id),
+    );
+
+    if (!pair) continue;
+
+    const dist = pair.distance;
 
     if (dist > tackleRadius) continue;
 
-    // Açı
+    // Açı yalnızca yönsel tackle bağlamıdır; fiziksel mesafe/relativeSpeed
+    // snapshot'tan gelir.
+    const dx = carrier.position.x - player.position.x;
+    const dy = carrier.position.y - player.position.y;
     const angle = Math.atan2(dy, dx);
 
-    // Göreli hız
-    const relVx = player.velocity.x - carrier.velocity.x;
-    const relVy = player.velocity.y - carrier.velocity.y;
-    const relativeSpeed = Math.sqrt(
-      relVx * relVx + relVy * relVy
-    );
+    const relativeSpeed = pair.relativeSpeed;
 
     // ── Shadow comparison (DEV only) ──
     if (import.meta.env.DEV) {
