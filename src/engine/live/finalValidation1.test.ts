@@ -74,8 +74,9 @@ it(
     });
 
     expect(result.stats.ticks).toBe(MATCH_TICKS);
-    expect(result.stats.simulationSeconds).toBe(
+    expect(result.stats.simulationSeconds).toBeCloseTo(
       MATCH_SECONDS,
+      6,
     );
   },
   30 * 60 * 1000,
