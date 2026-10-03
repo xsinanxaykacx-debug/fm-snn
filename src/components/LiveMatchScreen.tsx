@@ -176,6 +176,27 @@ export function LiveMatchScreen() {
   const pendingResultRef = useRef<Match | null>(null);
   const pendingPlayersRef = useRef<Record<string, import('../engine/types').Player> | null>(null);
   const playbackTimerRef = useRef<number | null>(null);
+  const playbackStepRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!running || !playbackStepRef.current) return;
+
+    if (playbackTimerRef.current !== null) {
+      window.clearInterval(playbackTimerRef.current);
+    }
+
+    playbackTimerRef.current = window.setInterval(
+      () => playbackStepRef.current?.(),
+      125 / playbackSpeed
+    );
+
+    return () => {
+      if (playbackTimerRef.current !== null) {
+        window.clearInterval(playbackTimerRef.current);
+        playbackTimerRef.current = null;
+      }
+    };
+  }, [running, playbackSpeed]);
 
   const fixture = useMemo(() => state.fixtures.find(m =>
     m.week === state.currentWeek &&
