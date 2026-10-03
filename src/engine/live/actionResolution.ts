@@ -253,7 +253,14 @@ export function resolvePassAction(
     tactic.directness === 'direct' ? 1.06 :
     tactic.directness === 'short' ? 0.97 : 1;
 
-  const skillProbability = passingSkill / 15;
+  // Passing attributes are 1-20. Map the effective rating onto a
+  // high-but-context-sensitive base completion rate; lane, distance,
+  // pressure and tactics then provide the actual risk.
+  const skillProbability = clamp(
+    0.70 + (passingSkill / 20) * 0.30,
+    0.70,
+    0.97
+  );
 
   // Pass quality is primarily driven by the passer's effective skill.
   // Contextual factors reduce that base probability additively so several
