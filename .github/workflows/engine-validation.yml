@@ -41,6 +41,7 @@ jobs:
           src/engine/live/shotGoalkeeperSeparation.test.ts
           src/engine/live/customFormationPosition.test.ts
           src/engine/live/liveResultIdentity.test.ts
+          src/engine/live/finalValidation1.test.ts
 
       - name: Core match-engine tests
         run: >
