@@ -9,6 +9,7 @@ type StartMessage = {
   week: number;
   userLineup?: string[];
   seed: number;
+  matchId: string;
 };
 
 type FramePlayer = {
@@ -164,6 +165,7 @@ scope.onmessage = (event) => {
       week: data.week,
       userLineup: data.userLineup,
       seed: data.seed,
+      matchId: data.matchId,
       onTick: (state) => {
         if (state.tick % 5 === 0 || state.isFinished) {
           sendFrame(state);
