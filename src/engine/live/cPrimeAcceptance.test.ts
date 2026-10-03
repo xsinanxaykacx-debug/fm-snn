@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { generateGameData } from '../data/generateData';
-import type { Club, Player } from '../types';
+import type { Club, LiveMatchState, Player } from '../types';
 import { MATCH_DURATION_SECONDS, TICK_DURATION } from './config';
 import { simulateMatchLive } from './liveMatch';
 
@@ -12,15 +12,23 @@ const DISCOVERY_SEEDS = [
 
 const DISCOVERY_MAX_TICKS = 12_000;
 
+interface OwnershipObservation {
+  tick: number;
+  previousOwnerId: string | null;
+  currentOwnerId: string | null;
+  previousOwnerClubId: string | null;
+  currentOwnerClubId: string | null;
+  lastBallOwnerId: string | null;
+  counterPressClubId: string | null;
+  breakClubId: string | null;
+}
+
 interface ChainObservation {
   seed: number;
   dirtyTackleTick: number;
-  looseBallObserved: boolean;
   recoveryTick: number;
-  recoveredPlayerId: string;
-  transitionTick: number;
-  transitionFromClubId: string;
-  transitionToClubId: string;
+  loose: OwnershipObservation;
+  recovery: OwnershipObservation;
 }
 
 function resetPlayers(players: Record<string, Player>): void {
@@ -50,6 +58,27 @@ function getFixture(data: {
   };
 }
 
+function observeOwnership(
+  state: LiveMatchState,
+  previousOwnerId: string | null,
+): OwnershipObservation {
+  const previousOwner =
+    previousOwnerId === null ? null : state.players[previousOwnerId];
+  const currentOwner =
+    state.ball.ownerId === null ? null : state.players[state.ball.ownerId];
+
+  return {
+    tick: state.tick,
+    previousOwnerId,
+    currentOwnerId: state.ball.ownerId,
+    previousOwnerClubId: previousOwner?.clubId ?? null,
+    currentOwnerClubId: currentOwner?.clubId ?? null,
+    lastBallOwnerId: state.lastBallOwnerId,
+    counterPressClubId: state.transition.counterPressClubId,
+    breakClubId: state.transition.breakClubId,
+  };
+}
+
 function findCausalChain(
   seed: number,
   maxTicks: number,
@@ -59,17 +88,13 @@ function findCausalChain(
 
   const { home, away } = getFixture(data);
 
-  let observedTick = 0;
-  let lastObservedRecoveryCount = 0;
   let dirtyTackle: {
     tick: number;
     tacklerId: string;
     tacklerClubId: string;
-    carrierId: string;
   } | null = null;
-  let dirtyTackleLooseObserved = false;
-  let recoveriesBeforeDirty = 0;
 
+  let loose: OwnershipObservation | null = null;
   let chain: ChainObservation | null = null;
 
   simulateMatchLive(home, away, data.players, {
@@ -88,207 +113,170 @@ function findCausalChain(
       if (!tackler) return;
 
       dirtyTackle = {
-        tick: observedTick + 1,
+        tick: 0,
         tacklerId: outcome.tacklerId,
         tacklerClubId: tackler.clubId ?? '',
-        carrierId: outcome.ballCarrierId,
       };
-      recoveriesBeforeDirty = lastObservedRecoveryCount;
     },
-    onTick: state => {
-      observedTick = state.tick;
+    onOwnershipObserved: (state, previousOwnerId) => {
+      if (chain !== null || dirtyTackle === null) return;
 
-      if (chain !== null || dirtyTackle === null) {
-        lastObservedRecoveryCount = state.stats.counterPressLooseBallRecoveries;
-        return;
+      if (dirtyTackle.tick === 0) {
+        dirtyTackle.tick = state.tick;
       }
 
-      // The callback is emitted before applyTackleWon(). A dirty outcome
-      // therefore proves that the real tackle resolver produced a loose-ball
-      // result; this observation confirms the applied state reached loose
-      // ball (ownerId === null) or recovered later in the same tick.
+      const observation = observeOwnership(state, previousOwnerId);
+
       if (
-        !dirtyTackleLooseObserved &&
-        state.tick >= dirtyTackle.tick &&
-        (
-          state.ball.ownerId === null ||
-          state.ball.lastTouchId === dirtyTackle.tacklerId
-        )
+        loose === null &&
+        observation.previousOwnerId === dirtyTackle.tacklerId &&
+        observation.currentOwnerId === null &&
+        observation.lastBallOwnerId === dirtyTackle.tacklerId
       ) {
-        dirtyTackleLooseObserved = true;
-      }
-
-      if (!dirtyTackleLooseObserved) {
-        lastObservedRecoveryCount =
-          state.stats.counterPressLooseBallRecoveries;
+        loose = observation;
         return;
       }
 
-      const recoveriesNow = state.stats.counterPressLooseBallRecoveries;
-      if (recoveriesNow <= recoveriesBeforeDirty) {
-        lastObservedRecoveryCount = recoveriesNow;
-        return;
+      if (
+        loose !== null &&
+        observation.tick === loose.tick &&
+        observation.previousOwnerId === null &&
+        observation.currentOwnerId !== null &&
+        observation.currentOwnerClubId !== dirtyTackle.tacklerClubId &&
+        observation.counterPressClubId === dirtyTackle.tacklerClubId &&
+        observation.breakClubId === observation.currentOwnerClubId
+      ) {
+        chain = {
+          seed,
+          dirtyTackleTick: dirtyTackle.tick,
+          recoveryTick: observation.tick,
+          loose,
+          recovery: observation,
+        };
       }
-
-      const recoveredOwnerId = state.ball.ownerId;
-      if (recoveredOwnerId === null) {
-        lastObservedRecoveryCount = recoveriesNow;
-        return;
-      }
-
-      const recoveredOwner = state.players[recoveredOwnerId];
-      if (!recoveredOwner) {
-        lastObservedRecoveryCount = recoveriesNow;
-        return;
-      }
-
-      if (recoveredOwner.clubId === dirtyTackle.tacklerClubId) {
-        lastObservedRecoveryCount = recoveriesNow;
-        return;
-      }
-
-      const transitionMatchesRecovery =
-        state.transition.startedAt === state.time &&
-        state.transition.counterPressClubId === dirtyTackle.tacklerClubId &&
-        state.transition.breakClubId === recoveredOwner.clubId;
-
-      if (!transitionMatchesRecovery) {
-        lastObservedRecoveryCount = recoveriesNow;
-        return;
-      }
-
-      chain = {
-        seed,
-        dirtyTackleTick: dirtyTackle.tick,
-        looseBallObserved: dirtyTackleLooseObserved,
-        recoveryTick: state.tick,
-        recoveredPlayerId: recoveredOwnerId,
-        transitionTick: state.tick,
-        transitionFromClubId: state.transition.counterPressClubId,
-        transitionToClubId: state.transition.breakClubId,
-      };
-
-      lastObservedRecoveryCount = recoveriesNow;
     },
   });
 
   return chain;
 }
 
-describe("C' acceptance — live causal chain", () => {
+function runFullMatch(
+  seed: number,
+): {
+  match: ReturnType<typeof simulateMatchLive>;
+  observations: OwnershipObservation[];
+  multiChangeTicks: Map<number, OwnershipObservation[]>;
+  chain: ChainObservation | null;
+} {
+  const data = generateGameData();
+  resetPlayers(data.players);
+
+  const { home, away } = getFixture(data);
+
+  const observations: OwnershipObservation[] = [];
+  const byTick = new Map<number, OwnershipObservation[]>();
+
+  let dirtyTackle: {
+    tick: number;
+    tacklerId: string;
+    tacklerClubId: string;
+  } | null = null;
+
+  let loose: OwnershipObservation | null = null;
+  let chain: ChainObservation | null = null;
+
+  const match = simulateMatchLive(home, away, data.players, {
+    seed,
+    onTackleResolved: outcome => {
+      if (
+        chain !== null ||
+        outcome.type !== 'won' ||
+        outcome.newOwnerId !== null
+      ) {
+        return;
+      }
+
+      const tackler = data.players[outcome.tacklerId];
+      if (!tackler) return;
+
+      dirtyTackle = {
+        tick: 0,
+        tacklerId: outcome.tacklerId,
+        tacklerClubId: tackler.clubId ?? '',
+      };
+    },
+    onOwnershipObserved: (state, previousOwnerId) => {
+      const observation = observeOwnership(state, previousOwnerId);
+      observations.push(observation);
+
+      const sameTick = byTick.get(observation.tick) ?? [];
+      sameTick.push(observation);
+      byTick.set(observation.tick, sameTick);
+
+      if (chain !== null || dirtyTackle === null) return;
+
+      if (dirtyTackle.tick === 0) {
+        dirtyTackle.tick = state.tick;
+      }
+
+      if (
+        loose === null &&
+        observation.previousOwnerId === dirtyTackle.tacklerId &&
+        observation.currentOwnerId === null &&
+        observation.lastBallOwnerId === dirtyTackle.tacklerId
+      ) {
+        loose = observation;
+        return;
+      }
+
+      if (
+        loose !== null &&
+        observation.tick === loose.tick &&
+        observation.previousOwnerId === null &&
+        observation.currentOwnerId !== null &&
+        observation.currentOwnerClubId !== dirtyTackle.tacklerClubId &&
+        observation.counterPressClubId === dirtyTackle.tacklerClubId &&
+        observation.breakClubId === observation.currentOwnerClubId
+      ) {
+        chain = {
+          seed,
+          dirtyTackleTick: dirtyTackle.tick,
+          recoveryTick: observation.tick,
+          loose,
+          recovery: observation,
+        };
+      }
+    },
+  });
+
+  const multiChangeTicks = new Map<number, OwnershipObservation[]>();
+  for (const [tick, tickObservations] of byTick) {
+    if (tickObservations.length > 1) {
+      multiChangeTicks.set(tick, tickObservations);
+    }
+  }
+
+  return { match, observations, multiChangeTicks, chain };
+}
+
+describe("C' acceptance — live causal ownership", () => {
   it(
-    'gerçek motor akışında 0→90 tamamlanır ve tackle → loose → recovery → possession → transition kanıtlanır',
+    'gerçek 0→90 akışında A → null → B ve historical ownership ayrımını kanıtlar',
     () => {
-      const discoveryChains: ChainObservation[] = [];
+      let discovery: ChainObservation | null = null;
 
       for (const seed of DISCOVERY_SEEDS) {
-        const chain = findCausalChain(seed, DISCOVERY_MAX_TICKS);
-        if (chain) {
-          discoveryChains.push(chain);
-          break;
-        }
+        discovery = findCausalChain(seed, DISCOVERY_MAX_TICKS);
+        if (discovery !== null) break;
       }
 
       expect(
-        discoveryChains.length,
-        'DISCOVERY_SEEDS içinde gerçek dirty-tackle causal chain bulunamadı',
-      ).toBeGreaterThan(0);
+        discovery,
+        'DISCOVERY_SEEDS içinde gerçek aynı-tick A → null → B zinciri bulunamadı',
+      ).not.toBeNull();
 
-      const selectedSeed = discoveryChains[0].seed;
-      const data = generateGameData();
-      resetPlayers(data.players);
-      const { home, away } = getFixture(data);
-
-      let lastObservedOwnerId: string | null = null;
-      let lastObservedRecoveryCount = 0;
-      let ownershipChanges = 0;
-      let fullMatchChain: ChainObservation | null = null;
-      let pendingDirty: {
-        tick: number;
-        tacklerId: string;
-        tacklerClubId: string;
-      } | null = null;
-      let looseObserved = false;
-      let recoveriesBefore = 0;
-
-      const match = simulateMatchLive(home, away, data.players, {
-        seed: selectedSeed,
-        onTackleResolved: outcome => {
-          if (
-            fullMatchChain !== null ||
-            outcome.type !== 'won' ||
-            outcome.newOwnerId !== null
-          ) {
-            return;
-          }
-
-          const tackler = data.players[outcome.tacklerId];
-          if (!tackler) return;
-
-          pendingDirty = {
-            tick: 0,
-            tacklerId: outcome.tacklerId,
-            tacklerClubId: tackler.clubId ?? '',
-          };
-          recoveriesBefore = lastObservedRecoveryCount;
-        },
-        onTick: state => {
-          if (state.ball.ownerId !== lastObservedOwnerId) {
-            ownershipChanges += 1;
-          }
-
-          if (pendingDirty !== null && pendingDirty.tick === 0) {
-            pendingDirty.tick = state.tick;
-          }
-
-          if (
-            pendingDirty !== null &&
-            !looseObserved &&
-            (
-              state.ball.ownerId === null ||
-              state.ball.lastTouchId === pendingDirty.tacklerId
-            )
-          ) {
-            looseObserved = true;
-          }
-
-          if (
-            pendingDirty !== null &&
-            looseObserved &&
-            fullMatchChain === null &&
-            state.stats.counterPressLooseBallRecoveries > recoveriesBefore &&
-            state.ball.ownerId !== null
-          ) {
-            const recoveredOwner = state.players[state.ball.ownerId];
-
-            if (
-              recoveredOwner &&
-              recoveredOwner.clubId !== pendingDirty.tacklerClubId &&
-              state.transition.startedAt === state.time &&
-              state.transition.counterPressClubId ===
-                pendingDirty.tacklerClubId &&
-              state.transition.breakClubId === recoveredOwner.clubId
-            ) {
-              fullMatchChain = {
-                seed: selectedSeed,
-                dirtyTackleTick: pendingDirty.tick,
-                looseBallObserved: true,
-                recoveryTick: state.tick,
-                recoveredPlayerId: recoveredOwner.player.id,
-                transitionTick: state.tick,
-                transitionFromClubId:
-                  state.transition.counterPressClubId,
-                transitionToClubId:
-                  state.transition.breakClubId,
-              };
-            }
-          }
-
-          lastObservedOwnerId = state.ball.ownerId;
-          lastObservedRecoveryCount =
-            state.stats.counterPressLooseBallRecoveries;
-        },
-      });
+      const result = runFullMatch(discovery!.seed);
+      const { match, observations, multiChangeTicks, chain } = result;
 
       expect(match.played).toBe(true);
       expect(match.stats.simulationSeconds).toBeGreaterThanOrEqual(
@@ -297,19 +285,54 @@ describe("C' acceptance — live causal chain", () => {
       expect(match.stats.ticks).toBe(
         Math.round(MATCH_DURATION_SECONDS / TICK_DURATION),
       );
-      expect(ownershipChanges).toBeGreaterThan(0);
 
-      expect(fullMatchChain).not.toBeNull();
-      expect(fullMatchChain?.looseBallObserved).toBe(true);
-      expect(fullMatchChain?.recoveredPlayerId).toBeTruthy();
-      expect(fullMatchChain?.transitionFromClubId).toBeTruthy();
-      expect(fullMatchChain?.transitionToClubId).toBeTruthy();
-      expect(fullMatchChain?.transitionFromClubId).not.toBe(
-        fullMatchChain?.transitionToClubId,
+      expect(observations.length).toBeGreaterThan(0);
+      expect(chain).not.toBeNull();
+
+      const { loose, recovery } = chain!;
+
+      // 1) Gerçek aynı-tick ownership sırası: A → null → B.
+      expect(loose.tick).toBe(recovery.tick);
+      expect(loose.previousOwnerId).toBeTruthy();
+      expect(loose.currentOwnerId).toBeNull();
+      expect(recovery.previousOwnerId).toBeNull();
+      expect(recovery.currentOwnerId).toBeTruthy();
+      expect(recovery.currentOwnerClubId).not.toBe(
+        loose.previousOwnerClubId,
       );
 
-      expect(fullMatchChain?.recoveryTick).toBeGreaterThanOrEqual(
-        fullMatchChain?.dirtyTackleTick ?? 0,
+      // 2) A → null anında history A'yı korur.
+      expect(loose.lastBallOwnerId).toBe(loose.previousOwnerId);
+
+      // 3) null → B anında history artık B olsa bile transition A → B'dir.
+      //    Böylece historical lastBallOwnerId trigger değildir.
+      expect(recovery.lastBallOwnerId).toBe(recovery.currentOwnerId);
+      expect(recovery.counterPressClubId).toBe(loose.previousOwnerClubId);
+      expect(recovery.breakClubId).toBe(recovery.currentOwnerClubId);
+      expect(recovery.counterPressClubId).not.toBe(
+        recovery.lastBallOwnerId,
+      );
+
+      // 4) Aynı tick'teki her ardışık ownership gözlemi gerçek bir önceki
+      //    owner üzerinden ilerlemelidir; historical memory kullanılmamalıdır.
+      for (const tickObservations of multiChangeTicks.values()) {
+        for (let i = 1; i < tickObservations.length; i += 1) {
+          expect(tickObservations[i].previousOwnerId).toBe(
+            tickObservations[i - 1].currentOwnerId,
+          );
+        }
+      }
+
+      // 5) Hedef tick'te gerçekten en az iki değişim ve ikinci değişimin
+      //    previous owner'ı null olmalıdır.
+      const targetTickObservations =
+        multiChangeTicks.get(loose.tick) ?? [];
+
+      expect(targetTickObservations.length).toBeGreaterThanOrEqual(2);
+      expect(targetTickObservations[0].currentOwnerId).toBeNull();
+      expect(targetTickObservations[1].previousOwnerId).toBeNull();
+      expect(targetTickObservations[1].currentOwnerId).toBe(
+        recovery.currentOwnerId,
       );
     },
     10 * 60 * 1000,
