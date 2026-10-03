@@ -38,6 +38,14 @@ describe('live match calibration measurement', () => {
 
       expect(result.stats.ticks).toBe(MATCH_TICKS);
       expect(result.stats.simulationSeconds).toBeCloseTo(5400, 6);
+
+      const totalOnTarget =
+        result.stats.onTarget.home +
+        result.stats.onTarget.away;
+
+      // Shot on target is a subset of recorded shots. Own goals are
+      // deliberately excluded from shot/on-target attribution.
+      expect(totalOnTarget).toBeLessThanOrEqual(shots);
     }
 
     console.log('=== LIVE MATCH CALIBRATION SAMPLE ===');
