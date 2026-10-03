@@ -1831,7 +1831,24 @@ function handleGoal(
   }
 
   const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
-  state.stats.onTarget[side] += 1;
+
+  // Normal goals are shots on target. Own goals are explicitly excluded
+  // from shot statistics. If the goal did not originate from a shot action
+  // (for example a direct cross/corner reaching the goal), record the goal
+  // itself as the shot attempt so shots >= onTarget remains a real invariant.
+  if (!outcome.ownGoal) {
+    const lastEvent = state.events[state.events.length - 1];
+    const goalAlreadyHasShot =
+      lastEvent?.type === 'shot' &&
+      lastEvent.playerId === scorerId;
+
+    if (!goalAlreadyHasShot) {
+      state.stats.shots[side] += 1;
+      state.stats.chances[side] += 1;
+    }
+
+    state.stats.onTarget[side] += 1;
+  }
 
   // CareerStats — own goal hariç
   if (!outcome.ownGoal && scorerId && players[scorerId]) {
