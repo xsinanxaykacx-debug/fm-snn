@@ -1286,20 +1286,6 @@ function resolveGoalkeeperSave(
     ? Math.max(0.02, Math.min(0.7, shotEvent.xG))
     : 0.2;
 
-  const gkSkill = Math.max(
-    0,
-    Math.min(
-      1,
-      (
-        goalkeeper.player.attributes.goalkeeper +
-        goalkeeper.player.attributes.reflexes +
-        goalkeeper.player.attributes.gkPositioning +
-        goalkeeper.player.attributes.handling +
-        goalkeeper.player.attributes.oneOnOne
-      ) / 100
-    )
-  );
-
   // xG artık sadece istatistik değil, gerçek gol çözümlemesinin de
   // girdisidir. Goal-mouth'a ulaşan her şut otomatik gol olamaz.
   // xG is already reduced by goalkeeper quality in the shot resolver.
