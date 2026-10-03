@@ -300,7 +300,6 @@ export interface MatchEvent {
   team?: 'home' | 'away';
   description: string;
   xG?: number;
-  shotOutcome?: 'goal' | 'save' | 'miss';
   weeks?: number;
 }
 
@@ -1282,6 +1281,7 @@ export interface LiveMatchState {
     shooterId: string;
     clubId: string;
     xG: number;
+    resolvedOutcome: 'goal' | 'miss';
   } | null;
 
   isStopped: boolean;
