@@ -158,6 +158,8 @@ export interface SimulateMatchLiveOptions {
   /** @internal Harness/debug gözlem kanalı; oyun davranışını değiştirmez. */
   onTackleResolved?: (outcome: TackleOutcome) => void;
   maxTicks?: number;
+  /** Existing fixture id, when the live engine is launched from the game UI. */
+  matchId?: string;
 }
 
 export function simulateMatchLive(
@@ -326,7 +328,7 @@ export function simulateMatchLive(
   updateCareerStatsAfterMatch(state, players);
 
   // ─── Match dönüşümü ───
-  return convertToMatch(state, home, away, week);
+  return convertToMatch(state, home, away, week, options.matchId);
 }
 
 // ═══════════════════════════════════════════════
@@ -2226,13 +2228,14 @@ function convertToMatch(
   state: LiveMatchState,
   home: Club,
   away: Club,
-  week: number | undefined
+  week: number | undefined,
+  matchId?: string
 ): Match {
   state.stats.ticks = state.tick;
   state.stats.simulationSeconds = state.time;
 
   return {
-    id: `match_live_${home.id}_${away.id}`,
+    id: matchId ?? `match_live_${home.id}_${away.id}`,
     week,
     homeId: home.id,
     awayId: away.id,
