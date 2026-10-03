@@ -9,7 +9,7 @@ type StartMessage = {
   week: number;
   userLineup?: string[];
   seed: number;
-  matchId: string;
+  matchId?: string;
 };
 
 type FramePlayer = {
