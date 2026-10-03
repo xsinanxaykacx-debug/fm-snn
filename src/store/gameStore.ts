@@ -492,12 +492,12 @@ export const useGameStore = create<Store>()(
           match.awayId === state.userClubId;
 
         const news = [...state.news];
+        const isHome = match.homeId === state.userClubId;
+        const opponentId = isHome ? match.awayId : match.homeId;
+        const opponent = opponentId ? state.clubs[opponentId] : undefined;
         if (isUserMatch) {
-          const isHome = match.homeId === state.userClubId;
           const our = isHome ? match.homeScore : match.awayScore;
           const their = isHome ? match.awayScore : match.homeScore;
-          const opponentId = isHome ? match.awayId : match.homeId;
-          const opponent = opponentId ? state.clubs[opponentId] : undefined;
           const verdict = our > their ? 'Kazandık' : our < their ? 'Kaybettik' : 'Berabere';
           news.unshift(
             `Hafta ${match.week}: ${opponent?.shortName ?? 'Rakip'} karşısında ${our}-${their} — ${verdict}`
