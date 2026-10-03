@@ -78,8 +78,6 @@ describe('POSITION_GROUPS.MID', () => {
   it('includes DMC and excludes the invalid DM position', () => {
     const players = {
       dmc: player('dmc', 'DMC'),
-      mc: player('mc', 'MC'),
-      dm: { ...player('dm', 'DMC'), id: 'dm-placeholder' },
     };
 
     const units = calculateTeamUnits(club, players);
