@@ -29,6 +29,9 @@ jobs:
       - name: TypeScript + Vite build
         run: npm run build
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Core live-engine tests
         run: >
           npx vitest run
@@ -54,3 +57,6 @@ jobs:
           src/engine/match/edgeCase.test.ts
           src/engine/match/chanceToShotCalibration.test.ts
           src/engine/match/performance.test.ts
+
+      - name: Full test suite
+        run: npm test
