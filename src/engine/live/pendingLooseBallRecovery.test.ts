@@ -184,6 +184,41 @@ describe('pendingLooseBallRecovery lifecycle', () => {
     expect(state.transition.pendingLooseBallRecoveryPlayerId).toBeNull();
   });
 
+  it('loose-ball winner seçiminde mevcut sözleşme mesafeyi hıza üstün tutar', () => {
+    const { state, runner } = makeCounterPressState();
+
+    const nearerSlow = makePlayer(
+      'nearerSlow',
+      'club_2',
+      { x: 0.4, y: 0 },
+      { x: 0, y: 0 },
+    );
+    const fartherFast = makePlayer(
+      'fartherFast',
+      'club_1',
+      { x: 0.8, y: 0 },
+      { x: 20, y: 0 },
+    );
+
+    state.players = {
+      runner,
+      owner: state.players.owner,
+      nearerSlow,
+      fartherFast,
+    };
+
+    state.ball.ownerId = null;
+    state.ball.velocity = { x: 0, y: 0, z: 0 };
+    state.ball.isMoving = false;
+    state.ball.position = { x: 0, y: 0, z: 0.11 };
+
+    resolveLooseBallControl(state);
+
+    // Bu test yeni recovery modeli önermiyor; mevcut V1 sözleşmesini
+    // karakterize ediyor: eligible oyuncular içinde en yakın olan kazanır.
+    expect(state.ball.ownerId).toBe('nearerSlow');
+  });
+
   it('pending runner yerine aynı kulüpten takım arkadaşı alırsa recovery sayılmaz', () => {
     const { state, runner } = makeCounterPressState();
 
