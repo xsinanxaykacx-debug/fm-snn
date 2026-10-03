@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, live-transition-v1]
+    branches: [main, live-transition-v1, fix/live-engine-game-integration]
 
 jobs:
   validate:
@@ -43,6 +43,7 @@ jobs:
           src/engine/live/liveResultIdentity.test.ts
           src/engine/live/finalValidation1.test.ts
           src/engine/live/liveMatchCalibration.test.ts
+          src/engine/live/dSeedDiscovery.tmp.test.ts
 
       - name: Core match-engine tests
         run: >
