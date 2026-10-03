@@ -169,6 +169,7 @@ export function LiveMatchScreen() {
   const [error, setError] = useState<string | null>(null);
   const [liveEvents, setLiveEvents] = useState<LiveFrame['latestEvent'][]>([]);
   const [playbackSpeed, setPlaybackSpeed] = useState<1 | 2 | 4>(2);
+  const playbackSpeedRef = useRef<1 | 2 | 4>(2);
   const workerRef = useRef<Worker | null>(null);
   const frameQueueRef = useRef<LiveFrame[]>([]);
   const pendingResultRef = useRef<Match | null>(null);
@@ -263,7 +264,6 @@ export function LiveMatchScreen() {
     // The engine simulates faster than real time. Keep the simulation
     // authoritative, but play its frames back in order so the user can
     // actually watch the 2D match instead of seeing the final frame flash.
-    const playbackIntervalMs = 125 / playbackSpeed;
     playbackTimerRef.current = window.setInterval(() => {
       const next = frameQueueRef.current.shift();
 
@@ -294,7 +294,7 @@ export function LiveMatchScreen() {
           playbackTimerRef.current = null;
         }
       }
-    }, playbackIntervalMs);
+    }, 125 / playbackSpeedRef.current);
   }
 
   function saveResult() {
@@ -348,7 +348,11 @@ export function LiveMatchScreen() {
                 {[1, 2, 4].map(speed => (
                   <button
                     key={speed}
-                    onClick={() => setPlaybackSpeed(speed as 1 | 2 | 4)}
+                    onClick={() => {
+                      const nextSpeed = speed as 1 | 2 | 4;
+                      playbackSpeedRef.current = nextSpeed;
+                      setPlaybackSpeed(nextSpeed);
+                    }}
                     className={`px-2.5 py-2 text-xs font-bold ${
                       playbackSpeed === speed
                         ? 'bg-accent text-slate-950'
