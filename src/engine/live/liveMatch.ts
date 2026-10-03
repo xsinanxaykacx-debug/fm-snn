@@ -157,6 +157,11 @@ export interface SimulateMatchLiveOptions {
   onTick?: (state: LiveMatchState) => void;
   /** @internal Harness/debug gözlem kanalı; oyun davranışını değiştirmez. */
   onTackleResolved?: (outcome: TackleOutcome) => void;
+  /** @internal Ownership sırasını gerçek runTick akışında gözlemlemek için. */
+  onOwnershipObserved?: (
+    state: LiveMatchState,
+    previousOwnerId: string | null,
+  ) => void;
   maxTicks?: number;
   /** Existing fixture id, when the live engine is launched from the game UI. */
   matchId?: string;
@@ -548,7 +553,11 @@ export function runTick(
   state: LiveMatchState,
   players: Record<string, Player>,
   onTick?: (state: LiveMatchState) => void,
-  onTackleResolved?: (outcome: TackleOutcome) => void
+  onTackleResolved?: (outcome: TackleOutcome) => void,
+  onOwnershipObserved?: (
+    state: LiveMatchState,
+    previousOwnerId: string | null,
+  ) => void,
 ): void {
   // ─── 1. ownership observation baseline ───
   // Ownership can change more than once inside one tick:
@@ -635,8 +644,10 @@ export function runTick(
   // dirty tackles: A -> null must be recorded before a same-tick recovery
   // can turn null -> B.
   if (state.ball.ownerId !== observedOwnerId) {
-    updateTransitionState(state, observedOwnerId);
+    const previousOwnerId = observedOwnerId;
+    updateTransitionState(state, previousOwnerId);
     observedOwnerId = state.ball.ownerId;
+    onOwnershipObserved?.(state, previousOwnerId);
   }
 
   // ─── 8. Top hareketi ───
@@ -677,8 +688,10 @@ export function runTick(
       );
     }
 
-    updateTransitionState(state, observedOwnerId);
+    const previousOwnerId = observedOwnerId;
+    updateTransitionState(state, previousOwnerId);
     observedOwnerId = state.ball.ownerId;
+    onOwnershipObserved?.(state, previousOwnerId);
   }
 
   // ─── 8c. Ball actions ───
@@ -690,8 +703,10 @@ export function runTick(
   // counter-press tackle). Register that second transition against the
   // ownership state observed immediately before the action.
   if (state.ball.ownerId !== observedOwnerId) {
-    updateTransitionState(state, observedOwnerId);
+    const previousOwnerId = observedOwnerId;
+    updateTransitionState(state, previousOwnerId);
     observedOwnerId = state.ball.ownerId;
+    onOwnershipObserved?.(state, previousOwnerId);
   }
 
   // ─── 9. Sınır geçişi ───
