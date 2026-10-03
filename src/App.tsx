@@ -64,6 +64,18 @@ export default function App() {
     }
   }, [pendingPressMatch, showPress, assistant, simulateAssistantPress]);
 
+  useEffect(() => {
+    const handleOpenSeasonEnd = () => setShowSeasonEnd(true);
+    window.addEventListener('openSeasonEnd', handleOpenSeasonEnd);
+    return () => window.removeEventListener('openSeasonEnd', handleOpenSeasonEnd);
+  }, []);
+
+  useEffect(() => {
+    if (seasonOver) {
+      window.dispatchEvent(new Event('openSeasonEnd'));
+    }
+  }, [seasonOver]);
+
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: 'dashboard', label: '📋 Ana Sayfa' },
     { key: 'fixtures', label: '📅 Fikstür' },
