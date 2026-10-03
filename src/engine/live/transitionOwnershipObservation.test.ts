@@ -92,6 +92,6 @@ describe('Transition ownership observation', () => {
 
     expect(state.transition.counterPressClubId).toBe(clubs[1].id);
     expect(state.transition.breakClubId).toBe(clubs[0].id);
-    expect(state.transition.counterPressPlayerId).toBe(c.player.id === a.player.id ? null : expect.any(String));
+    expect(state.transition.counterPressPlayerId).toBe(b.player.id);
   });
 });
