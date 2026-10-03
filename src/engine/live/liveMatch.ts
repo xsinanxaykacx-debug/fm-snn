@@ -1617,12 +1617,15 @@ function resolveGoalkeeperSave(
 
   // xG artık sadece istatistik değil, gerçek gol çözümlemesinin de
   // girdisidir. Goal-mouth'a ulaşan her şut otomatik gol olamaz.
+  // Goalkeeper effect is applied here, after the shot has reached
+  // the goal-boundary stage. Reuse the same GK resistance term used by
+  // shot resolution instead of applying a second independent model.
   const goalChance = Math.max(
     0.01,
     Math.min(
       0.45,
       shotXG *
-        (0.65 + gkSkill * 0.15)
+        (1 - gkSkill * 0.42)
     )
   );
 
