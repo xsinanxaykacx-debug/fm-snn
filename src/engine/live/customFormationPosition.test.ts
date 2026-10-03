@@ -24,6 +24,7 @@ describe('Live custom formation positioning', () => {
 
     attackLeft!.playerId = firstPlayerId!;
 
+    home.isUser = true;
     home.formation = 'CUSTOM';
     home.tactic = { ...home.tactic, formation: 'CUSTOM' };
     home.customFormation = {
