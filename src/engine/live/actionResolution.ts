@@ -285,9 +285,6 @@ export function resolveDribbleAction(
   }
 
   const d = defender.player.attributes;
-  const defense =
-    avg(d.tackling, d.marking, d.defensivePositioning, d.anticipation) *
-    conditionFactor(defender);
 
   const strength =
     avg(a.dribbling, a.agility, a.balance) * conditionFactor(owner);
