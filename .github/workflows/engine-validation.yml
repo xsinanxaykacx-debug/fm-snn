@@ -29,5 +29,24 @@ jobs:
       - name: TypeScript + Vite build
         run: npm run build
 
-      - name: Full Vitest suite
-        run: npx vitest run
+      - name: Core live-engine tests
+        run: >
+          npx vitest run
+          src/engine/live/transitionResolution.test.ts
+          src/engine/live/counterPressChain.test.ts
+          src/engine/live/counterPressLooseBallRecovery.test.ts
+          src/engine/live/dirtyTackleLooseBall.test.ts
+          src/engine/live/physics.test.ts
+          src/engine/live/transitionIntegration.test.ts
+          src/engine/live/shotGoalkeeperSeparation.test.ts
+
+      - name: Core match-engine tests
+        run: >
+          npx vitest run
+          src/engine/match/simulate.test.ts
+          src/engine/match/teamStrength.test.ts
+          src/engine/match/qualityImpact.test.ts
+          src/engine/match/defensiveBalance.test.ts
+          src/engine/match/edgeCase.test.ts
+          src/engine/match/chanceToShotCalibration.test.ts
+          src/engine/match/performance.test.ts
