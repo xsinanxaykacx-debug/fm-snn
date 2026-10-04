@@ -1660,7 +1660,11 @@ export const useGameStore = create<Store>()(
         if (result.homeScore === result.awayScore) {
           const homeUnits = home.reputation;
           const awayUnits = away.reputation;
-          result.penalties = simulatePenalties(homeUnits, awayUnits);
+          result.penalties = simulatePenalties(
+            homeUnits,
+            awayUnits,
+            createMatchSeed(`cup:${state.season}:${cupMatch.id}`, state.currentWeek)
+          );
         }
 
         const newCup = saveCupMatchResult(state.cup, matchId, result);

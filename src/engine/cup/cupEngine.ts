@@ -1,6 +1,7 @@
 // src/engine/cup/cupEngine.ts
 
 import type { CupState, CupMatch, CupRound, Match, Club } from '../types';
+import { createMatchSeed, createRng, nextBool, shuffleInPlace } from '../live';
 
 // ═══════════════════════════════════════════════
 // KUPA HAFTA TAKVİMİ
@@ -45,8 +46,11 @@ export function createCup(
     };
   }
 
-  // 16 takım seç (tüm takımlar zaten 16 ise hepsi)
-  const participants = [...clubIds].sort(() => Math.random() - 0.5).slice(0, 16);
+  // Seeded kura: aynı sezon + aynı kulüp kümesi → aynı eşleşmeler.
+  const rng = createRng(createMatchSeed(`cup:${season}`, season));
+  const participants = [...clubIds];
+  shuffleInPlace(rng, participants);
+  participants.length = 16;
 
   // 1. Tur eşleşmeleri (8 maç)
   const matches: Record<string, CupMatch> = {};
@@ -210,9 +214,11 @@ export function advanceCupRound(cup: CupState): CupState {
 
 export function simulatePenalties(
   homeStrength: number,
-  awayStrength: number
+  awayStrength: number,
+  seed = createMatchSeed(`penalties:${homeStrength}:${awayStrength}`, 0)
 ): { home: number; away: number } {
   // 5'er penaltı
+  const rng = createRng(seed);
   let home = 0;
   let away = 0;
 
@@ -223,15 +229,15 @@ export function simulatePenalties(
     const homeProb = 0.75 + homeAdv;
     const awayProb = 0.75;
 
-    if (Math.random() < homeProb) home++;
-    if (Math.random() < awayProb) away++;
+    if (nextBool(rng, homeProb)) home++;
+    if (nextBool(rng, awayProb)) away++;
   }
 
   // Beraberlik → sudden death
   let round = 0;
   while (home === away && round < 10) {
-    const homeScored = Math.random() < 0.75 + homeAdv;
-    const awayScored = Math.random() < 0.75;
+    const homeScored = nextBool(rng, 0.75 + homeAdv);
+    const awayScored = nextBool(rng, 0.75);
 
     if (homeScored) home++;
     if (awayScored) away++;
