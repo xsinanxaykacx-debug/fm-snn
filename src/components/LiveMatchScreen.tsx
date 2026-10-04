@@ -62,6 +62,7 @@ type DebugRecording = {
 };
 
 type WorkerMessage =
+  | { type: 'progress'; tick: number; time: number; phase: string }
   | LiveFrame
   | { type: 'complete'; result: Match; debug: DebugRecording }
   | { type: 'error'; message: string };
@@ -172,6 +173,9 @@ export function LiveMatchScreen() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastProgressRef = useRef(Date.now());
+  const lastProgressLabelRef = useRef('başlangıç');
 
   const fixture = useMemo(() => state.fixtures.find(m =>
     m.week === state.currentWeek &&
@@ -187,6 +191,7 @@ export function LiveMatchScreen() {
 
     return () => {
       workerRef.current?.terminate();
+      if (watchdogRef.current) clearInterval(watchdogRef.current);
     };
   }, []);
 
@@ -201,6 +206,9 @@ export function LiveMatchScreen() {
     setRunning(true);
 
     window.__LIVE_MATCH_DEBUG__ = undefined;
+    lastProgressRef.current = Date.now();
+    lastProgressLabelRef.current = 'worker-start';
+    if (watchdogRef.current) clearInterval(watchdogRef.current);
 
     const worker = new Worker(
       new URL('../workers/liveMatch.worker.ts', import.meta.url),
@@ -209,10 +217,31 @@ export function LiveMatchScreen() {
 
     workerRef.current = worker;
 
+    watchdogRef.current = setInterval(() => {
+      const stalledMs = Date.now() - lastProgressRef.current;
+      if (stalledMs <= 8000) return;
+
+      const label = lastProgressLabelRef.current;
+      worker.terminate();
+      workerRef.current = null;
+      if (watchdogRef.current) clearInterval(watchdogRef.current);
+      watchdogRef.current = null;
+      setError(`Canlı motor ilerlemiyor: ${label}. ${Math.round(stalledMs / 1000)} sn boyunca yeni tick/phase gelmedi.`);
+      setRunning(false);
+    }, 2000);
+
     worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
       const message = event.data;
 
+      if (message.type === 'progress') {
+        lastProgressRef.current = Date.now();
+        lastProgressLabelRef.current = `tick=${message.tick}, time=${message.time.toFixed(2)}, phase=${message.phase}`;
+        return;
+      }
+
       if (message.type === 'frame') {
+        lastProgressRef.current = Date.now();
+        lastProgressLabelRef.current = `frame tick=${message.tick}, time=${message.time.toFixed(2)}, phase=${message.phase}`;
         setFrame(message);
         return;
       }
@@ -224,18 +253,27 @@ export function LiveMatchScreen() {
           `LIVE MATCH DEBUG hazır: ${message.debug.frames.length} frame, ilk ${message.debug.maxSimulationSeconds} saniye.`
         );
 
+        if (watchdogRef.current) clearInterval(watchdogRef.current);
+        watchdogRef.current = null;
+        workerRef.current = null;
         setResult(message.result);
         setRunning(false);
         return;
       }
 
       if (message.type === 'error') {
+        if (watchdogRef.current) clearInterval(watchdogRef.current);
+        watchdogRef.current = null;
+        workerRef.current = null;
         setError(message.message);
         setRunning(false);
       }
     };
 
     worker.onerror = event => {
+      if (watchdogRef.current) clearInterval(watchdogRef.current);
+      watchdogRef.current = null;
+      workerRef.current = null;
       setError(event.message || 'Canlı maç worker hatası');
       setRunning(false);
     };
