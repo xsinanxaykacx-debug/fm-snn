@@ -498,9 +498,12 @@ export function resolveShotAction(
     defensiveSide.club.tactic.defensiveLine
   );
 
+  // Boundary-causality fix removed the historical pass-to-goal leakage.
+  // Recalibrate the now-authoritative shot outcome without making physics
+  // responsible for scoring again.
   const conversion =
     quality *
-    (0.70 + shooterSkill / 500) *
+    (1.10 + shooterSkill / 260) *
     (1 - goalkeeperSkill * 0.42) *
     defensiveLine;
 
