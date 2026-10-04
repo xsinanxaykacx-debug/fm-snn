@@ -739,6 +739,9 @@ export interface Ball {
   lastTouchId: string | null;
   lastTouchClubId: string | null;
 
+  /** Ground-pass destination used to stop the physical trajectory at its intended target. */
+  targetPosition?: Vec2;
+
   isMoving: boolean;
 }
 
