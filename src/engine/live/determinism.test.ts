@@ -87,7 +87,7 @@ describe('BUG-032 second-half movement regression', () => {
       seed: 32032,
       week: 6,
       onTick: state => {
-        if (state.time < 45 * 60 + 30 || state.time > 89 * 60 + 30) return;
+        if (state.time < 5 * 60 || state.time > 89 * 60 + 30) return;
 
         const positions = Object.fromEntries(
           Object.entries(state.players).map(([id, p]) => [id, { x: p.position.x, y: p.position.y }])
@@ -103,14 +103,14 @@ describe('BUG-032 second-half movement regression', () => {
 
         previousPositions = positions;
 
-        if (snapshots.length === 0 || state.time >= 89 * 60 + 30) {
+        if (snapshots.length === 0 || state.time >= 60 * 60 + 11 || state.time >= 89 * 60 + 30) {
           snapshots.push({ time: state.time, positions });
         }
       },
     });
 
     expect(match.played).toBe(true);
-    expect(snapshots.length).toBeGreaterThanOrEqual(2);
+    expect(snapshots.length).toBeGreaterThanOrEqual(3);
     expect(snapshots[snapshots.length - 1].time).toBeGreaterThanOrEqual(89 * 60 + 30);
     expect(cumulativeMovement).toBeGreaterThan(0);
   }, 120_000);
