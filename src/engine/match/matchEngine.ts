@@ -34,6 +34,7 @@ import {
 import { calculateChanceFromSequence } from './chance';
 import { resolveShot } from './goalkeeper';
 import { pickShooter, pickScorer } from './attack';
+import { createMatchRng, type MatchRng } from './rng';
 
 // ═══════════════════════════════════════════════
 // DEBUG HOOK — SHOT
@@ -53,7 +54,8 @@ export function setShotDebugCallback(
 // ═══════════════════════════════════════════════
 
 function pickInjuryType(
-  severity: 'light' | 'medium' | 'severe'
+  severity: 'light' | 'medium' | 'severe',
+  rng: MatchRng = Math.random
 ): string {
   const light = [
     'Kas Agrisi',
@@ -81,7 +83,7 @@ function pickInjuryType(
         : severe;
 
   return pool[
-    Math.floor(Math.random() * pool.length)
+    Math.floor(rng() * pool.length)
   ];
 }
 
@@ -285,6 +287,7 @@ export function simulateMatch(
   players: Record<string, Player>,
   week: number,
   userLineup?: string[],
+  seed?: number,
   debugCallback?: (
     info: ActionDebugInfo
   ) => void
@@ -340,6 +343,8 @@ export function simulateMatch(
 
     userLineup,
   };
+
+  const rng = createMatchRng(seed);
 
   ensureInjuredPlayers(
     state.home
@@ -507,7 +512,7 @@ export function simulateMatch(
         90,
         baseMinute +
           Math.floor(
-            Math.random() * 3
+            rng() * 3
           )
       );
 
@@ -527,14 +532,16 @@ export function simulateMatch(
       players,
       sentOff,
       matchYellows,
-      pendingEvents
+      pendingEvents,
+      rng
     );
 
     processInjuriesInMatch(
       state,
       players,
       sentOff,
-      pendingEvents
+      pendingEvents,
+      rng
     );
 
     // ═════════════════════════════════════════
@@ -543,7 +550,8 @@ export function simulateMatch(
 
     const possessionTeam =
       choosePossessionTeam(
-        state
+        state,
+        rng
       );
 
     state.possessionCount[
@@ -582,7 +590,7 @@ export function simulateMatch(
     // ═════════════════════════════════════════
 
     if (
-      Math.random() >
+      rng() >
       sequenceProbability
     ) {
       consumeCondition(
@@ -600,7 +608,8 @@ export function simulateMatch(
       chooseAttackZone(
         state,
         attackState,
-        defendState
+        defendState,
+        rng
       );
 
     const attackLineup =
@@ -664,7 +673,8 @@ export function simulateMatch(
         defendState,
         attackXI2,
         defendXI2,
-        zone
+        zone,
+        rng
       );
 
     state.sequences.push(
@@ -688,7 +698,7 @@ export function simulateMatch(
 
     if (
       !sequence.resultedInShot ||
-      Math.random() >
+      rng() >
         shotProbability
     ) {
       if (
@@ -723,7 +733,8 @@ export function simulateMatch(
     const shooter =
       pickShooter(
         attackXI2,
-        sequence.finalZone
+        sequence.finalZone,
+        rng
       ) ||
       attackXI2[0];
 
@@ -739,7 +750,8 @@ export function simulateMatch(
       pickScorer(
         attackXI2,
         sequence.finalZone,
-        shooter
+        shooter,
+        rng
       );
 
     // ═════════════════════════════════════════
@@ -759,7 +771,8 @@ export function simulateMatch(
         shooter,
         attackState,
         defendState,
-        isHome
+        isHome,
+        rng
       );
 
     sequence.xG =
@@ -779,7 +792,8 @@ export function simulateMatch(
       resolveShot(
         chance,
         gk,
-        defendState
+        defendState,
+        rng
       );
 
     sequence.shotOutcome =
@@ -868,7 +882,7 @@ export function simulateMatch(
       // ═══════════════════════════════════════
 
       const hasAssist =
-        Math.random() < 0.75;
+        rng() < 0.75;
 
       if (hasAssist) {
         const successfulPasses =
@@ -997,7 +1011,7 @@ export function simulateMatch(
               );
 
             let r =
-              Math.random() *
+              rng() *
               totalWeight;
 
             for (
@@ -1270,7 +1284,7 @@ export function simulateMatch(
     }
 
     matchRating +=
-      (Math.random() - 0.5) *
+      (rng() - 0.5) *
       1.0;
 
     matchRating =
@@ -1451,16 +1465,17 @@ function processCardsInMatch(
   pendingEvents: {
     minute: number;
     event: MatchEvent;
-  }[]
+  }[],
+  rng: MatchRng = Math.random
 ): void {
   if (
-    Math.random() > 0.08
+    rng() > 0.08
   ) {
     return;
   }
 
   const isHome =
-    Math.random() < 0.5;
+    rng() < 0.5;
 
   const club =
     isHome
@@ -1524,7 +1539,7 @@ function processCardsInMatch(
   const player =
     pool[
       Math.floor(
-        Math.random() *
+        rng() *
           pool.length
       )
     ];
@@ -1579,7 +1594,7 @@ function processCardsInMatch(
   }
 
   const red =
-    Math.random() < 0.06;
+    rng() < 0.06;
 
   if (red) {
     players[player.id] = {
@@ -1691,13 +1706,13 @@ function processInjuriesInMatch(
   }[]
 ): void {
   if (
-    Math.random() > 0.015
+    rng() > 0.015
   ) {
     return;
   }
 
   const isHome =
-    Math.random() < 0.5;
+    rng() < 0.5;
 
   const club =
     isHome
@@ -1742,7 +1757,7 @@ function processInjuriesInMatch(
   const player =
     activePlayers[
       Math.floor(
-        Math.random() *
+        rng() *
           activePlayers.length
       )
     ];
@@ -1752,7 +1767,7 @@ function processInjuriesInMatch(
   }
 
   const injuryRoll =
-    Math.random();
+    rng();
 
   let weeks: number;
   let type: string;
@@ -1763,7 +1778,8 @@ function processInjuriesInMatch(
     weeks = 1;
     type =
       pickInjuryType(
-        'light'
+        'light',
+        rng
       );
   } else if (
     injuryRoll < 0.88
@@ -1771,23 +1787,25 @@ function processInjuriesInMatch(
     weeks =
       2 +
       Math.floor(
-        Math.random() * 3
+        rng() * 3
       );
 
     type =
       pickInjuryType(
-        'medium'
+        'medium',
+        rng
       );
   } else {
     weeks =
       5 +
       Math.floor(
-        Math.random() * 4
+        rng() * 4
       );
 
     type =
       pickInjuryType(
-        'severe'
+        'severe',
+        rng
       );
   }
 
