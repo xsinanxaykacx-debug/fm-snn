@@ -24,6 +24,17 @@ describe('BUG-020 regression', () => {
     ball.lastTouchId = ownGoalPlayer.id;
     ball.lastTouchClubId = home.id;
 
+    const goalkeeperPlayer = Object.values(players).find(
+      player =>
+        player.clubId === home.id &&
+        player.position === 'GK' &&
+        player.squadRole !== 'u21'
+    );
+
+    if (!goalkeeperPlayer) {
+      throw new Error('No eligible goalkeeper found for BUG-020 regression');
+    }
+
     const state = {
       time: 1,
       tick: 1,
@@ -33,7 +44,15 @@ describe('BUG-020 regression', () => {
       home: { club: home, players: [], formation: home.formation, tactic: home.tactic, mentality: home.tactic.mentality, hasPossession: false, isHome: true, attackingDirection: 1, formationZones: [] },
       away: { club: away, players: [], formation: away.formation, tactic: away.tactic, mentality: away.tactic.mentality, hasPossession: false, isHome: false, attackingDirection: -1, formationZones: [] },
       ball,
-      players: {},
+      players: {
+        [goalkeeperPlayer.id]: {
+          player: goalkeeperPlayer,
+          role: 'GK',
+          isHome: true,
+          clubId: home.id,
+          position: { x: 5, y: pitch.width / 2 },
+        },
+      },
       score: { home: 0, away: 0 },
       stats: {
         possession: { home: 50, away: 50 },
@@ -72,7 +91,23 @@ describe('BUG-020 regression', () => {
         ticks: 0,
         simulationSeconds: 0,
       },
-      events: [],
+      events: [
+        {
+          minute: 1,
+          type: 'shot',
+          playerId: ownGoalPlayer.id,
+          clubId: home.id,
+          xG: 0.7,
+          description: 'Eski şut',
+        },
+        {
+          minute: 1,
+          type: 'pass',
+          playerId: ownGoalPlayer.id,
+          clubId: home.id,
+          description: 'Sonraki pas',
+        },
+      ],
       setPiece: null,
       decisions: {},
       sequences: [],
@@ -94,6 +129,10 @@ describe('BUG-020 regression', () => {
       players
     );
 
+    // Regression contract: the old implementation searched backward for any
+    // historical shot by lastTouchId and could turn this non-shot own-goal
+    // boundary into a goalkeeper save. The current implementation must bind
+    // save resolution to the immediate preceding event only.
     expect(state.score.away).toBe(1);
     expect(state.score.home).toBe(0);
     expect(state.events.at(-1)?.type).toBe('kickoff');
