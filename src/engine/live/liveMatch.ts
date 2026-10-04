@@ -470,6 +470,23 @@ function runTick(
     console.log(`boundaryOutcome: ${JSON.stringify(boundaryOutcome)}`);
   }
 
+  if (state.tick === 169) {
+    const pendingShot = (state as LiveMatchState & {
+      pendingShot?: {
+        playerId: string;
+        outcome: 'goal' | 'save' | 'miss';
+        goalkeeperId?: string;
+      };
+    }).pendingShot;
+
+    console.log(`=== T169 SHOT BINDING DEBUG ===`);
+    console.log(`lastTouchId: ${state.ball.lastTouchId}`);
+    console.log(`lastTouchClubId: ${state.ball.lastTouchClubId}`);
+    console.log(`lastEvent: ${JSON.stringify(state.events[state.events.length - 1])}`);
+    console.log(`pendingShot: ${JSON.stringify(pendingShot)}`);
+    console.log(`boundaryOutcome: ${JSON.stringify(boundaryOutcome)}`);
+  }
+
   // ─── 10. Sınır sonucu ───
   applyBoundaryOutcome(boundaryOutcome, state, players);
 
