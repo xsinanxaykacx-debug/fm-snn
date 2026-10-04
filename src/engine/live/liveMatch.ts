@@ -147,6 +147,7 @@ export interface SimulateMatchLiveOptions {
   userLineup?: string[];
   pitchDimensions?: PitchDimensions;
   onTick?: (state: LiveMatchState) => void;
+  onTickPhase?: (state: LiveMatchState, phase: string) => void;
 }
 
 export function simulateMatchLive(
@@ -276,7 +277,8 @@ export function simulateMatchLive(
           }
         }
         options.onTick?.(s);
-      }
+      },
+      options.onTickPhase
     );
   }
 
@@ -369,9 +371,11 @@ function applyHalftimeRecovery(state: LiveMatchState): void {
 function runTick(
   state: LiveMatchState,
   players: Record<string, Player>,
-  onTick?: (state: LiveMatchState) => void
+  onTick?: (state: LiveMatchState) => void,
+  onTickPhase?: (state: LiveMatchState, phase: string) => void
 ): void {
   // ─── 1. prevBallPos ───
+  onTickPhase?.(state, 'tick-start');
   const prevBallPos = {
     x: state.ball.position.x,
     y: state.ball.position.y,
@@ -384,9 +388,11 @@ function runTick(
 
   updateMatchFatigue(state);
   applyHalftimeRecovery(state);
+  onTickPhase?.(state, 'after-time');
 
   // ─── 3. Perception cache ───
   updatePerceptionCaches(state);
+  onTickPhase?.(state, 'after-perception');
 
   // ─── 4. Kararlar ───
   const decisionState = buildDecisionState(state);
@@ -394,6 +400,7 @@ function runTick(
   const { decisions, debugs } = computeAllDecisions(decisionState);
 
   state.decisions = debugs;
+  onTickPhase?.(state, 'after-decisions');
 
   // ─── 5. Hareket ───
   const movementContext: MovementContext = {
@@ -408,8 +415,10 @@ function runTick(
     movementContext,
     TICK_DURATION
   );
+  onTickPhase?.(state, 'after-movement');
 
   // ─── 6. Tackle çözümlemesi ───
+  onTickPhase?.(state, 'before-tackle');
   const tackleOutcomes = resolveAllTackles(
     state.players,
     decisions,
@@ -418,6 +427,7 @@ function runTick(
   );
 
   // ─── 7. Tackle outcome'ları ───
+  onTickPhase?.(state, 'after-tackle');
   const tackleChangedPossession = applyTackleOutcomes(
     tackleOutcomes,
     state,
@@ -439,11 +449,13 @@ function runTick(
   // Böylece topa koşan oyuncu fiziksel olarak top kontrol mesafesine
   // girdiğinde ownerId tekrar oluşturulur.
   resolveLooseBallControl(state);
+  onTickPhase?.(state, 'after-ball');
 
   // ─── 8b. Ball actions ───
   if (!tackleChangedPossession) {
     applyBallActions(state, decisions, players);
   }
+  onTickPhase?.(state, 'after-ball-actions');
 
   // ─── 9. Sınır geçişi ───
   const boundaryOutcome = detectBoundaryOutcome({
@@ -462,9 +474,11 @@ function runTick(
 
   // ─── 10. Sınır sonucu ───
   applyBoundaryOutcome(boundaryOutcome, state, players);
+  onTickPhase?.(state, 'after-boundary');
 
   // ─── 11. Set-piece güncelle ───
   updateSetPieceStatus(state);
+  onTickPhase?.(state, 'after-setpiece');
 
   // ─── 12. Set-piece temizliği ───
   if (
@@ -473,12 +487,15 @@ function runTick(
   ) {
     state.setPiece = null;
   }
+  onTickPhase?.(state, 'after-setpiece-cleanup');
 
   // ─── 13. Faz geçişi ───
   checkPhaseTransition(state);
+  onTickPhase?.(state, 'after-phase');
 
   // ─── 14. Possession / takım state ───
   syncMatchOwnershipState(state);
+  onTickPhase?.(state, 'after-sync');
 
   // ─── 15. Callback ───
   if (onTick) onTick(state);
