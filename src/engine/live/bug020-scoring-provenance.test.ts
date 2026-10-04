@@ -30,3 +30,4 @@ describe('BUG-020 scoring provenance diagnostic', () => {
     }, null, 2));
   }, 120000);
 });
+
