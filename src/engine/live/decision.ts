@@ -1448,18 +1448,12 @@ export function computeAllDecisions(
 
   // Space is independent of the observing player except for team side.
   // Build at most one map per team per tick instead of once per decision.
-  const homeSpace = computeSpaceMap(
-    homePlayers[0],
-    state.players,
-    state.pitch,
-    SPACE_GRID_SIZE
-  );
-  const awaySpace = computeSpaceMap(
-    awayPlayers[0],
-    state.players,
-    state.pitch,
-    SPACE_GRID_SIZE
-  );
+  const homeSpace = homePlayers.length > 0
+    ? computeSpaceMap(homePlayers[0], state.players, state.pitch, SPACE_GRID_SIZE)
+    : undefined;
+  const awaySpace = awayPlayers.length > 0
+    ? computeSpaceMap(awayPlayers[0], state.players, state.pitch, SPACE_GRID_SIZE)
+    : undefined;
 
   for (const id of Object.keys(state.players).sort()) {
     const player = state.players[id];
