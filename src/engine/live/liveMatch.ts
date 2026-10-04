@@ -1222,7 +1222,7 @@ function handleDribbleAction(
 // BOUNDARY OUTCOMES
 // ═══════════════════════════════════════════════
 
-function applyBoundaryOutcome(
+export function applyBoundaryOutcome(
   outcome: BoundaryOutcome,
   state: LiveMatchState,
   players: Record<string, Player>
