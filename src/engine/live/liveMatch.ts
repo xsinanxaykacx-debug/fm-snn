@@ -118,6 +118,7 @@ import {
 
 import {
   detectBoundaryOutcome,
+  detectOffside,
   type BoundaryOutcome,
 } from './events';
 
@@ -1045,6 +1046,85 @@ function handlePassAction(
       description: `Pas kesildi: ${owner.player.name}`,
     });
     return;
+  }
+
+  if (completed && decision.targetPlayerId !== null) {
+    const receiver = state.players[decision.targetPlayerId];
+
+    if (receiver) {
+      const defendingClubId =
+        owner.isHome
+          ? state.away.club.id
+          : state.home.club.id;
+
+      const defenders = Object.values(state.players)
+        .filter(player =>
+          player.clubId === defendingClubId &&
+          !player.player.sentOff &&
+          !player.player.injured
+        )
+        .map(player => ({
+          clubId: player.clubId,
+          position: player.position,
+        }));
+
+      const offside = detectOffside(
+        state.pitch,
+        owner.isHome ? 1 : -1,
+        defendingClubId,
+        {
+          x: owner.position.x,
+          y: owner.position.y,
+        },
+        receiver.position,
+        defenders
+      );
+
+      if (offside.type === 'offside') {
+        state.stats.offsides[side] += 1;
+        state.events.push({
+          minute: Math.floor(state.time / 60),
+          type: 'offside',
+          playerId: receiver.player.id,
+          clubId: receiver.clubId,
+          description: `Ofsayt: ${receiver.player.name}`,
+        });
+
+        state.ball = releaseBall(state.ball);
+        state.ball.position.x = offside.freeKickPoint.x;
+        state.ball.position.y = offside.freeKickPoint.y;
+        state.ball.position.z = DEFAULT_BALL_PHYSICS.radius;
+        state.ball.velocity = { x: 0, y: 0, z: 0 };
+        state.ball.isMoving = false;
+        syncBallOwnerFlags(state);
+
+        const freeKickSide = offside.side;
+
+        state.setPiece = createSetPieceForMatch(
+          'free_kick',
+          freeKickSide,
+          offside.freeKickPoint,
+          state.pitch,
+          state.home.club,
+          state.away.club,
+          players
+        );
+
+        state.events.push({
+          minute: Math.floor(state.time / 60),
+          type: 'free_kick',
+          clubId: freeKickSide === 'HOME'
+            ? state.home.club.id
+            : state.away.club.id,
+          description: `Ofsayt sonrası serbest vuruş: ${
+            freeKickSide === 'HOME'
+              ? state.home.club.shortName
+              : state.away.club.shortName
+          }`,
+        });
+        return;
+      }
+    }
   }
 
   const target = completed
