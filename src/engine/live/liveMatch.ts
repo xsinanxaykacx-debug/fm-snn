@@ -1026,6 +1026,8 @@ function handlePassAction(
     interception.defenderId !== null &&
     nextBool(state.rng, interception.probability);
 
+  const side = owner.isHome ? 'home' : 'away';
+
   if (intercepted && interception.defenderId) {
     state.ball = releaseBall(state.ball);
     state.ball.position.x = state.players[interception.defenderId].position.x;
@@ -1152,7 +1154,6 @@ function handlePassAction(
 
   syncBallOwnerFlags(state);
 
-  const side = owner.isHome ? 'home' : 'away';
   state.stats.passes[side] += 1;
 
   if (completed) {
