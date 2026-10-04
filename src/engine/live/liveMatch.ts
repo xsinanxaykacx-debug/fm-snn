@@ -725,6 +725,16 @@ export function runTick(
     awayClubId: state.away.club.id,
   });
 
+  if (state.tick >= 167 && state.tick <= 170) {
+    console.log(`\n=== T${state.tick} BOUNDARY DEBUG ===`);
+    console.log(`prevBallPos: (${prevBallPos.x.toFixed(4)}, ${prevBallPos.y.toFixed(4)}, z=${prevBallPos.z.toFixed(4)})`);
+    console.log(`nextBallPos: (${state.ball.position.x.toFixed(4)}, ${state.ball.position.y.toFixed(4)}, z=${state.ball.position.z.toFixed(4)})`);
+    console.log(`boundaryOutcome.type: ${boundaryOutcome.type}`);
+    if (boundaryOutcome.type !== 'none') {
+      console.log(`boundaryOutcome: ${JSON.stringify(boundaryOutcome)}`);
+    }
+  }
+
   // ─── 10. Sınır sonucu ───
   applyBoundaryOutcome(boundaryOutcome, state, players);
 
