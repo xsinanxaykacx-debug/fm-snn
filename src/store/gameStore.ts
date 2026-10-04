@@ -1077,6 +1077,17 @@ export const useGameStore = create<Store>()(
 
         if (!finalBuyerId) return;
 
+        const buyerClubForValidation = state.clubs[finalBuyerId];
+        if (!buyerClubForValidation || buyerClubForValidation.budget < player.value) {
+          set({
+            news: [
+              '❌ Transfer gerçekleşmedi: alıcı kulübün bütçesi yetersiz.',
+              ...state.news,
+            ].slice(0, 30),
+          });
+          return;
+        }
+
         const updatedPlayer: Player = {
           ...player,
           clubId: finalBuyerId,
