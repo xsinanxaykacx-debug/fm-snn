@@ -141,15 +141,36 @@ scope.onmessage = (event) => {
       week: data.week,
       userLineup: data.userLineup,
       seed: data.seed,
-      onTickPhase: (state, phase) => {
-        scope.postMessage({
-          type: 'progress',
-          tick: state.tick,
-          time: state.time,
-          phase,
-        } satisfies ProgressMessage);
-      },
+      onTickPhase: (() => {
+        let phaseStartedAt = Date.now();
+
+        return (state, phase) => {
+          const now = Date.now();
+          const phaseElapsedMs = now - phaseStartedAt;
+          phaseStartedAt = now;
+
+          // Keep the diagnostic channel cheap: one heartbeat per 5 ticks.
+          // If a single phase becomes genuinely slow, report that phase
+          // immediately so the UI watchdog can identify the stall point.
+          if (phaseElapsedMs >= 250) {
+            scope.postMessage({
+              type: 'progress',
+              tick: state.tick,
+              time: state.time,
+              phase: `slow:${phase}:${phaseElapsedMs}ms`,
+            } satisfies ProgressMessage);
+          }
+        };
+      })(),
       onTick: (state) => {
+        if (state.tick % 5 === 0 || state.isFinished) {
+          scope.postMessage({
+            type: 'progress',
+            tick: state.tick,
+            time: state.time,
+            phase: 'tick-complete',
+          } satisfies ProgressMessage);
+        }
         if (state.tick % 5 === 0 || state.isFinished) {
           sendFrame(state);
         }
