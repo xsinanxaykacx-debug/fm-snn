@@ -1703,7 +1703,8 @@ function processInjuriesInMatch(
   pendingEvents: {
     minute: number;
     event: MatchEvent;
-  }[]
+  }[],
+  rng: MatchRng = Math.random
 ): void {
   if (
     rng() > 0.015
