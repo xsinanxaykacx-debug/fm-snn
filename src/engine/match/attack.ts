@@ -29,7 +29,7 @@ export function pickDefender(defendXI: Player[], zone: string, rng: MatchRng = M
   if (candidates.length === 0) {
     return defendXI.length > 0 ? defendXI[Math.floor(rng() * defendXI.length)] : null;
   }
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  return candidates[Math.floor(rng() * candidates.length)];
 }
 
 // ═══════════════════════════════════════════════
@@ -61,7 +61,7 @@ export function pickShooter(attackXI: Player[], zone: string, rng: MatchRng = Ma
   });
 
   const total = weighted.reduce((a, b) => a + b, 0);
-  let r = Math.random() * total;
+  let r = rng() * total;
   for (let i = 0; i < candidates.length; i++) {
     r -= weighted[i];
     if (r <= 0) return candidates[i];
@@ -75,7 +75,7 @@ export function pickShooter(attackXI: Player[], zone: string, rng: MatchRng = Ma
 
 export function pickScorer(attackXI: Player[], _zone: string, shooter: Player, rng: MatchRng = Math.random): Player {
   // Şutör zaten en olası golcü
-  if (Math.random() < 0.6) return shooter;
+  if (rng() < 0.6) return shooter;
 
   const candidates = attackXI.filter(p =>
     p.id !== shooter.id &&
@@ -94,7 +94,7 @@ export function pickScorer(attackXI: Player[], _zone: string, shooter: Player, r
   });
 
   const total = weighted.reduce((a, b) => a + b, 0);
-  let r = Math.random() * total;
+  let r = rng() * total;
   for (let i = 0; i < candidates.length; i++) {
     r -= weighted[i];
     if (r <= 0) return candidates[i];
