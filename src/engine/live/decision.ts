@@ -111,6 +111,7 @@ import {
   DECISION_POWER,
   SPACE_NEUTRAL,
   SET_PIECE_POSITION_TOLERANCE,
+  SPACE_GRID_SIZE,
 } from './config';
 
 import {
@@ -1451,13 +1452,13 @@ export function computeAllDecisions(
     homePlayers[0],
     state.players,
     state.pitch,
-    4.0
+    SPACE_GRID_SIZE
   );
   const awaySpace = computeSpaceMap(
     awayPlayers[0],
     state.players,
     state.pitch,
-    4.0
+    SPACE_GRID_SIZE
   );
 
   for (const id of Object.keys(state.players).sort()) {
