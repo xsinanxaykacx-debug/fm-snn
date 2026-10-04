@@ -457,6 +457,34 @@ function runTick(
     awayClubId: state.away.club.id,
   });
 
+  // TEMP BUG-020 runtime evidence: only the requested T167-T170 window.
+  if (state.tick >= 167 && state.tick <= 170) {
+    const lastEvent = state.events[state.events.length - 1];
+    const recentShot = [...state.events]
+      .reverse()
+      .find(event => event.type === 'shot');
+
+    console.log(
+      '[BUG-020-TRACE]',
+      JSON.stringify({
+        tick: state.tick,
+        time: state.time,
+        prevBallPos,
+        nextBallPos: state.ball.position,
+        ownerId: state.ball.ownerId,
+        lastTouchId: state.ball.lastTouchId,
+        lastTouchClubId: state.ball.lastTouchClubId,
+        boundaryOutcome,
+        lastEvent,
+        recentShot,
+        shots: state.stats.shots,
+        onTarget: state.stats.onTarget,
+        xG: state.stats.xG,
+        score: state.score,
+      }),
+    );
+  }
+
   // ─── 10. Sınır sonucu ───
   applyBoundaryOutcome(boundaryOutcome, state, players);
 
