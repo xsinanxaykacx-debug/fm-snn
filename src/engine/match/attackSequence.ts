@@ -338,7 +338,7 @@ export function pickPlayerForZone(
   }
 
   return candidates[
-    Math.floor(Math.random() * candidates.length)
+    Math.floor(rng() * candidates.length)
   ];
 }
 
@@ -361,7 +361,7 @@ function chooseSequenceAction(
 
   const directness = team.directness;
 
-  const r = Math.random();
+  const r = rng();
 
   if (isWing) {
     if (r < 0.20) return 'cross';
@@ -475,7 +475,7 @@ function resolveSequenceAction(
     );
 
   const success =
-    Math.random() < finalProb;
+    rng() < finalProb;
 
   return {
     success,
