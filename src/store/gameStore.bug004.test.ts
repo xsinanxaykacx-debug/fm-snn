@@ -43,3 +43,37 @@ describe('BUG-004 live match result persistence', () => {
     expect(persisted.fixtures.find(match => match.id === fixture.id)?.played).toBe(true);
   });
 });
+
+
+describe('BUG-022 transfer buyer budget', () => {
+  it('does not complete a sale when the buyer cannot afford the player', async () => {
+    const { useGameStore } = await import('./gameStore');
+    useGameStore.getState().newGame();
+
+    const before = useGameStore.getState();
+    const player = Object.values(before.players).find(
+      p => p.clubId === before.userClubId && p.squadRole !== 'u21'
+    );
+    const buyer = Object.values(before.clubs).find(
+      c => c.id !== before.userClubId
+    );
+
+    expect(player).toBeDefined();
+    expect(buyer).toBeDefined();
+    if (!player || !buyer) return;
+
+    useGameStore.setState({
+      clubs: {
+        ...before.clubs,
+        [buyer.id]: { ...buyer, budget: 0 },
+      },
+      currentWeek: 1,
+    });
+
+    useGameStore.getState().transferSell(player.id, buyer.id);
+
+    const after = useGameStore.getState();
+    expect(after.players[player.id].clubId).toBe(before.userClubId);
+    expect(after.clubs[buyer.id].budget).toBe(0);
+  });
+});
