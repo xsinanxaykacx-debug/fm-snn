@@ -26,4 +26,4 @@ jobs:
         run: npm ci
 
       - name: BUG-020 debug trace
-        run: npx vitest run src/engine/live/debug-trace.test.ts --reporter=verbose
+        run: npx vitest run src/engine/live/debug-trace.test.ts src/engine/live/bug020-regression.test.ts --reporter=verbose
