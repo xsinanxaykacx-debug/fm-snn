@@ -1,4 +1,3 @@
-import { createJSONStorage } from 'zustand/middleware';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 class TestStorage implements Storage {
@@ -33,7 +32,6 @@ describe('BUG-026 save/load persistence acceptance', () => {
   const storage = new TestStorage();
 
   beforeEach(() => {
-    vi.resetModules();
     storage.clear();
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
@@ -42,9 +40,7 @@ describe('BUG-026 save/load persistence acceptance', () => {
   });
 
   it('round-trips a changed game through the real Zustand persist middleware', async () => {
-    const first = await import('./gameStore');
-    const firstStore = first.useGameStore;
-    firstStore.persist.setOptions({ storage: createJSONStorage(() => storage) });
+    const { useGameStore: firstStore } = await import('./gameStore');
     await firstStore.persist.rehydrate();
 
     firstStore.getState().newGame();
@@ -68,19 +64,20 @@ describe('BUG-026 save/load persistence acceptance', () => {
       },
     });
 
-    // Flush the real persist middleware before inspecting its serialized payload.
-    await Promise.resolve();
+    // The real persist middleware writes synchronously for synchronous storage.
     const saved = JSON.parse(storage.getItem('fm-clone-save') ?? 'null');
     expect(saved?.state?.season).toBe(3);
     expect(saved?.state?.currentWeek).toBe(17);
     expect(saved?.state?.news).toContain('PERSISTENCE-CHECK');
 
-    vi.resetModules();
-
-    const second = await import('./gameStore');
-    second.useGameStore.persist.setOptions({ storage: createJSONStorage(() => storage) });
-    await second.useGameStore.persist.rehydrate();
-    const loaded = second.useGameStore.getState();
+    // Simulate a reload by replacing the in-memory state, then rehydrate from storage.
+    firstStore.setState({
+      season: 99,
+      currentWeek: 99,
+      news: ['IN-MEMORY-ONLY'],
+    });
+    await firstStore.persist.rehydrate();
+    const loaded = firstStore.getState();
 
     expect(loaded.season).toBe(3);
     expect(loaded.currentWeek).toBe(17);
