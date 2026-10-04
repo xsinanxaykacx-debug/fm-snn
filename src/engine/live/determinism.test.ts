@@ -69,3 +69,43 @@ describe('BUG-032 live progress diagnostics', () => {
     expect(phases).toContain('1:after-phase');
   }, 120_000);
 });
+
+
+describe('BUG-032 second-half movement regression', () => {
+  it('continues changing player positions after 45 minutes', () => {
+    const data = generateGameData(20261004);
+    const home = data.clubs.club_1;
+    const away = data.clubs.club_14;
+    expect(home).toBeDefined();
+    expect(away).toBeDefined();
+
+    const snapshots: Array<{ time: number; positions: Record<string, { x: number; y: number }> }> = [];
+    const match = simulateMatchLive(home, away, data.players, {
+      seed: 32032,
+      week: 6,
+      onTick: state => {
+        if (state.time >= 45 * 60 + 30 && state.time <= 45 * 60 + 40) {
+          snapshots.push({
+            time: state.time,
+            positions: Object.fromEntries(
+              Object.entries(state.players).map(([id, p]) => [id, { x: p.position.x, y: p.position.y }])
+            ),
+          });
+        }
+      },
+    });
+
+    expect(match.played).toBe(true);
+    expect(snapshots.length).toBeGreaterThan(0);
+
+    const first = snapshots[0].positions;
+    const last = snapshots[snapshots.length - 1].positions;
+    const totalDelta = Object.keys(first).reduce((sum, id) => {
+      const a = first[id];
+      const b = last[id];
+      return sum + Math.hypot(b.x - a.x, b.y - a.y);
+    }, 0);
+
+    expect(totalDelta).toBeGreaterThan(0);
+  }, 120_000);
+});
