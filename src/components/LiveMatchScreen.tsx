@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { createMatchSeed } from '../engine/live';
 import type { Match } from '../engine/types';
 
 type FramePlayer = {
@@ -246,7 +247,10 @@ export function LiveMatchScreen() {
       players: state.players,
       week: state.currentWeek,
       userLineup: state.userLineup,
-      seed: Date.now(),
+      seed: createMatchSeed(
+        `${state.season}:${fixture.id ?? `${fixture.week}:${fixture.homeId}:${fixture.awayId}`}`,
+        fixture.week ?? state.currentWeek
+      ),
     });
   }
 

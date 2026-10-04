@@ -21,7 +21,7 @@ import { generateGameData, replaceRetiredPlayers } from '../engine/data/generate
 import { generateFixtures } from '../engine/league/fixtures';
 import { initTable, updateTable } from '../engine/league/table';
 import { simulateMatch } from '../engine/match/simulate';
-import { simulateMatchLive } from '../engine/live';
+import { simulateMatchLive, createMatchSeed } from '../engine/live';
 import { developPlayers } from '../engine/progression/training';
 import { applyTrainingToSquad } from '../engine/progression/trainingSystem';
 import { decrementContracts, evaluateContractOffer, applyContractRenewal } from '../engine/progression/contract';
@@ -589,7 +589,10 @@ export const useGameStore = create<Store>()(
             ? simulateMatchLive(home, away, newPlayers, {
                 week: m.week,
                 userLineup: lineup,
-                seed: null,
+                seed: createMatchSeed(
+                  `${state.season}:${m.id ?? `${m.week}:${m.homeId}:${m.awayId}`}`,
+                  m.week ?? state.currentWeek
+                ),
               })
             : simulateMatch(
                 home,
@@ -684,7 +687,10 @@ export const useGameStore = create<Store>()(
               ? simulateMatchLive(home, away, newPlayers, {
                   week: state.currentWeek,
                   userLineup: lineup,
-                  seed: null,
+                  seed: createMatchSeed(
+                `${state.season}:${cupMatch.id}`,
+                state.currentWeek
+              ),
                 })
               : simulateMatch(
                   home,
@@ -1622,7 +1628,10 @@ export const useGameStore = create<Store>()(
           ? simulateMatchLive(home, away, playersCopy, {
               week: state.currentWeek,
               userLineup: lineup,
-              seed: null,
+              seed: createMatchSeed(
+              `${state.season}:${cupMatch.id}`,
+              state.currentWeek
+            ),
             })
           : simulateMatch(
               home,
