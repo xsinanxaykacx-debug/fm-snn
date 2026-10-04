@@ -1,0 +1,25 @@
+name: BUG-020 Runtime Debug
+
+on:
+  push:
+    branches:
+      - "debug/bug020-shot-runtime"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: BUG-020 runtime trace
+        run: npx vitest run src/engine/live/debug-trace.test.ts --reporter=verbose
