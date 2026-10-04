@@ -73,7 +73,7 @@ export function choosePossessionTeam(
     (homePower + homeBonus) /
     total;
 
-  return Math.random() < homeProb
+  return rng() < homeProb
     ? 'home'
     : 'away';
 }
@@ -142,7 +142,7 @@ export function chooseAttackZone(
     wRight;
 
   let r =
-    Math.random() * total;
+    rng() * total;
 
   if (r < wLeft) {
     return {
@@ -215,7 +215,7 @@ export function chooseMidfieldZone(
     wRight;
 
   let r =
-    Math.random() * total;
+    rng() * total;
 
   if (r < wLeft) {
     return 'leftMidfield';
