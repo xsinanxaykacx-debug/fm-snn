@@ -1281,7 +1281,7 @@ function handleDribbleAction(
 // BOUNDARY OUTCOMES
 // ═══════════════════════════════════════════════
 
-function applyBoundaryOutcome(
+export function applyBoundaryOutcome(
   outcome: BoundaryOutcome,
   state: LiveMatchState,
   players: Record<string, Player>
@@ -1297,34 +1297,50 @@ function applyBoundaryOutcome(
       };
     }).pendingShot;
 
-    // Skor yalnızca halen topun fiziksel olarak taşıdığı şutun
-    // önceden çözülmüş sonucu "goal" ise yazılır.
+    // A goal-mouth crossing is authoritative for non-shot actions too
+    // (e.g. a bad pass/own goal). pendingShot only overrides the outcome
+    // when it still belongs to the player who physically carried the ball
+    // across the boundary.
     if (
-      pendingShot === undefined ||
-      pendingShot.playerId !== state.ball.lastTouchId
+      pendingShot !== undefined &&
+      pendingShot.playerId === state.ball.lastTouchId
     ) {
+      delete (state as LiveMatchState & {
+        pendingShot?: {
+          playerId: string;
+          outcome: 'goal' | 'save' | 'miss';
+          goalkeeperId?: string;
+        };
+      }).pendingShot;
+
+      if (
+        pendingShot.outcome === 'save' ||
+        pendingShot.outcome === 'miss'
+      ) {
+        handleResolvedShotFailure(
+          outcome,
+          pendingShot.outcome,
+          state,
+          players
+        );
+        return;
+      }
+
+      handleGoal(outcome, state, players);
       return;
     }
 
-    delete (state as LiveMatchState & {
-      pendingShot?: {
-        playerId: string;
-        outcome: 'goal' | 'save' | 'miss';
-        goalkeeperId?: string;
-      };
-    }).pendingShot;
-
-    if (
-      pendingShot.outcome === 'save' ||
-      pendingShot.outcome === 'miss'
-    ) {
-      handleResolvedShotFailure(
-        outcome,
-        pendingShot.outcome,
-        state,
-        players
-      );
-      return;
+    // A stale/missing shot binding must not suppress a real goal-mouth
+    // crossing. Discard stale shot context and resolve the boundary event
+    // from the current physical ball touch.
+    if (pendingShot !== undefined) {
+      delete (state as LiveMatchState & {
+        pendingShot?: {
+          playerId: string;
+          outcome: 'goal' | 'save' | 'miss';
+          goalkeeperId?: string;
+        };
+      }).pendingShot;
     }
 
     handleGoal(outcome, state, players);
