@@ -6,7 +6,7 @@ on:
       - "debug/bug020-runtime"
   pull_request:
     branches:
-      - "debug/bug020-runtime"
+      - main
 
 jobs:
   validate:
