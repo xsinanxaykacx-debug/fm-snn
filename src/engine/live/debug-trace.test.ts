@@ -24,3 +24,4 @@ describe('BUG-020 shot runtime debug', () => {
     expect(match.stats.shots.home + match.stats.shots.away).toBeGreaterThan(0);
   }, 120000);
 });
+
