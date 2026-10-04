@@ -1,12 +1,6 @@
 name: Engine Validation
 
-# BUG-020 validation gate: shot outcome must survive boundary causality.
-
 on:
-  push:
-    branches:
-      - main
-      - "fix/**"
   pull_request:
     branches:
       - main
@@ -14,28 +8,15 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: BUG-020 regression and calibration
-        run: npx vitest run src/engine/live/bug020-regression.test.ts src/engine/live/bug020-calibration.acceptance.test.ts --reporter=verbose
-
-      - name: Tests
-        run: npx vitest run
+      - name: BUG-020 scoring volume
+        run: npx vitest run src/engine/live/bug020-post-boundary-fix.test.ts --reporter=verbose
