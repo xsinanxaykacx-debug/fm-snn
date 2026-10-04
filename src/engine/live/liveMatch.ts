@@ -1454,6 +1454,13 @@ function resolveGoalkeeperSave(
   state: LiveMatchState,
   players: Record<string, Player>
 ): boolean {
+  // A boundary goal may only be converted through the shot that
+  // physically caused the current ball trajectory. Historical shot events
+  // from the same player are not causal.
+  if (state.ball.lastAction !== 'shot') {
+    return false;
+  }
+
   const shotEvent = [...state.events]
     .reverse()
     .find(event =>
