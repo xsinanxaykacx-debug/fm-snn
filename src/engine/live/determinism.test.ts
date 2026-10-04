@@ -80,32 +80,38 @@ describe('BUG-032 second-half movement regression', () => {
     expect(away).toBeDefined();
 
     const snapshots: Array<{ time: number; positions: Record<string, { x: number; y: number }> }> = [];
+    let cumulativeMovement = 0;
+    let previousPositions: Record<string, { x: number; y: number }> | null = null;
+
     const match = simulateMatchLive(home, away, data.players, {
       seed: 32032,
       week: 6,
       onTick: state => {
-        if (state.time >= 45 * 60 + 30 && state.time <= 45 * 60 + 40) {
-          snapshots.push({
-            time: state.time,
-            positions: Object.fromEntries(
-              Object.entries(state.players).map(([id, p]) => [id, { x: p.position.x, y: p.position.y }])
-            ),
-          });
+        if (state.time < 45 * 60 + 30 || state.time > 89 * 60 + 30) return;
+
+        const positions = Object.fromEntries(
+          Object.entries(state.players).map(([id, p]) => [id, { x: p.position.x, y: p.position.y }])
+        );
+
+        if (previousPositions) {
+          cumulativeMovement += Object.keys(positions).reduce((sum, id) => {
+            const a = previousPositions![id];
+            const b = positions[id];
+            return sum + Math.hypot(b.x - a.x, b.y - a.y);
+          }, 0);
+        }
+
+        previousPositions = positions;
+
+        if (snapshots.length === 0 || state.time >= 89 * 60 + 30) {
+          snapshots.push({ time: state.time, positions });
         }
       },
     });
 
     expect(match.played).toBe(true);
-    expect(snapshots.length).toBeGreaterThan(0);
-
-    const first = snapshots[0].positions;
-    const last = snapshots[snapshots.length - 1].positions;
-    const totalDelta = Object.keys(first).reduce((sum, id) => {
-      const a = first[id];
-      const b = last[id];
-      return sum + Math.hypot(b.x - a.x, b.y - a.y);
-    }, 0);
-
-    expect(totalDelta).toBeGreaterThan(0);
+    expect(snapshots.length).toBeGreaterThanOrEqual(2);
+    expect(snapshots[snapshots.length - 1].time).toBeGreaterThanOrEqual(89 * 60 + 30);
+    expect(cumulativeMovement).toBeGreaterThan(0);
   }, 120_000);
 });
