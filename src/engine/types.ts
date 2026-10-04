@@ -745,6 +745,7 @@ export interface Ball {
 
   lastTouchId: string | null;
   lastTouchClubId: string | null;
+  lastAction: BallLastAction;
 
   isMoving: boolean;
 }
