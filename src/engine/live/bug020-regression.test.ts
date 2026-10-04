@@ -3,7 +3,7 @@ import { generateGameData } from '../data/generateData';
 import { createBall } from './ball';
 import { DEFAULT_PITCH_DIMENSIONS } from './pitch';
 import { createRng } from './rng';
-import { applyBoundaryOutcome } from './liveMatch';
+import { applyBoundaryOutcome, simulateMatchLive } from './liveMatch';
 
 describe('BUG-020 regression', () => {
   it('resolves a non-shot goal-mouth crossing when no pending shot is bound', () => {
