@@ -23,5 +23,6 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Temporary BUG-020 runtime trace
       - name: Debug Trace
         run: npx vitest run src/engine/live/debug-trace.test.ts
