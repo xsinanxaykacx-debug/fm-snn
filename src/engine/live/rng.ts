@@ -54,6 +54,18 @@ export interface RngState {
  *  • counter = 0 ile başlar.
  *  • RNG state'i mutate edilebilir; çağıran tarafından taşınmalıdır.
  */
+export function createMatchSeed(fixtureId: string, week: number): number {
+  let hash = 2166136261;
+
+  const input = `${fixtureId}:${week}`;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
 export function createRng(seed: number): RngState {
   return {
     seed: seed >>> 0,
