@@ -72,7 +72,7 @@ type WorkerScope = {
 const scope = self as unknown as WorkerScope;
 
 const DEBUG_SAMPLE_TICKS = 10;
-const DEBUG_MAX_SECONDS = 300;
+const DEBUG_MAX_SECONDS = 90 * 60;
 
 function compactFrame(state: LiveMatchState): Frame {
   return {
@@ -149,9 +149,9 @@ scope.onmessage = (event) => {
           const phaseElapsedMs = now - phaseStartedAt;
           phaseStartedAt = now;
 
-          // Keep the diagnostic channel cheap: one heartbeat per 5 ticks.
-          // If a single phase becomes genuinely slow, report that phase
-          // immediately so the UI watchdog can identify the stall point.
+          // Keep the diagnostic channel cheap. Normal progress is emitted
+          // by onTick every 5 ticks; this callback only reports unusually
+          // slow engine phases so the UI watchdog can identify the stall point.
           if (phaseElapsedMs >= 250) {
             scope.postMessage({
               type: 'progress',
