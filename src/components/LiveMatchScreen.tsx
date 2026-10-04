@@ -173,6 +173,13 @@ export function LiveMatchScreen() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const frameStatsRef = useRef({
+    received: 0,
+    firstTick: null as number | null,
+    lastTick: null as number | null,
+    firstPlayerPositions: null as Record<string, { x: number; y: number }> | null,
+    lastPlayerPositions: null as Record<string, { x: number; y: number }> | null,
+  });
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastProgressRef = useRef(Date.now());
   const lastProgressLabelRef = useRef('başlangıç');
@@ -202,6 +209,13 @@ export function LiveMatchScreen() {
 
     setFrame(null);
     setResult(null);
+    frameStatsRef.current = {
+      received: 0,
+      firstTick: null,
+      lastTick: null,
+      firstPlayerPositions: null,
+      lastPlayerPositions: null,
+    };
     setError(null);
     setRunning(true);
 
@@ -240,6 +254,18 @@ export function LiveMatchScreen() {
       }
 
       if (message.type === 'frame') {
+        const stats = frameStatsRef.current;
+        stats.received += 1;
+        stats.firstTick ??= message.tick;
+        stats.lastTick = message.tick;
+        if (!stats.firstPlayerPositions) {
+          stats.firstPlayerPositions = Object.fromEntries(
+            message.players.map(p => [p.id, { x: p.x, y: p.y }])
+          );
+        }
+        stats.lastPlayerPositions = Object.fromEntries(
+          message.players.map(p => [p.id, { x: p.x, y: p.y }])
+        );
         lastProgressRef.current = Date.now();
         lastProgressLabelRef.current = `frame tick=${message.tick}, time=${message.time.toFixed(2)}, phase=${message.phase}`;
         setFrame(message);
@@ -248,6 +274,19 @@ export function LiveMatchScreen() {
 
       if (message.type === 'complete') {
         window.__LIVE_MATCH_DEBUG__ = message.debug;
+
+        const stats = frameStatsRef.current;
+        let totalDelta = 0;
+        if (stats.firstPlayerPositions && stats.lastPlayerPositions) {
+          for (const id of Object.keys(stats.firstPlayerPositions)) {
+            const a = stats.firstPlayerPositions[id];
+            const b = stats.lastPlayerPositions[id];
+            totalDelta += Math.hypot(b.x - a.x, b.y - a.y);
+          }
+        }
+        console.log(
+          `LIVE FRAME STATS: ${stats.received} frame, tick ${stats.firstTick} -> ${stats.lastTick}, player delta=${totalDelta.toFixed(3)}m`
+        );
 
         console.log(
           `LIVE MATCH DEBUG hazır: ${message.debug.frames.length} frame, ilk ${message.debug.maxSimulationSeconds} saniye.`
