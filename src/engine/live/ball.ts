@@ -122,6 +122,7 @@ export function createBall(pitch: PitchDimensions): Ball {
     ownerId: null,
     lastTouchId: null,
     lastTouchClubId: null,
+    lastAction: null,
     isMoving: false,
   };
 }
@@ -227,6 +228,7 @@ export function applyPass(
   ball.ownerId = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
+  ball.lastAction = 'pass';
 
   ball.position.x = from.x;
   ball.position.y = from.y;
@@ -256,6 +258,7 @@ export function applyShot(
   ball.ownerId = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
+  ball.lastAction = 'shot';
 
   ball.position.x = from.x;
   ball.position.y = from.y;
@@ -288,6 +291,7 @@ export function applyCross(
   ball.ownerId = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
+  ball.lastAction = 'cross';
 
   ball.position.x = from.x;
   ball.position.y = from.y;
