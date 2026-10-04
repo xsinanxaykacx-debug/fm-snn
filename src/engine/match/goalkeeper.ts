@@ -4,6 +4,7 @@ import type { Player } from '../types';
 import type { Chance } from './chance';
 import { applyGoalkeeper, onTargetProbability } from './chance';
 import { eff } from './teamAnalysis';
+import type { MatchRng } from './rng';
 
 export interface ShotResult {
   outcome: 'goal' | 'save' | 'miss' | 'blocked';
@@ -15,12 +16,13 @@ export interface ShotResult {
 export function resolveShot(
   chance: Chance,
   goalkeeper: Player | null,
-  _defendingTeam: any
+  _defendingTeam: any,
+  rng: MatchRng = Math.random
 ): ShotResult {
   const shooter = chance.shooter;
 
   const onTargetProb = onTargetProbability(shooter, chance.xG);
-  const onTarget = Math.random() < onTargetProb;
+  const onTarget = rng() < onTargetProb;
 
   if (!onTarget) {
     return {
@@ -65,7 +67,8 @@ export function resolveShot(
 
 export function handleCrossChance(
   goalkeeper: Player | null,
-  crossQuality: number
+  crossQuality: number,
+  rng: MatchRng = Math.random
 ): boolean {
   if (!goalkeeper) return Math.random() < 0.5;
 
