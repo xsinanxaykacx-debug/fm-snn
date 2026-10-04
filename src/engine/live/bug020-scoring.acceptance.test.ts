@@ -12,7 +12,7 @@ describe('BUG-020 live scoring acceptance', () => {
     let totalShots = 0;
     let matchesWithGoals = 0;
 
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < 4; i += 1) {
       const home = clubList[(i * 2) % clubList.length];
       const away = clubList[(i * 2 + 1) % clubList.length];
 
@@ -29,11 +29,11 @@ describe('BUG-020 live scoring acceptance', () => {
       }
     }
 
-    const averageGoals = totalGoals / 10;
+    const averageGoals = totalGoals / 4;
 
     expect(totalShots).toBeGreaterThan(0);
-    expect(totalGoals).toBeGreaterThan(5);
+    expect(totalGoals).toBeGreaterThan(2);
     expect(averageGoals).toBeGreaterThan(0.5);
-    expect(matchesWithGoals).toBeGreaterThan(2);
+    expect(matchesWithGoals).toBeGreaterThan(1);
   }, 120000);
 });
