@@ -207,10 +207,10 @@ export const CROSS_TACTICAL_FIT = 0.7;
 // ═══════════════════════════════════════════════
 
 export const SHOOT_MAX_DISTANCE = 30.0;
-export const SHOOT_XG_BASE = 0.55;
-export const SHOOT_XG_DISTANCE_PENALTY = 0.02;
+export const SHOOT_XG_BASE = 0.70;
+export const SHOOT_XG_DISTANCE_PENALTY = 0.018;
 export const SHOOT_XG_CLOSE_DISTANCE = 6.0;
-export const SHOOT_XG_PRESSURE_PENALTY = 0.3;
+export const SHOOT_XG_PRESSURE_PENALTY = 0.18;
 export const SHOOT_XG_MIN = 0.02;
 export const SHOOT_XG_MAX = 0.7;
 
