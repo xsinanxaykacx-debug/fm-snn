@@ -734,6 +734,7 @@ export type BallLastAction =
   | 'cross'
   | 'clearance'
   | 'control'
+  | 'dribble'
   | null;
 
 export interface Ball {

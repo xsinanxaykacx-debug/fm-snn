@@ -1382,6 +1382,9 @@ function handleDribbleAction(
   const resolution = resolveDribbleAction(owner, state);
   const success = nextBool(state.rng, resolution.probability);
 
+  // Dribble is a new ball action; it must invalidate prior shot provenance.
+  state.ball.lastAction = 'dribble';
+
   const side = owner.isHome ? 'home' : 'away';
   state.stats.dribbles[side] += 1;
 
