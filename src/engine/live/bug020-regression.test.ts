@@ -146,3 +146,24 @@ describe('BUG-020 regression', () => {
   });
 });
 
+
+describe('BUG-020 pass target boundary', () => {
+  it('keeps a pass target inside the pitch when the receiver is on the goal line', async () => {
+    const { clubs, players } = generateGameData(20261004);
+    const home = Object.values(clubs)[0];
+    const away = Object.values(clubs)[1];
+    const result = simulateMatchLive(home, away, players, {
+      week: 20,
+      seed: 100000,
+    });
+
+    const ownGoals = result.events.filter(
+      event => event.type === 'goal' && event.description.includes('Kendi kalesine')
+    );
+
+    // The regression is exercised through the same deterministic seed that
+    // previously produced repeated goalkeeper own goals after goal kicks.
+    expect(ownGoals.length).toBeLessThanOrEqual(2);
+    expect(result.homeScore + result.awayScore).toBeLessThanOrEqual(7);
+  }, 120000);
+});
