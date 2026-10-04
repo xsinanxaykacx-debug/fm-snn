@@ -274,6 +274,7 @@ export {
 
 export {
   createRng,
+  createMatchSeed,
   cloneRng,
   nextFloat,
   nextInt,
