@@ -1259,12 +1259,17 @@ function resolveGoalkeeperSave(
   state: LiveMatchState,
   players: Record<string, Player>
 ): boolean {
-  const shotEvent = [...state.events]
-    .reverse()
-    .find(event =>
-      event.type === 'shot' &&
-      event.playerId === state.ball.lastTouchId
-    );
+  // A goalkeeper save is causal only when the current goal-boundary
+  // crossing immediately follows the shot that put the ball toward goal.
+  // Never search historical events: a later pass/cross/own-goal must not
+  // inherit an unrelated old shot.
+  const lastEvent = state.events[state.events.length - 1];
+
+  const shotEvent =
+    lastEvent?.type === 'shot' &&
+    lastEvent.playerId === state.ball.lastTouchId
+      ? lastEvent
+      : null;
 
   if (!shotEvent) {
     return false;
