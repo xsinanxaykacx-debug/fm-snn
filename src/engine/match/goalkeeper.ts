@@ -39,7 +39,7 @@ export function resolveShot(
   let adjustedGoalProb = (chance.xG * gkEffect) / onTargetProb;
   adjustedGoalProb = Math.max(0.05, Math.min(0.95, adjustedGoalProb));
 
-  const roll = Math.random();
+  const roll = rng();
 
   if (roll < adjustedGoalProb) {
     return {
@@ -70,7 +70,7 @@ export function handleCrossChance(
   crossQuality: number,
   rng: MatchRng = Math.random
 ): boolean {
-  if (!goalkeeper) return Math.random() < 0.5;
+  if (!goalkeeper) return rng() < 0.5;
 
   const aerialReach = eff(goalkeeper, 'aerialReach');
   const handling = eff(goalkeeper, 'handling');
@@ -79,5 +79,5 @@ export function handleCrossChance(
   const gkPower = aerialReach * 0.4 + handling * 0.35 + positioning * 0.25;
 
   const catchProb = 0.5 + (gkPower - crossQuality) / 200;
-  return Math.random() < Math.max(0.20, Math.min(0.85, catchProb));
+  return rng() < Math.max(0.20, Math.min(0.85, catchProb));
 }
