@@ -314,7 +314,8 @@ export function computeFullPerception(
     players: Record<string, LivePlayer>;
     pitch: PitchDimensions;
     time: number;
-  }
+  },
+  precomputedSpace?: SpaceMap
 ): Perception {
   const ball = state.ball;
   const ballPos2: Vec2 = { x: ball.position.x, y: ball.position.y };
@@ -405,7 +406,7 @@ export function computeFullPerception(
     }));
 
   // ─── Space map ───
-  const space = computeSpaceMap(
+  const space = precomputedSpace ?? computeSpaceMap(
     self,
     state.players,
     state.pitch,
