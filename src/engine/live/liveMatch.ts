@@ -368,14 +368,7 @@ function runTick(
   players: Record<string, Player>,
   onTick?: (state: LiveMatchState) => void
 ): void {
-  // ─── 1. prevBallPos ───
-  const prevBallPos = {
-    x: state.ball.position.x,
-    y: state.ball.position.y,
-    z: state.ball.position.z,
-  };
-
-  // ─── 2. Zaman ───
+  // ─── 1. Zaman ───
   state.time += TICK_DURATION;
   state.tick += 1;
 
@@ -422,7 +415,20 @@ function runTick(
   );
 
   // ─── 8. Top hareketi ───
-  if (state.ball.ownerId === null) {
+  // Boundary başlangıç noktası yalnızca serbest topun fiziksel
+  // hareketinden hemen önce alınır. Tick başındaki pozisyonu kullanmak,
+  // oyuncunun hareketi + yeni pas/şut başlangıcını tek bir segmentte
+  // birleştirerek sahte goal/corner/throw-in üretir.
+  const ballWasFree = state.ball.ownerId === null;
+  const prevBallPos = ballWasFree
+    ? {
+        x: state.ball.position.x,
+        y: state.ball.position.y,
+        z: state.ball.position.z,
+      }
+    : null;
+
+  if (ballWasFree) {
     state.ball = stepBall(
       state.ball,
       state.pitch,
@@ -437,30 +443,41 @@ function runTick(
   // girdiğinde ownerId tekrar oluşturulur.
   resolveLooseBallControl(state);
 
-  // ─── 8b. Ball actions ───
-  if (!tackleChangedPossession) {
+  // ─── 8b. Fiziksel sınır geçişi ───
+  // Ball action'ları (pass/shot/cross) yeni trajektoriyi bu tick'in
+  // sonunda başlatır; sınır sonucu bir sonraki tick'teki fiziksel
+  // hareketten doğar. Bu yüzden boundary çözümü action'lardan önce yapılır.
+  const boundaryOutcome =
+    prevBallPos === null
+      ? { type: 'none' as const }
+      : detectBoundaryOutcome({
+          pitch: state.pitch,
+          prevBallPos,
+          nextBallPos: {
+            x: state.ball.position.x,
+            y: state.ball.position.y,
+            z: state.ball.position.z,
+          },
+          lastTouchId: state.ball.lastTouchId,
+          lastTouchClubId: state.ball.lastTouchClubId,
+          homeClubId: state.home.club.id,
+          awayClubId: state.away.club.id,
+        });
+
+  // ─── 8c. Sınır sonucu ───
+  applyBoundaryOutcome(boundaryOutcome, state, players);
+
+  // ─── 8d. Ball actions ───
+  // Boundary bir restart/goal ürettiyse aynı tick'te yeni bir açık oyun
+  // aksiyonu çalıştırma.
+  if (
+    boundaryOutcome.type === 'none' &&
+    !tackleChangedPossession
+  ) {
     applyBallActions(state, decisions);
   }
 
-  // ─── 9. Sınır geçişi ───
-  const boundaryOutcome = detectBoundaryOutcome({
-    pitch: state.pitch,
-    prevBallPos,
-    nextBallPos: {
-      x: state.ball.position.x,
-      y: state.ball.position.y,
-      z: state.ball.position.z,
-    },
-    lastTouchId: state.ball.lastTouchId,
-    lastTouchClubId: state.ball.lastTouchClubId,
-    homeClubId: state.home.club.id,
-    awayClubId: state.away.club.id,
-  });
-
-  // ─── 10. Sınır sonucu ───
-  applyBoundaryOutcome(boundaryOutcome, state, players);
-
-  // ─── 11. Set-piece güncelle ───
+  // ─── 9. Set-piece güncelle ───
   updateSetPieceStatus(state);
 
   // ─── 12. Set-piece temizliği ───
