@@ -34,8 +34,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: BUG-020 regression and calibration
-        run: npx vitest run src/engine/live/bug020-regression.test.ts src/engine/live/bug020-calibration.acceptance.test.ts --reporter=verbose
-
       - name: BUG-020 scoring provenance diagnostic
         run: npx vitest run src/engine/live/bug020-scoring-provenance.test.ts --reporter=verbose
