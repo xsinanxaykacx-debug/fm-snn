@@ -1,5 +1,6 @@
 
 import type { MatchState, TeamMatchState } from './matchState';
+import type { MatchRng } from './rng';
 
 export type ZoneKey =
   | 'leftDefense'
@@ -34,7 +35,8 @@ export type ZoneKey =
 // ═══════════════════════════════════════════════
 
 export function choosePossessionTeam(
-  state: MatchState
+  state: MatchState,
+  rng: MatchRng = Math.random
 ): 'home' | 'away' {
   const home = state.home;
   const away = state.away;
@@ -62,7 +64,7 @@ export function choosePossessionTeam(
     homeBonus;
 
   if (total <= 0) {
-    return Math.random() < 0.5
+    return rng() < 0.5
       ? 'home'
       : 'away';
   }
@@ -96,7 +98,8 @@ export function choosePossessionTeam(
 export function chooseAttackZone(
   state: MatchState,
   attackingTeam: TeamMatchState,
-  defendingTeam: TeamMatchState
+  defendingTeam: TeamMatchState,
+  rng: MatchRng = Math.random
 ): {
   zone: ZoneKey;
   advantagePct: number;
@@ -176,7 +179,8 @@ export function chooseAttackZone(
 
 export function chooseMidfieldZone(
   attackingTeam: TeamMatchState,
-  defendingTeam: TeamMatchState
+  defendingTeam: TeamMatchState,
+  rng: MatchRng = Math.random
 ): ZoneKey {
   const leftAdv =
     sigmoid(
