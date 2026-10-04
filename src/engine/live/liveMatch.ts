@@ -134,6 +134,8 @@ import {
   resolveInterceptionAction,
 } from './actionResolution';
 
+import { resolveFoulDiscipline } from './discipline';
+
 // ═══════════════════════════════════════════════
 // SIMULATE MATCH LIVE
 // ═══════════════════════════════════════════════
@@ -887,13 +889,123 @@ function applyTackleFoul(
 
   syncBallOwnerFlags(state);
 
-  state.events.push({
-    minute: Math.floor(state.time / 60),
-    type: 'foul',
-    playerId: tackler.player.id,
-    clubId: tackler.clubId,
-    description: `Faul: ${tackler.player.name}`,
-  });
+  const carrier = state.players[outcome.ballCarrierId];
+
+  if (carrier) {
+    const discipline = resolveFoulDiscipline(
+      tackler,
+      carrier,
+      outcome.severity,
+      state.rng
+    );
+
+    if (discipline.card === 'yellow') {
+      tackler.player.yellowCards += 1;
+      tackler.player.careerStats.yellowCards += 1;
+      tackler.player.careerStats.seasonYellowCards += 1;
+
+      state.stats.yellowCards[foulSide] += 1;
+      state.events.push({
+        minute: Math.floor(state.time / 60),
+        type: 'yellow',
+        playerId: tackler.player.id,
+        clubId: tackler.clubId,
+        description: discipline.secondYellow
+          ? `İkinci sarı kart: ${tackler.player.name}`
+          : `Sarı kart: ${tackler.player.name}`,
+      });
+    }
+
+    if (discipline.card === 'red') {
+      if (discipline.secondYellow) {
+        tackler.player.yellowCards += 1;
+        tackler.player.careerStats.yellowCards += 1;
+        tackler.player.careerStats.seasonYellowCards += 1;
+        state.stats.yellowCards[foulSide] += 1;
+
+        state.events.push({
+          minute: Math.floor(state.time / 60),
+          type: 'yellow',
+          playerId: tackler.player.id,
+          clubId: tackler.clubId,
+          description: `İkinci sarı kart: ${tackler.player.name}`,
+        });
+      }
+
+      tackler.player.redCard = true;
+      tackler.player.sentOff = true;
+      tackler.player.suspensionWeeks = Math.max(
+        tackler.player.suspensionWeeks,
+        3
+      );
+
+      tackler.player.careerStats.redCards += 1;
+      tackler.player.careerStats.seasonRedCards += 1;
+      state.stats.redCards[foulSide] += 1;
+
+      state.events.push({
+        minute: Math.floor(state.time / 60),
+        type: 'red',
+        playerId: tackler.player.id,
+        clubId: tackler.clubId,
+        description: discipline.secondYellow
+          ? `İkinci sarıdan ihraç: ${tackler.player.name}`
+          : `Kırmızı kart: ${tackler.player.name}`,
+      });
+    }
+
+    if (discipline.injuryWeeks > 0) {
+      carrier.player.injured = true;
+      carrier.player.injuryWeeks = Math.max(
+        carrier.player.injuryWeeks,
+        discipline.injuryWeeks
+      );
+      carrier.player.injuryType = discipline.injuryType;
+
+      state.events.push({
+        minute: Math.floor(state.time / 60),
+        type: 'injury',
+        playerId: carrier.player.id,
+        clubId: carrier.clubId,
+        weeks: discipline.injuryWeeks,
+        description: `Sakatlık: ${carrier.player.name} (${discipline.injuryWeeks} hf)`,
+      });
+    }
+  }
+
+  tackler.currentDecision = {
+    intent: 'idle',
+    reason: 'formation',
+    target: null,
+    targetPlayerId: null,
+    power: 0,
+    timestamp: state.time,
+  };
+  tackler.currentIntent = 'idle';
+  tackler.velocity.x = 0;
+  tackler.velocity.y = 0;
+
+  if (carrier?.player.injured) {
+    carrier.currentDecision = {
+      intent: 'idle',
+      reason: 'formation',
+      target: null,
+      targetPlayerId: null,
+      power: 0,
+      timestamp: state.time,
+    };
+    carrier.currentIntent = 'idle';
+    carrier.velocity.x = 0;
+    carrier.velocity.y = 0;
+
+    if (state.ball.ownerId === carrier.player.id) {
+      state.ball = releaseBall(state.ball);
+    }
+  }
+
+  if (tackler.player.sentOff && state.ball.ownerId === tackler.player.id) {
+    state.ball = releaseBall(state.ball);
+  }
 
   const freeKickSide: TeamSide = tackler.isHome ? 'AWAY' : 'HOME';
 

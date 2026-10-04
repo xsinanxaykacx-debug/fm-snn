@@ -778,6 +778,7 @@ export const useGameStore = create<Store>()(
             p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
             if (p.injuryWeeks === 0) {
               p.injuryType = null;
+              p.injured = false;
               if (p.clubId === state.userClubId) {
                 news.unshift(`💚 ${p.name} iyileşti, tekrar oynayabilir!`);
               }
@@ -786,8 +787,12 @@ export const useGameStore = create<Store>()(
 
           if (p.suspensionWeeks > 0) {
             p.suspensionWeeks = Math.max(0, p.suspensionWeeks - 1);
-            if (p.suspensionWeeks === 0 && p.clubId === state.userClubId) {
-              news.unshift(`✅ ${p.name} cezasını tamamladı!`);
+            if (p.suspensionWeeks === 0) {
+              p.sentOff = false;
+              p.redCard = false;
+              if (p.clubId === state.userClubId) {
+                news.unshift(`✅ ${p.name} cezasını tamamladı!`);
+              }
             }
           }
 
