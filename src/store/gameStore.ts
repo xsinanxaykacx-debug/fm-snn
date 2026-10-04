@@ -1628,7 +1628,10 @@ export const useGameStore = create<Store>()(
           ? simulateMatchLive(home, away, playersCopy, {
               week: state.currentWeek,
               userLineup: lineup,
-              seed: null,
+              seed: createMatchSeed(
+              `${state.season}:${cupMatch.id}`,
+              state.currentWeek
+            ),
             })
           : simulateMatch(
               home,
