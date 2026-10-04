@@ -118,6 +118,12 @@ describe('BUG-020 regression', () => {
       isFinished: false,
     } as any;
 
+    state.pendingShot = {
+      playerId: ownGoalPlayer.id,
+      outcome: 'save',
+      goalkeeperId: goalkeeperPlayer.id,
+    };
+
     applyBoundaryOutcome(
       {
         type: 'goal',
@@ -136,5 +142,6 @@ describe('BUG-020 regression', () => {
     expect(state.score.away).toBe(1);
     expect(state.score.home).toBe(0);
     expect(state.events.at(-1)?.type).toBe('kickoff');
+    expect(state.pendingShot).toBeUndefined();
   });
 });

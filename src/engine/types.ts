@@ -300,6 +300,8 @@ export interface MatchEvent {
   team?: 'home' | 'away';
   description: string;
   xG?: number;
+  shotOutcome?: 'goal' | 'save' | 'miss';
+  goalkeeperId?: string;
   weeks?: number;
 }
 

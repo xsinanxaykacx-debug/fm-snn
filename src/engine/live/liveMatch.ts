@@ -842,6 +842,7 @@ function applyTackleWon(
   outcome: TackleOutcome & { type: 'won' },
   state: LiveMatchState
 ): void {
+  deletePendingShot(state);
   const tackler = state.players[outcome.tacklerId];
   if (!tackler) return;
 
@@ -870,6 +871,7 @@ function applyTackleFoul(
   state: LiveMatchState,
   players: Record<string, Player>
 ): void {
+  deletePendingShot(state);
   const tackler = state.players[outcome.tacklerId];
   if (!tackler) return;
 
@@ -958,6 +960,8 @@ function resolveLooseBallControl(state: LiveMatchState): void {
 
   if (bestPlayer === null) return;
 
+  deletePendingShot(state);
+
   state.ball = controlBall(
     state.ball,
     bestPlayer.player.id,
@@ -1012,6 +1016,7 @@ function handlePassAction(
   state: LiveMatchState
 ): void {
   if (!decision.target) return;
+  deletePendingShot(state);
 
   const resolution = resolvePassAction(owner, decision, state);
   const completed = nextBool(state.rng, resolution.probability);
@@ -1098,6 +1103,17 @@ function handleShootAction(
   if (!decision.target) return;
 
   const resolution = resolveShotAction(owner, decision, state);
+  const isGoal = nextBool(state.rng, resolution.probability);
+
+  const saveChance =
+    resolution.defenderId !== null
+      ? resolution.goalkeeperSkill * (1 - resolution.probability)
+      : 0;
+
+  const isSave = !isGoal && nextBool(state.rng, saveChance);
+  const shotOutcome: 'goal' | 'save' | 'miss' =
+    isGoal ? 'goal' : isSave ? 'save' : 'miss';
+
   const shotXG = resolution.xG;
 
   state.ball = applyShot(
@@ -1127,8 +1143,22 @@ function handleShootAction(
     playerId: owner.player.id,
     clubId: owner.clubId,
     xG: shotXG,
+    shotOutcome,
+    goalkeeperId: resolution.defenderId ?? undefined,
     description: `Şut: ${owner.player.name}`,
   });
+
+  (state as LiveMatchState & {
+    pendingShot?: {
+      playerId: string;
+      outcome: 'goal' | 'save' | 'miss';
+      goalkeeperId?: string;
+    };
+  }).pendingShot = {
+    playerId: owner.player.id,
+    outcome: shotOutcome,
+    goalkeeperId: resolution.defenderId ?? undefined,
+  };
 }
 
 function handleCrossAction(
@@ -1137,6 +1167,7 @@ function handleCrossAction(
   state: LiveMatchState
 ): void {
   if (!decision.target) return;
+  deletePendingShot(state);
 
   const resolution = resolveCrossAction(owner, decision, state);
   const completed = nextBool(state.rng, resolution.probability);
@@ -1184,6 +1215,7 @@ function handleDribbleAction(
   owner: LivePlayer,
   state: LiveMatchState
 ): void {
+  deletePendingShot(state);
   const resolution = resolveDribbleAction(owner, state);
   const success = nextBool(state.rng, resolution.probability);
 
@@ -1230,13 +1262,40 @@ export function applyBoundaryOutcome(
   if (outcome.type === 'none') return;
 
   if (outcome.type === 'goal') {
-    if (resolveGoalkeeperSave(outcome, state, players)) {
+    const pendingShot = getPendingShot(state);
+
+    if (
+      pendingShot !== undefined &&
+      pendingShot.playerId === state.ball.lastTouchId
+    ) {
+      deletePendingShot(state);
+
+      if (
+        pendingShot.outcome === 'save' ||
+        pendingShot.outcome === 'miss'
+      ) {
+        handleResolvedShotFailure(
+          outcome,
+          pendingShot.outcome,
+          pendingShot.goalkeeperId,
+          state,
+          players
+        );
+        return;
+      }
+
+      handleGoal(outcome, state, players);
       return;
     }
 
+    // Missing/stale shot context must never suppress a real physical goal.
+    deletePendingShot(state);
     handleGoal(outcome, state, players);
     return;
   }
+
+  // Any non-goal boundary ends the causal lifetime of a pending shot.
+  deletePendingShot(state);
 
   if (outcome.type === 'corner') {
     handleCorner(outcome, state, players);
@@ -1254,115 +1313,82 @@ export function applyBoundaryOutcome(
   }
 }
 
-function resolveGoalkeeperSave(
+function getPendingShot(
+  state: LiveMatchState
+): {
+  playerId: string;
+  outcome: 'goal' | 'save' | 'miss';
+  goalkeeperId?: string;
+} | undefined {
+  return (state as LiveMatchState & {
+    pendingShot?: {
+      playerId: string;
+      outcome: 'goal' | 'save' | 'miss';
+      goalkeeperId?: string;
+    };
+  }).pendingShot;
+}
+
+function deletePendingShot(state: LiveMatchState): void {
+  delete (state as LiveMatchState & {
+    pendingShot?: {
+      playerId: string;
+      outcome: 'goal' | 'save' | 'miss';
+      goalkeeperId?: string;
+    };
+  }).pendingShot;
+}
+
+function handleResolvedShotFailure(
   outcome: BoundaryOutcome & { type: 'goal' },
+  shotOutcome: 'save' | 'miss',
+  goalkeeperId: string | undefined,
   state: LiveMatchState,
   players: Record<string, Player>
-): boolean {
-  // A goalkeeper save is causal only when the current goal-boundary
-  // crossing immediately follows the shot that put the ball toward goal.
-  // Never search historical events: a later pass/cross/own-goal must not
-  // inherit an unrelated old shot.
-  const lastEvent = state.events[state.events.length - 1];
+): void {
+  const defendingSide: TeamSide =
+    outcome.scorerSide === 'HOME' ? 'AWAY' : 'HOME';
 
-  const shotEvent =
-    lastEvent?.type === 'shot' &&
-    lastEvent.playerId === state.ball.lastTouchId
-      ? lastEvent
-      : null;
-
-  if (!shotEvent) {
-    return false;
-  }
-
-  const defendingSide = outcome.scorerSide === 'HOME' ? 'AWAY' : 'HOME';
-  const goalkeeper = Object.values(state.players).find(
-    player =>
-      player.role === 'GK' &&
-      ((defendingSide === 'HOME' && player.isHome) ||
-        (defendingSide === 'AWAY' && !player.isHome))
-  );
-
-  if (!goalkeeper) {
-    return false;
-  }
-
-  const shotXG = typeof shotEvent.xG === 'number'
-    ? Math.max(0.02, Math.min(0.7, shotEvent.xG))
-    : 0.2;
-
-  const gkSkill = Math.max(
-    0,
-    Math.min(
-      1,
-      (
-        goalkeeper.player.attributes.goalkeeper +
-        goalkeeper.player.attributes.reflexes +
-        goalkeeper.player.attributes.gkPositioning +
-        goalkeeper.player.attributes.handling +
-        goalkeeper.player.attributes.oneOnOne
-      ) / 100
-    )
-  );
-
-  // xG artık sadece istatistik değil, gerçek gol çözümlemesinin de
-  // girdisidir. Goal-mouth'a ulaşan her şut otomatik gol olamaz.
-  const goalChance = Math.max(
-    0.01,
-    Math.min(
-      0.45,
-      shotXG *
-        (0.65 + gkSkill * 0.15)
-    )
-  );
-
-  if (nextBool(state.rng, goalChance)) {
-    return false;
-  }
+  const goalkeeperName =
+    goalkeeperId !== undefined && players[goalkeeperId]
+      ? players[goalkeeperId].name
+      : 'Kaleci';
 
   const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
-  state.stats.onTarget[side] += 1;
 
-  state.events.push({
-    minute: Math.floor(state.time / 60),
-    type: 'goal_kick',
-    clubId: defendingSide === 'HOME'
-      ? state.home.club.id
-      : state.away.club.id,
-    description: `Kurtarış: ${goalkeeper.player.name}`,
-  });
+  if (shotOutcome === 'save') {
+    state.stats.onTarget[side] += 1;
+    state.events.push({
+      minute: Math.floor(state.time / 60),
+      type: 'save',
+      playerId: state.ball.lastTouchId ?? undefined,
+      clubId: state.ball.lastTouchClubId ?? undefined,
+      goalkeeperId,
+      description: `Kurtarış: ${goalkeeperName}`,
+    });
+  } else {
+    state.events.push({
+      minute: Math.floor(state.time / 60),
+      type: 'miss',
+      playerId: state.ball.lastTouchId ?? undefined,
+      clubId: state.ball.lastTouchClubId ?? undefined,
+      description: 'Şut auta çıktı.',
+    });
+  }
 
-  state.ball = releaseBall(state.ball);
-
-  const goalKickX = defendingSide === 'HOME'
-    ? state.pitch.goalAreaDepth / 2
-    : state.pitch.length - state.pitch.goalAreaDepth / 2;
-
-  state.ball.position.x = goalKickX;
-  state.ball.position.y = Math.max(
-    8,
-    Math.min(
-      state.pitch.width - 8,
-      state.ball.position.y
-    )
-  );
-  state.ball.position.z = DEFAULT_BALL_PHYSICS.radius;
-  state.ball.velocity = { x: 0, y: 0, z: 0 };
-  state.ball.isMoving = false;
-
-  syncBallOwnerFlags(state);
-
-  state.setPiece = createSetPieceForMatch(
-    'goal_kick',
-    defendingSide,
-    { x: goalKickX, y: state.ball.position.y },
-    state.pitch,
-    state.home.club,
-    state.away.club,
+  const point = outcome.point;
+  handleGoalKick(
+    {
+      type: 'goal_kick',
+      side: defendingSide,
+      point: {
+        x: point.x,
+        y: Math.max(8, Math.min(state.pitch.width - 8, point.y)),
+      },
+    },
+    state,
     players
   );
-
-  return true;
 }
 
 /**
