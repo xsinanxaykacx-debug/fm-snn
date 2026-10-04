@@ -1144,6 +1144,20 @@ function handleShootAction(
     goalkeeperId: resolution.defenderId ?? undefined,
     description: `Şut: ${owner.player.name}`,
   });
+
+  // Fiziksel kale çizgisi yalnızca bu şutun sonucunu uygular.
+  // Eski shot event'leri sonraki pozisyonlarda gol üretemez.
+  (state as LiveMatchState & {
+    pendingShot?: {
+      playerId: string;
+      outcome: 'goal' | 'save' | 'miss';
+      goalkeeperId?: string;
+    };
+  }).pendingShot = {
+    playerId: owner.player.id,
+    outcome: shotOutcome,
+    goalkeeperId: resolution.defenderId ?? undefined,
+  };
 }
 
 function handleCrossAction(
@@ -1245,15 +1259,41 @@ function applyBoundaryOutcome(
   if (outcome.type === 'none') return;
 
   if (outcome.type === 'goal') {
-    const shotEvent = [...state.events]
-      .reverse()
-      .find(event =>
-        event.type === 'shot' &&
-        event.playerId === state.ball.lastTouchId
-      );
+    const pendingShot = (state as LiveMatchState & {
+      pendingShot?: {
+        playerId: string;
+        outcome: 'goal' | 'save' | 'miss';
+        goalkeeperId?: string;
+      };
+    }).pendingShot;
 
-    if (shotEvent?.shotOutcome === 'save' || shotEvent?.shotOutcome === 'miss') {
-      handleResolvedShotFailure(outcome, shotEvent.shotOutcome, state, players);
+    // Skor yalnızca halen topun fiziksel olarak taşıdığı şutun
+    // önceden çözülmüş sonucu "goal" ise yazılır.
+    if (
+      pendingShot === undefined ||
+      pendingShot.playerId !== state.ball.lastTouchId
+    ) {
+      return;
+    }
+
+    delete (state as LiveMatchState & {
+      pendingShot?: {
+        playerId: string;
+        outcome: 'goal' | 'save' | 'miss';
+        goalkeeperId?: string;
+      };
+    }).pendingShot;
+
+    if (
+      pendingShot.outcome === 'save' ||
+      pendingShot.outcome === 'miss'
+    ) {
+      handleResolvedShotFailure(
+        outcome,
+        pendingShot.outcome,
+        state,
+        players
+      );
       return;
     }
 
