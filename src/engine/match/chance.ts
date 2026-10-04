@@ -157,7 +157,7 @@ export function calculateChanceFromSequence(
       Math.min(
         120,
         angle +
-          (Math.random() - 0.5) *
+          (rng() - 0.5) *
             15
       )
     );
