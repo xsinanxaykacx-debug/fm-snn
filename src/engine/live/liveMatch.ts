@@ -1336,6 +1336,94 @@ function handleResolvedShotFailure(
   );
 }
 
+/**
+ * GOL.
+ *
+ * KONTRAT:
+ *  - Skor +1
+ *  - onTarget +1
+ *  - shots +1 YOK (shot anında zaten yapıldı)
+ *  - CareerStats (own goal hariç)
+ *  - Top MERKEZE taşınır
+ *  - phase = 'goal'
+ *  - kickoff set-piece oluşturulur
+ *  - kickoff event üretilir
+ */
+function handleGoal(
+  outcome: BoundaryOutcome & { type: 'goal' },
+  state: LiveMatchState,
+  players: Record<string, Player>
+): void {
+  const scorerId = state.ball.lastTouchId;
+
+  if (outcome.scorerSide === 'HOME') {
+    state.score.home += 1;
+  } else {
+    state.score.away += 1;
+  }
+
+  const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
+  state.stats.onTarget[side] += 1;
+
+  if (!outcome.ownGoal && scorerId && players[scorerId]) {
+    const p = players[scorerId];
+    p.careerStats.goals += 1;
+    p.careerStats.seasonGoals += 1;
+  }
+
+  state.events.push({
+    minute: Math.floor(state.time / 60),
+    type: 'goal',
+    playerId: scorerId ?? undefined,
+    clubId: outcome.scorerSide === 'HOME'
+      ? state.home.club.id
+      : state.away.club.id,
+    description: outcome.ownGoal
+      ? 'Kendi kalesine gol!'
+      : `GOL! ${scorerId && players[scorerId] ? players[scorerId].name : '?'}`,
+  });
+
+  state.ball = releaseBall(state.ball);
+
+  const center = getCenterPoint(state.pitch);
+
+  state.ball.position.x = center.x;
+  state.ball.position.y = center.y;
+  state.ball.position.z = DEFAULT_BALL_PHYSICS.radius;
+  state.ball.velocity = { x: 0, y: 0, z: 0 };
+  state.ball.isMoving = false;
+
+  syncBallOwnerFlags(state);
+
+  state.phase = 'goal';
+
+  const kickoffSide: TeamSide =
+    outcome.scorerSide === 'HOME' ? 'AWAY' : 'HOME';
+
+  state.setPiece = createSetPieceForMatch(
+    'kickoff',
+    kickoffSide,
+    center,
+    state.pitch,
+    state.home.club,
+    state.away.club,
+    players
+  );
+
+  state.events.push({
+    minute: Math.floor(state.time / 60),
+    type: 'kickoff',
+    clubId: kickoffSide === 'HOME'
+      ? state.home.club.id
+      : state.away.club.id,
+    description: `Başlangıç vuruşu: ${
+      kickoffSide === 'HOME'
+        ? state.home.club.shortName
+        : state.away.club.shortName
+    }`,
+  });
+}
+
 function handleCorner(
   outcome: BoundaryOutcome & { type: 'corner' },
   state: LiveMatchState,
