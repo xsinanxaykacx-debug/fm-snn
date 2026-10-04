@@ -2,12 +2,13 @@
 
 import type { Player } from '../types';
 import { eff } from './teamAnalysis';
+import type { MatchRng } from './rng';
 
 // ═══════════════════════════════════════════════
 // SAVUNMACI SEÇİMİ
 // ═══════════════════════════════════════════════
 
-export function pickDefender(defendXI: Player[], zone: string): Player | null {
+export function pickDefender(defendXI: Player[], zone: string, rng: MatchRng = Math.random): Player | null {
   let positions: string[];
 
   if (zone.includes('Defense')) {
@@ -26,7 +27,7 @@ export function pickDefender(defendXI: Player[], zone: string): Player | null {
 
   const candidates = defendXI.filter(p => positions.includes(p.position));
   if (candidates.length === 0) {
-    return defendXI.length > 0 ? defendXI[Math.floor(Math.random() * defendXI.length)] : null;
+    return defendXI.length > 0 ? defendXI[Math.floor(rng() * defendXI.length)] : null;
   }
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
@@ -35,7 +36,7 @@ export function pickDefender(defendXI: Player[], zone: string): Player | null {
 // ŞUTÖR SEÇİMİ
 // ═══════════════════════════════════════════════
 
-export function pickShooter(attackXI: Player[], zone: string): Player | null {
+export function pickShooter(attackXI: Player[], zone: string, rng: MatchRng = Math.random): Player | null {
   let positions: string[];
 
   if (zone.includes('Attack')) {
@@ -72,7 +73,7 @@ export function pickShooter(attackXI: Player[], zone: string): Player | null {
 // GOLCÜ SEÇİMİ
 // ═══════════════════════════════════════════════
 
-export function pickScorer(attackXI: Player[], _zone: string, shooter: Player): Player {
+export function pickScorer(attackXI: Player[], _zone: string, shooter: Player, rng: MatchRng = Math.random): Player {
   // Şutör zaten en olası golcü
   if (Math.random() < 0.6) return shooter;
 
