@@ -158,9 +158,47 @@ export function stepBall(
   ball.velocity.z *= physics.airDrag;
 
   // 3) Konum güncelle
+  const previousPosition = {
+    x: ball.position.x,
+    y: ball.position.y,
+  };
+
   ball.position.x += ball.velocity.x * tickDuration;
   ball.position.y += ball.velocity.y * tickDuration;
   ball.position.z += ball.velocity.z * tickDuration;
+
+  // Ground pass: hedef oyuncunun pozisyonuna ulaştığında fiziksel
+  // trajektori hedefte sonlanır. Aksi halde sabit hız + sürtünme,
+  // hedefi geçip saha dışına taşan "hayalet paslar" üretebilir.
+  if (ball.targetPosition !== undefined) {
+    const targetDx = ball.targetPosition.x - previousPosition.x;
+    const targetDy = ball.targetPosition.y - previousPosition.y;
+    const targetDistanceSq =
+      targetDx * targetDx +
+      targetDy * targetDy;
+
+    const stepDx = ball.position.x - previousPosition.x;
+    const stepDy = ball.position.y - previousPosition.y;
+    const passedTarget =
+      stepDx * targetDx +
+      stepDy * targetDy >= targetDistanceSq;
+
+    const nextDistanceDx = ball.position.x - ball.targetPosition.x;
+    const nextDistanceDy = ball.position.y - ball.targetPosition.y;
+    const reachedTarget =
+      nextDistanceDx * nextDistanceDx +
+      nextDistanceDy * nextDistanceDy <= 0.25 * 0.25;
+
+    if (passedTarget || reachedTarget) {
+      ball.position.x = ball.targetPosition.x;
+      ball.position.y = ball.targetPosition.y;
+      ball.position.z = physics.radius;
+      ball.velocity = { x: 0, y: 0, z: 0 };
+      ball.isMoving = false;
+      delete ball.targetPosition;
+      return ball;
+    }
+  }
 
   // 4) Zemin çarpışması / sekme
   if (ball.position.z <= physics.radius) {
@@ -227,6 +265,7 @@ export function applyPass(
   ball.ownerId = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
+  ball.targetPosition = { ...to };
 
   ball.position.x = from.x;
   ball.position.y = from.y;
@@ -256,6 +295,7 @@ export function applyShot(
   ball.ownerId = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
+  delete ball.targetPosition;
 
   ball.position.x = from.x;
   ball.position.y = from.y;
@@ -364,6 +404,7 @@ export function controlBall(
   ball.ownerId = playerId;
   ball.lastTouchId = playerId;
   ball.lastTouchClubId = clubId;
+  delete ball.targetPosition;
   ball.velocity = { x: 0, y: 0, z: 0 };
   ball.isMoving = false;
 
@@ -372,6 +413,7 @@ export function controlBall(
 
 export function releaseBall(ball: Ball): Ball {
   ball.ownerId = null;
+  delete ball.targetPosition;
   return ball;
 }
 
