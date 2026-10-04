@@ -367,7 +367,7 @@ export type OffsideOutcome =
  */
 export function detectOffside(
   pitch: PitchDimensions,
-  attackingClubId: string,
+  attackingDirection: 1 | -1,
   defendingClubId: string,
   passOrigin: Vec2,
   receiverPosition: Vec2,
@@ -380,12 +380,6 @@ export function detectOffside(
   if (defendingPositions.length < 2) {
     return { type: 'none' };
   }
-
-  const attackingDirection = attackingClubId === defendingClubId
-    ? 1
-    : passOrigin.x <= pitch.length / 2
-      ? 1
-      : -1;
 
   const receiverInOppositionHalf =
     attackingDirection === 1
