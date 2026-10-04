@@ -98,7 +98,7 @@ export function createAttackSequence(
 
     const success = resolved.success;
 
-    if (debugCallback) {
+    if (typeof debugCallback === 'function') {
       debugCallback({
         actionIndex: i,
         action: actionType,
