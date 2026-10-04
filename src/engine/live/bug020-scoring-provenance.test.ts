@@ -26,7 +26,13 @@ describe('BUG-020 scoring provenance diagnostic', () => {
         const previous = match.events[match.events.indexOf(g) - 1];
         return previous?.type === 'shot';
       }).length,
-      firstGoals: goals.slice(0, 20),
+      firstGoals: goals.slice(0, 10).map(goal => {
+        const index = match.events.indexOf(goal);
+        return {
+          goal,
+          previousEvents: match.events.slice(Math.max(0, index - 5), index),
+        };
+      }),
     }, null, 2));
   }, 120000);
 });
