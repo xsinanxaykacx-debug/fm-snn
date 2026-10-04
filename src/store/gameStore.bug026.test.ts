@@ -65,6 +65,9 @@ describe('BUG-026 save/load persistence acceptance', () => {
       },
     });
 
+    // Zustand persist writes synchronously in normal storage, but yielding once also
+    // makes this acceptance test safe against middleware scheduling differences.
+    await Promise.resolve();
     const saved = JSON.parse(storage.getItem('fm-clone-save') ?? 'null');
     expect(saved?.state?.season).toBe(3);
     expect(saved?.state?.currentWeek).toBe(17);
