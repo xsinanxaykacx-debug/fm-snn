@@ -1,3 +1,4 @@
+import { createJSONStorage } from 'zustand/middleware';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 class TestStorage implements Storage {
@@ -43,6 +44,8 @@ describe('BUG-026 save/load persistence acceptance', () => {
   it('round-trips a changed game through the real Zustand persist middleware', async () => {
     const first = await import('./gameStore');
     const firstStore = first.useGameStore;
+    firstStore.persist.setOptions({ storage: createJSONStorage(() => storage) });
+    await firstStore.persist.rehydrate();
 
     firstStore.getState().newGame();
     const initial = firstStore.getState();
@@ -65,8 +68,7 @@ describe('BUG-026 save/load persistence acceptance', () => {
       },
     });
 
-    // Zustand persist writes synchronously in normal storage, but yielding once also
-    // makes this acceptance test safe against middleware scheduling differences.
+    // Flush the real persist middleware before inspecting its serialized payload.
     await Promise.resolve();
     const saved = JSON.parse(storage.getItem('fm-clone-save') ?? 'null');
     expect(saved?.state?.season).toBe(3);
@@ -76,6 +78,8 @@ describe('BUG-026 save/load persistence acceptance', () => {
     vi.resetModules();
 
     const second = await import('./gameStore');
+    second.useGameStore.persist.setOptions({ storage: createJSONStorage(() => storage) });
+    await second.useGameStore.persist.rehydrate();
     const loaded = second.useGameStore.getState();
 
     expect(loaded.season).toBe(3);
