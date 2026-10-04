@@ -3,12 +3,14 @@ import { generateGameData } from '../data/generateData';
 import { simulateMatchLive } from './liveMatch';
 
 describe('BUG-020 live scoring calibration', () => {
-  it('keeps the 20-match average total goals between 2 and 3', () => {
+  it('keeps the 100-match average total goals between 2 and 3', () => {
     const { clubs, players } = generateGameData(20261004);
-    const home = clubs.club_1;
-    const away = clubs.club_14;
+    const clubList = Object.values(clubs);
 
-    const totalGoals = Array.from({ length: 20 }, (_, i) => {
+    const totalGoals = Array.from({ length: 100 }, (_, i) => {
+      const home = clubList[(i * 2) % clubList.length];
+      const away = clubList[(i * 2 + 1) % clubList.length];
+
       const match = simulateMatchLive(home, away, players, {
         week: 20,
         seed: 100000 + i,
@@ -16,7 +18,7 @@ describe('BUG-020 live scoring calibration', () => {
       return match.homeScore + match.awayScore;
     }).reduce((sum, goals) => sum + goals, 0);
 
-    const averageGoals = totalGoals / 20;
+    const averageGoals = totalGoals / 100;
 
     expect(averageGoals).toBeGreaterThanOrEqual(2);
     expect(averageGoals).toBeLessThanOrEqual(3);
