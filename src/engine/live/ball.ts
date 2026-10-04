@@ -7,25 +7,12 @@ import type { Ball, PitchDimensions, Vec2, Vec3 } from '../types';
 // ═══════════════════════════════════════════════
 
 export interface BallPhysicsConfig {
-  /** Yerçekimi (m/s²). Negatif. */
   gravity: number;
-
-  /** Hava direnci — TICK BAŞINA katsayı. 10 Hz'de 0.995 → saniyede ≈ 0.951. */
   airDrag: number;
-
-  /** Zemin sürtünmesi — TICK BAŞINA katsayı. 10 Hz'de 0.97 → saniyede ≈ 0.738. */
   groundFriction: number;
-
-  /** Zemin sekme katsayısı (0..1). */
   bounceFactor: number;
-
-  /** Top yarıçapı (m). */
   radius: number;
-
-  /** Top kütlesi (kg) — şimdilik kullanılmıyor. */
   mass: number;
-
-  /** Maksimum top hızı (m/s). */
   maxSpeed: number;
 }
 
@@ -39,20 +26,12 @@ export const DEFAULT_BALL_PHYSICS: BallPhysicsConfig = {
   maxSpeed: 35,
 };
 
-// ═══════════════════════════════════════════════
-// HIZ ARALIKLARI (çağıran tarafından kullanılır)
-// ═══════════════════════════════════════════════
-
 export const BALL_SPEED = {
-  pass: { min: 4,  max: 25 },
+  pass: { min: 4, max: 25 },
   shot: { min: 12, max: 35 },
   cross: { min: 10, max: 25 },
   clearance: { min: 15, max: 30 },
 } as const;
-
-// ═══════════════════════════════════════════════
-// YARDIMCILAR
-// ═══════════════════════════════════════════════
 
 function clampPower(power: number): number {
   if (!Number.isFinite(power)) return 0;
@@ -74,10 +53,7 @@ function directionTo(from: Vec3, to: Vec2): Vec2 {
   const dy = to.y - from.y;
   const len = Math.sqrt(dx * dx + dy * dy);
 
-  if (len < 1e-6) {
-    // Aynı noktaya pas: minimal bir yön ver, NaN üretme
-    return { x: 1, y: 0 };
-  }
+  if (len < 1e-6) return { x: 1, y: 0 };
 
   return { x: dx / len, y: dy / len };
 }
@@ -85,17 +61,12 @@ function directionTo(from: Vec3, to: Vec2): Vec2 {
 function normalizeDirection(dir: Vec2): Vec2 {
   const len = Math.sqrt(dir.x * dir.x + dir.y * dir.y);
 
-  if (len < 1e-6) {
-    return { x: 1, y: 0 };
-  }
+  if (len < 1e-6) return { x: 1, y: 0 };
 
   return { x: dir.x / len, y: dir.y / len };
 }
 
-function clampSpeed(
-  ball: Ball,
-  physics: BallPhysicsConfig
-): void {
+function clampSpeed(ball: Ball, physics: BallPhysicsConfig): void {
   const v = ball.velocity;
   const speed = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 
@@ -106,10 +77,6 @@ function clampSpeed(
     v.z *= scale;
   }
 }
-
-// ═══════════════════════════════════════════════
-// TOP OLUŞTURMA
-// ═══════════════════════════════════════════════
 
 export function createBall(pitch: PitchDimensions): Ball {
   return {
@@ -127,43 +94,27 @@ export function createBall(pitch: PitchDimensions): Ball {
   };
 }
 
-// ═══════════════════════════════════════════════
-// STEP — TEK TICK FİZİK
-// ═══════════════════════════════════════════════
-//
-// KONTRAT:
-//   • Eğer topun sahibi varsa, fizik uygulanmaz.
-//     Top sahibin ayağındadır ve movement.ts tarafından taşınır.
-//   • Sıra: gravity → air drag → position → collision → friction → clamp → stop
-//   • RNG YOKTUR. Bu fonksiyon deterministiktir.
-//
 export function stepBall(
   ball: Ball,
   _pitch: PitchDimensions,
   physics: BallPhysicsConfig,
   tickDuration: number
 ): Ball {
-  // Sahip varsa top ayakta — fizik yok
   if (ball.ownerId !== null) {
     ball.velocity = { x: 0, y: 0, z: 0 };
     ball.isMoving = false;
     return ball;
   }
 
-  // 1) Yerçekimi
   ball.velocity.z += physics.gravity * tickDuration;
-
-  // 2) Hava direnci (her zaman)
   ball.velocity.x *= physics.airDrag;
   ball.velocity.y *= physics.airDrag;
   ball.velocity.z *= physics.airDrag;
 
-  // 3) Konum güncelle
   ball.position.x += ball.velocity.x * tickDuration;
   ball.position.y += ball.velocity.y * tickDuration;
   ball.position.z += ball.velocity.z * tickDuration;
 
-  // 4) Zemin çarpışması / sekme
   if (ball.position.z <= physics.radius) {
     ball.position.z = physics.radius;
 
@@ -175,15 +126,12 @@ export function stepBall(
       ball.velocity.z = 0;
     }
 
-    // 5) Zemin sürtünmesi (yalnızca yerdeyken)
     ball.velocity.x *= physics.groundFriction;
     ball.velocity.y *= physics.groundFriction;
   }
 
-  // 6) Hız sınırı
   clampSpeed(ball, physics);
 
-  // 7) Duran top kontrolü
   const speed =
     Math.abs(ball.velocity.x) +
     Math.abs(ball.velocity.y) +
@@ -200,18 +148,6 @@ export function stepBall(
 
   return ball;
 }
-
-// ═══════════════════════════════════════════════
-// TOP DOKUNMA FONKSİYONLARI
-// ═══════════════════════════════════════════════
-//
-// KONTRAT:
-//   • Bu fonksiyonlar hedefi HESAPLAMAZ. Hedef çağırandan gelir.
-//   • RNG YOKTUR.
-//   • Sadece topa hız verir ve sahipliği serbest bırakır.
-//   • lastTouchId ve lastTouchClubId çağıran tarafından set edilmeli,
-//     ancak kolaylık olsun diye opsiyonel bir player/club parametresi alır.
-//
 
 export function applyPass(
   ball: Ball,
@@ -237,7 +173,6 @@ export function applyPass(
   ball.velocity.x = dir.x * speed;
   ball.velocity.y = dir.y * speed;
   ball.velocity.z = 0;
-
   ball.isMoving = true;
 
   return ball;
@@ -266,11 +201,7 @@ export function applyShot(
 
   ball.velocity.x = dir.x * speed;
   ball.velocity.y = dir.y * speed;
-
-  // Yerden şut varsayılanı: vz = 0.
-  // Çağıran isterse from.z > radius vererek havadan şut atabilir.
   ball.velocity.z = 0;
-
   ball.isMoving = true;
 
   return ball;
@@ -299,11 +230,7 @@ export function applyCross(
 
   ball.velocity.x = dir.x * speed;
   ball.velocity.y = dir.y * speed;
-
-  // Cross her zaman havaya doğru başlar.
-  // Vz, hıza orantılıdır: ~%30 yukarı bileşen.
   ball.velocity.z = speed * 0.3;
-
   ball.isMoving = true;
 
   return ball;
@@ -324,6 +251,7 @@ export function applyClearance(
   ball.ownerId = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
+  ball.lastAction = 'clearance';
 
   ball.position.x = from.x;
   ball.position.y = from.y;
@@ -332,26 +260,17 @@ export function applyClearance(
   ball.velocity.x = dir.x * speed;
   ball.velocity.y = dir.y * speed;
   ball.velocity.z = speed * 0.4;
-
   ball.isMoving = true;
 
   return ball;
 }
-
-// ═══════════════════════════════════════════════
-// TOP KONTROLÜ
-// ═══════════════════════════════════════════════
 
 export function canControl(
   ball: Ball,
   playerPos: Vec2,
   controlRadius: number
 ): boolean {
-  // Top havadaysa kontrol zorlaşır.
-  // Şimdilik basit eşik: z > 1.0 m ise kontrol edilemez.
-  if (ball.position.z > 1.0) {
-    return false;
-  }
+  if (ball.position.z > 1.0) return false;
 
   const dx = ball.position.x - playerPos.x;
   const dy = ball.position.y - playerPos.y;
@@ -368,6 +287,7 @@ export function controlBall(
   ball.ownerId = playerId;
   ball.lastTouchId = playerId;
   ball.lastTouchClubId = clubId;
+  ball.lastAction = 'control';
   ball.velocity = { x: 0, y: 0, z: 0 };
   ball.isMoving = false;
 
@@ -379,12 +299,6 @@ export function releaseBall(ball: Ball): Ball {
   return ball;
 }
 
-/**
- * Sahibi olan topu, sahibin ayağının önüne taşır.
- * movement.ts tarafından her tick çağrılır.
- *
- * Bu fonksiyon topa hız vermez; sadece konumunu sahibe bağlar.
- */
 export function attachBallToOwner(
   ball: Ball,
   ownerPosition: Vec2,
@@ -393,7 +307,6 @@ export function attachBallToOwner(
 ): Ball {
   if (ball.ownerId === null) return ball;
 
-  // Ayak topu: sahibin 0.5 m önünde, yerde
   const footDistance = 0.5;
   const rad = (ownerFacing * Math.PI) / 180;
 
@@ -406,10 +319,6 @@ export function attachBallToOwner(
 
   return ball;
 }
-
-// ═══════════════════════════════════════════════
-// SORGULAR
-// ═══════════════════════════════════════════════
 
 export function ballSpeed(ball: Ball): number {
   const v = ball.velocity;
