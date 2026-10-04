@@ -224,6 +224,7 @@ export function shouldDecide(
   player: LivePlayer,
   time: number
 ): boolean {
+  if (player.player.sentOff || player.player.injured) return false;
   return time >= player.nextDecisionTime;
 }
 
@@ -1421,7 +1422,8 @@ export function computeAllDecisions(
 
   const allPlayers = Object.keys(state.players)
     .sort()
-    .map(id => state.players[id]);
+    .map(id => state.players[id])
+    .filter(player => !player.player.sentOff && !player.player.injured);
 
   const ballPosition: Vec2 = {
     x: state.ball.position.x,
