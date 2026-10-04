@@ -202,7 +202,8 @@ export function createAttackSequence(
     ) {
       nextPlayer = pickPlayerForZone(
         attackXI,
-        currentZone
+        currentZone,
+        rng
       );
 
       tries++;
