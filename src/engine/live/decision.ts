@@ -48,6 +48,7 @@ import type {
   RngState,
   SetPieceState,
   Vec2,
+  SpaceMap,
 } from '../types';
 
 import {
@@ -115,6 +116,7 @@ import {
 import {
   computeDistance,
   computeFullPerception,
+  computeSpaceMap,
 } from './perception';
 
 import { weightedChoice } from './rng';
@@ -1319,7 +1321,8 @@ export function decideForPlayer(
   self: LivePlayer,
   state: DecisionState,
   chaseSet: Set<string>,
-  markAssignments: MarkAssignments = {}
+  markAssignments: MarkAssignments = {},
+  precomputedSpace?: SpaceMap
 ): {
   decision: Decision;
   debug: DecisionDebug;
@@ -1338,7 +1341,8 @@ export function decideForPlayer(
       players: state.players,
       pitch: state.pitch,
       time: state.time,
-    }
+    },
+    precomputedSpace
   );
 
   const ball = state.ball;
@@ -1441,6 +1445,21 @@ export function computeAllDecisions(
     state.pitch
   );
 
+  // Space is independent of the observing player except for team side.
+  // Build at most one map per team per tick instead of once per decision.
+  const homeSpace = computeSpaceMap(
+    homePlayers[0],
+    state.players,
+    state.pitch,
+    4.0
+  );
+  const awaySpace = computeSpaceMap(
+    awayPlayers[0],
+    state.players,
+    state.pitch,
+    4.0
+  );
+
   for (const id of Object.keys(state.players).sort()) {
     const player = state.players[id];
 
@@ -1468,7 +1487,8 @@ export function computeAllDecisions(
       player,
       state,
       chaseSet,
-      markAssignments
+      markAssignments,
+      player.isHome ? homeSpace : awaySpace
     );
 
     decisions[id] = result.decision;
