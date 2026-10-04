@@ -324,6 +324,7 @@ export function applyClearance(
   ball.ownerId = null;
   ball.lastTouchId = playerId ?? null;
   ball.lastTouchClubId = clubId ?? null;
+  ball.lastAction = 'clearance';
 
   ball.position.x = from.x;
   ball.position.y = from.y;
@@ -368,6 +369,7 @@ export function controlBall(
   ball.ownerId = playerId;
   ball.lastTouchId = playerId;
   ball.lastTouchClubId = clubId;
+  ball.lastAction = 'control';
   ball.velocity = { x: 0, y: 0, z: 0 };
   ball.isMoving = false;
 
