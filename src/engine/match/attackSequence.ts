@@ -5,6 +5,7 @@ import type { Player, AttackSequence, AttackSequenceAction, ActionDebugInfo } fr
 import type { TeamMatchState } from './matchState';
 import { eff } from './teamAnalysis';
 import { pickDefender } from './attack';
+import type { MatchRng } from './rng';
 
 // ═══════════════════════════════════════════════
 // TEST EDİLEBİLİR AYAR
@@ -39,11 +40,12 @@ export function createAttackSequence(
   defendingTeam: TeamMatchState,
   attackXI: Player[],
   defendXI: Player[],
-  startingZone: string
+  startingZone: string,
+  rng: MatchRng = Math.random
 ): AttackSequence {
   const actions: AttackSequenceAction[] = [];
   let currentZone = startingZone;
-  let currentPlayer = pickPlayerForZone(attackXI, currentZone);
+  let currentPlayer = pickPlayerForZone(attackXI, currentZone, rng);
   let totalSpace = 0;
   let totalPressure = 0;
   let actionCount = 1;
@@ -71,7 +73,7 @@ export function createAttackSequence(
   attackingTeam.dribblesSuccess++;
 
   for (let i = 0; i < maxActions; i++) {
-    const defender = pickDefender(defendXI, currentZone);
+    const defender = pickDefender(defendXI, currentZone, rng);
     const pressure = calculateDefenderPressure(defender, defendingTeam);
 
     totalPressure += pressure;
@@ -80,7 +82,8 @@ export function createAttackSequence(
     const actionType = chooseSequenceAction(
       currentPlayer,
       currentZone,
-      attackingTeam
+      attackingTeam,
+      rng
     );
 
     const resolved = resolveSequenceAction(
@@ -89,7 +92,8 @@ export function createAttackSequence(
       defender,
       currentZone,
       attackingTeam,
-      defendingTeam
+      defendingTeam,
+      rng
     );
 
     const success = resolved.success;
@@ -185,7 +189,8 @@ export function createAttackSequence(
 
     let nextPlayer = pickPlayerForZone(
       attackXI,
-      currentZone
+      currentZone,
+      rng
     );
 
     let tries = 0;
@@ -258,7 +263,8 @@ export function createAttackSequence(
 
 export function pickPlayerForZone(
   xi: Player[],
-  zone: string
+  zone: string,
+  rng: MatchRng = Math.random
 ): Player | null {
   let positions: string[];
 
@@ -327,7 +333,7 @@ export function pickPlayerForZone(
 
   if (candidates.length === 0) {
     return xi.length > 0
-      ? xi[Math.floor(Math.random() * xi.length)]
+      ? xi[Math.floor(rng() * xi.length)]
       : null;
   }
 
@@ -343,7 +349,8 @@ export function pickPlayerForZone(
 function chooseSequenceAction(
   _player: Player,
   zone: string,
-  team: TeamMatchState
+  team: TeamMatchState,
+  rng: MatchRng = Math.random
 ): AttackSequenceAction['action'] {
   const isWing =
     zone === 'leftAttack' ||
@@ -403,7 +410,8 @@ function resolveSequenceAction(
   defender: Player | null,
   zone: string,
   attackTeam: TeamMatchState,
-  defendTeam: TeamMatchState
+  defendTeam: TeamMatchState,
+  rng: MatchRng = Math.random
 ): ResolvedAction {
   const attackerPower =
     calculateAttackerPower(
