@@ -23,3 +23,4 @@ describe('BUG-020 runtime debug', () => {
     expect(seen).toEqual([167, 168, 169, 170]);
   }, 120000);
 });
+
