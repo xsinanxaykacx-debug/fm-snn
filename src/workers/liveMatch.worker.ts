@@ -57,6 +57,13 @@ type DebugRecording = {
   frames: Frame[];
 };
 
+type ProgressMessage = {
+  type: 'progress';
+  tick: number;
+  time: number;
+  phase: string;
+};
+
 type WorkerScope = {
   onmessage: ((event: MessageEvent<StartMessage>) => void) | null;
   postMessage: (message: unknown) => void;
@@ -134,6 +141,14 @@ scope.onmessage = (event) => {
       week: data.week,
       userLineup: data.userLineup,
       seed: data.seed,
+      onTickPhase: (state, phase) => {
+        scope.postMessage({
+          type: 'progress',
+          tick: state.tick,
+          time: state.time,
+          phase,
+        } satisfies ProgressMessage);
+      },
       onTick: (state) => {
         if (state.tick % 5 === 0 || state.isFinished) {
           sendFrame(state);
