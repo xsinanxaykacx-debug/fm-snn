@@ -130,7 +130,10 @@ describe('BUG-025 live set-piece coverage', () => {
 
   it('selects the goalkeeper for a goal kick', () => {
     const players = makePlayers();
-    expect(selectTaker('goal_kick', players)).toBe('h1');
+    const home = Object.fromEntries(
+      Object.entries(players).filter(([, p]) => p.clubId === 'home')
+    );
+    expect(selectTaker('goal_kick', home)).toBe('h1');
   });
 
   it('times out positioning into ready state instead of getting stuck', () => {
