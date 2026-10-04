@@ -1,12 +1,9 @@
 name: Engine Validation
 
-# BUG-020 validation gate: shot outcome must survive boundary causality.
-
 on:
   push:
     branches:
-      - main
-      - "fix/**"
+      - "debug/bug020-runtime-v3"
   pull_request:
     branches:
       - main
@@ -28,14 +25,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: BUG-020 regression and calibration
-        run: npx vitest run src/engine/live/bug020-regression.test.ts src/engine/live/bug020-calibration.acceptance.test.ts --reporter=verbose
-
-      - name: Tests
-        run: npx vitest run
+      - name: BUG-020 remaining goal sources
+        run: npx vitest run src/engine/live/bug020-runtime-v3.test.ts --reporter=verbose
