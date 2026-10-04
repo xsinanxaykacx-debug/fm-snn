@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { generateGameData } from '../data/generateData';
 import { simulateMatchLive } from './liveMatch';
+import { createMatchSeed } from './rng';
 
 describe('BUG-021 live engine determinism', () => {
   it('produces the same score and event stream for the same seed', () => {
@@ -31,4 +32,13 @@ describe('BUG-021 live engine determinism', () => {
     expect(match2.awayScore).toBe(match1.awayScore);
     expect(match2.events).toEqual(match1.events);
   }, 120_000);
+});
+
+describe('BUG-021 deterministic production seed', () => {
+  it('derives the same seed from the same fixture identity', () => {
+    const seedA = createMatchSeed('fixture_week6_club1_club14', 6);
+    const seedB = createMatchSeed('fixture_week6_club1_club14', 6);
+
+    expect(seedB).toBe(seedA);
+  });
 });
