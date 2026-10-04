@@ -366,13 +366,60 @@ export type OffsideOutcome =
  * Ofsayt tespiti — HENÜZ İMPLEMENTE EDİLMEDİ.
  */
 export function detectOffside(
-  _pitch: PitchDimensions,
-  _attackingClubId: string,
-  _defendingClubId: string,
-  _passOrigin: Vec2,
-  _receiverPosition: Vec2
+  pitch: PitchDimensions,
+  attackingDirection: 1 | -1,
+  defendingClubId: string,
+  passOrigin: Vec2,
+  receiverPosition: Vec2,
+  defenders: Array<{ clubId: string; position: Vec2 }>
 ): OffsideOutcome {
-  return { type: 'none' };
+  const defendingPositions = defenders
+    .filter(player => player.clubId === defendingClubId)
+    .map(player => player.position);
+
+  if (defendingPositions.length < 2) {
+    return { type: 'none' };
+  }
+
+  const receiverInOppositionHalf =
+    attackingDirection === 1
+      ? receiverPosition.x > pitch.length / 2
+      : receiverPosition.x < pitch.length / 2;
+
+  if (!receiverInOppositionHalf) {
+    return { type: 'none' };
+  }
+
+  const sortedDefenders = [...defendingPositions].sort((a, b) =>
+    attackingDirection === 1
+      ? b.x - a.x
+      : a.x - b.x
+  );
+
+  const secondLastDefenderX = sortedDefenders[1].x;
+
+  const beyondDefender =
+    attackingDirection === 1
+      ? receiverPosition.x > secondLastDefenderX
+      : receiverPosition.x < secondLastDefenderX;
+
+  const beyondBall =
+    attackingDirection === 1
+      ? receiverPosition.x > passOrigin.x
+      : receiverPosition.x < passOrigin.x;
+
+  if (!beyondDefender || !beyondBall) {
+    return { type: 'none' };
+  }
+
+  return {
+    type: 'offside',
+    side: attackingDirection === 1 ? 'AWAY' : 'HOME',
+    freeKickPoint: {
+      x: Math.max(2, Math.min(pitch.length - 2, passOrigin.x)),
+      y: Math.max(2, Math.min(pitch.width - 2, passOrigin.y)),
+    },
+  };
 }
 
 /**
