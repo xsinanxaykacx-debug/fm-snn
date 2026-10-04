@@ -42,3 +42,30 @@ describe('BUG-021 deterministic production seed', () => {
     expect(seedB).toBe(seedA);
   });
 });
+
+
+describe('BUG-032 live progress diagnostics', () => {
+  it('emits tick phase progress and reaches full time', () => {
+    const data = generateGameData(20261004);
+    const home = data.clubs.club_1;
+    const away = data.clubs.club_14;
+    expect(home).toBeDefined();
+    expect(away).toBeDefined();
+
+    const phases: string[] = [];
+    const match = simulateMatchLive(home, away, data.players, {
+      seed: 32032,
+      week: 6,
+      onTickPhase: (state, phase) => {
+        if (state.tick <= 2 || phase === 'after-phase') {
+          phases.push(state.tick + ':' + phase);
+        }
+      },
+    });
+
+    expect(match.played).toBe(true);
+    expect(match.stats.simulationSeconds).toBeGreaterThanOrEqual(90 * 60);
+    expect(phases).toContain('1:tick-start');
+    expect(phases).toContain('1:after-phase');
+  }, 120_000);
+});
