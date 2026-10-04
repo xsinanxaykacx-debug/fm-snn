@@ -728,6 +728,14 @@ export interface RngState {
 // TOP (LIVE)
 // ═══════════════════════════════════════════════
 
+export type BallLastAction =
+  | 'pass'
+  | 'shot'
+  | 'cross'
+  | 'clearance'
+  | 'control'
+  | null;
+
 export interface Ball {
   position: Vec3;
   velocity: Vec3;
