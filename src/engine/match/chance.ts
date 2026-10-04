@@ -10,6 +10,7 @@ import type {
 } from './matchState';
 
 import { eff } from './teamAnalysis';
+import type { MatchRng } from './rng';
 
 export interface Chance {
   shooter: Player;
@@ -65,7 +66,8 @@ export function calculateChanceFromSequence(
   shooter: Player,
   attackingTeam: TeamMatchState,
   defendingTeam: TeamMatchState,
-  isHome: boolean = false
+  isHome: boolean = false,
+  rng: MatchRng = Math.random
 ): Chance {
   // Parametreler motor sözleşmesinin parçası.
   // Şimdilik takım state'leri sequence tarafından
@@ -123,7 +125,7 @@ export function calculateChanceFromSequence(
       Math.min(
         30,
         distance +
-          (Math.random() - 0.5) *
+          (rng() - 0.5) *
             4
       )
     );
