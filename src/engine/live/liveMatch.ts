@@ -1264,10 +1264,14 @@ export function applyBoundaryOutcome(
   if (outcome.type === 'goal') {
     const pendingShot = getPendingShot(state);
 
-    if (
+    const lastEvent = state.events[state.events.length - 1];
+    const shotIsCausallyBound =
       pendingShot !== undefined &&
-      pendingShot.playerId === state.ball.lastTouchId
-    ) {
+      lastEvent?.type === 'shot' &&
+      lastEvent.playerId === state.ball.lastTouchId &&
+      pendingShot.playerId === state.ball.lastTouchId;
+
+    if (shotIsCausallyBound) {
       deletePendingShot(state);
 
       if (
