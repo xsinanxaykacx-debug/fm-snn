@@ -1,5 +1,7 @@
 name: Engine Validation
 
+# BUG-020 validation gate: shot outcome must survive boundary causality.
+
 on:
   push:
     branches:
