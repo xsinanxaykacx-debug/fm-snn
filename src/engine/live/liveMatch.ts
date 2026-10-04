@@ -1098,6 +1098,17 @@ function handleShootAction(
   if (!decision.target) return;
 
   const resolution = resolveShotAction(owner, decision, state);
+  const isGoal = nextBool(state.rng, resolution.probability);
+
+  const saveChance =
+    resolution.defenderId !== null
+      ? resolution.goalkeeperSkill * (1 - resolution.probability)
+      : 0;
+
+  const isSave = !isGoal && nextBool(state.rng, saveChance);
+  const shotOutcome: 'goal' | 'save' | 'miss' =
+    isGoal ? 'goal' : isSave ? 'save' : 'miss';
+
   const shotXG = resolution.xG;
 
   state.ball = applyShot(
@@ -1127,8 +1138,37 @@ function handleShootAction(
     playerId: owner.player.id,
     clubId: owner.clubId,
     xG: shotXG,
+    shotOutcome,
+    goalkeeperId: resolution.defenderId ?? undefined,
     description: `Şut: ${owner.player.name}`,
   });
+
+  (state as LiveMatchState & {
+    pendingShot?: {
+      playerId: string;
+      outcome: 'goal' | 'save' | 'miss';
+      goalkeeperId?: string;
+    };
+  }).pendingShot = {
+    playerId: owner.player.id,
+    outcome: shotOutcome,
+    goalkeeperId: resolution.defenderId ?? undefined,
+  };
+
+  console.log(
+    '[BUG-020-SHOT]',
+    JSON.stringify({
+      tick: state.tick,
+      time: state.time,
+      playerId: owner.player.id,
+      lastTouchId: state.ball.lastTouchId,
+      probability: resolution.probability,
+      xG: resolution.xG,
+      shotOutcome,
+      goalkeeperId: resolution.defenderId,
+      pendingShot: (state as LiveMatchState & { pendingShot?: unknown }).pendingShot,
+    }),
+  );
 }
 
 function handleCrossAction(
@@ -1230,11 +1270,55 @@ function applyBoundaryOutcome(
   if (outcome.type === 'none') return;
 
   if (outcome.type === 'goal') {
-    if (resolveGoalkeeperSave(outcome, state, players)) {
+    const pendingShot = (state as LiveMatchState & {
+      pendingShot?: {
+        playerId: string;
+        outcome: 'goal' | 'save' | 'miss';
+        goalkeeperId?: string;
+      };
+    }).pendingShot;
+
+    if (state.tick >= 167 && state.tick <= 170) {
+      console.log(
+        '[BUG-020-BOUNDARY]',
+        JSON.stringify({
+          tick: state.tick,
+          time: state.time,
+          boundary: outcome,
+          lastTouchId: state.ball.lastTouchId,
+          pendingShot,
+          lastEvent: state.events[state.events.length - 1],
+          score: state.score,
+        }),
+      );
+    }
+
+    if (
+      pendingShot === undefined ||
+      pendingShot.playerId !== state.ball.lastTouchId
+    ) {
       return;
     }
 
-    handleGoal(outcome, state, players);
+    delete (state as LiveMatchState & {
+      pendingShot?: {
+        playerId: string;
+        outcome: 'goal' | 'save' | 'miss';
+        goalkeeperId?: string;
+      };
+    }).pendingShot;
+
+    if (pendingShot.outcome === 'goal') {
+      handleGoal(outcome, state, players);
+      return;
+    }
+
+    handleResolvedShotFailure(
+      outcome,
+      pendingShot.outcome,
+      state,
+      players
+    );
     return;
   }
 
@@ -1358,6 +1442,64 @@ function resolveGoalkeeperSave(
   );
 
   return true;
+}
+
+function handleResolvedShotFailure(
+  outcome: BoundaryOutcome & { type: 'goal' },
+  shotOutcome: 'save' | 'miss',
+  state: LiveMatchState,
+  players: Record<string, Player>
+): void {
+  const defendingSide: TeamSide =
+    outcome.scorerSide === 'HOME' ? 'AWAY' : 'HOME';
+
+  const goalkeeperId =
+    [...state.events]
+      .reverse()
+      .find(event =>
+        event.type === 'shot' &&
+        event.playerId === state.ball.lastTouchId
+      )?.goalkeeperId;
+
+  const goalkeeperName =
+    goalkeeperId !== undefined && players[goalkeeperId]
+      ? players[goalkeeperId].name
+      : 'Kaleci';
+
+  const side = outcome.scorerSide === 'HOME' ? 'home' : 'away';
+
+  if (shotOutcome === 'save') {
+    state.stats.onTarget[side] += 1;
+    state.events.push({
+      minute: Math.floor(state.time / 60),
+      type: 'save',
+      playerId: state.ball.lastTouchId ?? undefined,
+      clubId: state.ball.lastTouchClubId ?? undefined,
+      goalkeeperId,
+      description: `Kurtarış: ${goalkeeperName}`,
+    });
+  } else {
+    state.events.push({
+      minute: Math.floor(state.time / 60),
+      type: 'miss',
+      playerId: state.ball.lastTouchId ?? undefined,
+      clubId: state.ball.lastTouchClubId ?? undefined,
+      description: 'Şut auta çıktı.',
+    });
+  }
+
+  handleGoalKick(
+    {
+      type: 'goal_kick',
+      side: defendingSide,
+      point: {
+        x: outcome.point.x,
+        y: Math.max(8, Math.min(state.pitch.width - 8, outcome.point.y)),
+      },
+    },
+    state,
+    players
+  );
 }
 
 /**
