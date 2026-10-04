@@ -1069,7 +1069,7 @@ function handlePassAction(
     return;
   }
 
-  const target = completed
+  const rawTarget = completed
     ? decision.target
     : {
         x: owner.position.x +
@@ -1077,6 +1077,14 @@ function handlePassAction(
         y: owner.position.y +
           (decision.target.y - owner.position.y) * 0.55,
       };
+
+  // A receiver may legally be positioned on the pitch boundary, but a pass
+  // ending exactly on x=0/x=length can be interpreted by the boundary detector
+  // as a goal-mouth crossing. Keep every pass target strictly inside the field.
+  const target = {
+    x: Math.max(2, Math.min(state.pitch.length - 2, rawTarget.x)),
+    y: Math.max(2, Math.min(state.pitch.width - 2, rawTarget.y)),
+  };
 
   state.ball = applyPass(
     state.ball,
