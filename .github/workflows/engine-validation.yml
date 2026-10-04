@@ -1,25 +1,36 @@
 name: Engine Validation
 
 on:
-  workflow_dispatch:
   push:
-    branches: [debug/bug020-runtime]
+    branches:
+      - main
+      - "fix/**"
+  pull_request:
+    branches:
+      - main
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install
+      - name: Install dependencies
         run: npm ci
 
-      - name: Debug Trace
-        run: npx vitest run src/engine/live/debug-trace.test.ts
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Tests
+        run: npx vitest run
