@@ -440,7 +440,7 @@ function runTick(
 
   // ─── 8b. Ball actions ───
   if (!tackleChangedPossession) {
-    applyBallActions(state, decisions);
+    applyBallActions(state, decisions, players);
   }
 
   // ─── 9. Sınır geçişi ───
@@ -974,7 +974,8 @@ function resolveLooseBallControl(state: LiveMatchState): void {
 
 function applyBallActions(
   state: LiveMatchState,
-  decisions: Record<string, Decision>
+  decisions: Record<string, Decision>,
+  players: Record<string, Player>
 ): void {
   const ownerId = state.ball.ownerId;
   if (ownerId === null) return;
@@ -987,7 +988,7 @@ function applyBallActions(
 
   switch (decision.intent) {
     case 'pass':
-      handlePassAction(owner, decision, state);
+      handlePassAction(owner, decision, state, players);
       break;
 
     case 'shoot':
@@ -1010,7 +1011,8 @@ function applyBallActions(
 function handlePassAction(
   owner: LivePlayer,
   decision: Decision,
-  state: LiveMatchState
+  state: LiveMatchState,
+  players: Record<string, Player>
 ): void {
   if (!decision.target) return;
 
