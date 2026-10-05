@@ -1,4 +1,12 @@
-import type { BallState, MatchEvent, Pitch, TeamSide, Vec2, Vec3 } from './state';
+import type {
+  BallState,
+  MatchEvent,
+  Pitch,
+  PlayerState,
+  TeamSide,
+  Vec2,
+  Vec3,
+} from './state';
 
 const EPSILON = 1e-9;
 
@@ -185,27 +193,62 @@ function restartPoint(pitch: Pitch, side: TeamSide): Vec2 {
   };
 }
 
+function cornerPoint(pitch: Pitch, crossing: BoundaryCrossing): Vec2 {
+  return {
+    x: crossing.side === 'LEFT' ? 0 : pitch.length,
+    y: crossing.point.y < pitch.width / 2 ? 0 : pitch.width,
+  };
+}
+
+function throwInPoint(pitch: Pitch, crossing: BoundaryCrossing): Vec2 {
+  return {
+    x: Math.max(0, Math.min(pitch.length, crossing.point.x)),
+    y: crossing.side === 'TOP' ? 0 : pitch.width,
+  };
+}
+
+function lastTouchSide(
+  ball: BallState,
+  players: Readonly<Record<string, PlayerState>>,
+): TeamSide {
+  if (ball.lastTouchSide !== null) {
+    return ball.lastTouchSide;
+  }
+
+  if (ball.lastTouchId === null) {
+    throw new Error(
+      'live-v2 boundary: null lastTouchSide requires lastTouchId',
+    );
+  }
+
+  const player = players[ball.lastTouchId];
+
+  if (!player) {
+    throw new Error(
+      'live-v2 boundary: lastTouchId ' + ball.lastTouchId + ' not found in players',
+    );
+  }
+
+  return player.team;
+}
+
 function resolveCrossing(
   pitch: Pitch,
   crossing: BoundaryCrossing,
   ball: BallState,
+  players: Readonly<Record<string, PlayerState>>,
 ): MatchEvent {
+  const touchSide = lastTouchSide(ball, players);
+
   if (crossing.side === 'TOP' || crossing.side === 'BOTTOM') {
     return {
       type: 'throw_in',
-      side:
-        ball.lastTouchSide === null
-          ? 'HOME'
-          : opposite(ball.lastTouchSide),
-      point: crossing.point,
+      side: opposite(touchSide),
+      point: throwInPoint(pitch, crossing),
     };
   }
 
   const defending = defendingSide(crossing.side);
-  const attacking =
-    ball.lastTouchSide === null
-      ? opposite(defending)
-      : ball.lastTouchSide;
 
   if (
     inGoalMouth(pitch, crossing.point.y) &&
@@ -214,16 +257,16 @@ function resolveCrossing(
   ) {
     return {
       type: 'goal',
-      scorerSide: attacking,
+      scorerSide: touchSide,
       point: crossing.point,
     };
   }
 
-  if (ball.lastTouchSide === defending) {
+  if (touchSide === defending) {
     return {
       type: 'corner',
-      side: attacking,
-      point: crossing.point,
+      side: opposite(defending),
+      point: cornerPoint(pitch, crossing),
     };
   }
 
@@ -239,19 +282,17 @@ function resolveCrossing(
  *
  * It accepts both normal inside-to-outside crossings and states where the
  * ball is already outside the field. The caller never needs a second
- * "recovery" function.
+ * recovery function.
  *
- * The function:
- * - never mutates the supplied ball or pitch;
- * - uses no RNG;
- * - derives the crossing from the current input pair;
- * - produces a deterministic result for identical inputs.
+ * When lastTouchSide is null, the lastTouchId is resolved against the
+ * supplied player table. No arbitrary side fallback is permitted.
  */
 export function resolveBoundary(
   pitch: Pitch,
   previousBallPosition: Vec3,
   nextBallPosition: Vec3,
   ball: BallState,
+  players: Readonly<Record<string, PlayerState>>,
 ): BoundaryResult {
   if (!finite(previousBallPosition) || !finite(nextBallPosition)) {
     throw new Error('live-v2 boundary: non-finite ball position');
@@ -282,7 +323,7 @@ export function resolveBoundary(
   }
 
   return {
-    event: resolveCrossing(pitch, crossing, ball),
+    event: resolveCrossing(pitch, crossing, ball, players),
     crossing,
   };
 }
