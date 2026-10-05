@@ -46,6 +46,11 @@ export function eventToRestart(state: MatchState, event: MatchEvent): RestartSta
 
 export function applyRestart(state: MatchState, event: MatchEvent): MatchState {
   const restart = eventToRestart(state, event);
+
+  if (restart === null) {
+    throw new Error('live-v2 restart: event did not produce a restart');
+  }
+
   const score =
     event.type === 'goal'
       ? event.scorerSide === 'HOME'
