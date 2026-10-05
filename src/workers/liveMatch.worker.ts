@@ -57,6 +57,13 @@ type DebugRecording = {
   frames: Frame[];
 };
 
+type ProgressMessage = {
+  type: 'progress';
+  tick: number;
+  time: number;
+  phase: string;
+};
+
 type WorkerScope = {
   onmessage: ((event: MessageEvent<StartMessage>) => void) | null;
   postMessage: (message: unknown) => void;
@@ -65,7 +72,7 @@ type WorkerScope = {
 const scope = self as unknown as WorkerScope;
 
 const DEBUG_SAMPLE_TICKS = 10;
-const DEBUG_MAX_SECONDS = 300;
+const DEBUG_MAX_SECONDS = 90 * 60;
 
 function compactFrame(state: LiveMatchState): Frame {
   return {
@@ -134,7 +141,36 @@ scope.onmessage = (event) => {
       week: data.week,
       userLineup: data.userLineup,
       seed: data.seed,
+      onTickPhase: (() => {
+        let phaseStartedAt = Date.now();
+
+        return (state, phase) => {
+          const now = Date.now();
+          const phaseElapsedMs = now - phaseStartedAt;
+          phaseStartedAt = now;
+
+          // Keep the diagnostic channel cheap. Normal progress is emitted
+          // by onTick every 5 ticks; this callback only reports unusually
+          // slow engine phases so the UI watchdog can identify the stall point.
+          if (phaseElapsedMs >= 250) {
+            scope.postMessage({
+              type: 'progress',
+              tick: state.tick,
+              time: state.time,
+              phase: `slow:${phase}:${phaseElapsedMs}ms`,
+            } satisfies ProgressMessage);
+          }
+        };
+      })(),
       onTick: (state) => {
+        if (state.tick % 5 === 0 || state.isFinished) {
+          scope.postMessage({
+            type: 'progress',
+            tick: state.tick,
+            time: state.time,
+            phase: 'tick-complete',
+          } satisfies ProgressMessage);
+        }
         if (state.tick % 5 === 0 || state.isFinished) {
           sendFrame(state);
         }

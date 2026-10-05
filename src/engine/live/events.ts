@@ -130,12 +130,21 @@ export function detectBoundaryOutcome(
     { x: nextBallPos.x, y: nextBallPos.y }
   );
 
-  const crossingPoint = crossing.point;
+  let resolvedCrossing = crossing;
+
+  // Güvenlik ağı: ilk sınır olayı kaçırılmışsa top sonraki tick'te
+  // zaten saha dışında olabilir. Bu durumda crossing geometrisi artık
+  // yeni bir kesişim üretmez ve top deadlock'a girebilir.
+  if (!resolvedCrossing.crossed) {
+    resolvedCrossing = recoverOutsideCrossing(pitch, nextBallPos);
+  }
+
+  const crossingPoint = resolvedCrossing.point;
 
   if (
-    !crossing.crossed ||
+    !resolvedCrossing.crossed ||
     crossingPoint === null ||
-    crossing.side === null
+    resolvedCrossing.side === null
   ) {
     return { type: 'none' };
   }
@@ -148,14 +157,14 @@ export function detectBoundaryOutcome(
   );
 
   // 3) Sınıflandırma
-  switch (crossing.type) {
+  switch (resolvedCrossing.type) {
     case 'TOUCHLINE':
       return handleTouchline(crossingPoint, lastTouchSide);
 
     case 'GOAL_MOUTH':
       return handleGoalMouth(
         pitch,
-        crossing,
+        resolvedCrossing,
         crossingPoint,
         prevBallPos,
         nextBallPos,
@@ -165,7 +174,7 @@ export function detectBoundaryOutcome(
     case 'GOAL_LINE':
       return handleGoalLine(
         pitch,
-        crossing,
+        resolvedCrossing,
         crossingPoint,
         lastTouchSide
       );
@@ -174,6 +183,46 @@ export function detectBoundaryOutcome(
     default:
       return { type: 'none' };
   }
+}
+
+
+function recoverOutsideCrossing(
+  pitch: PitchDimensions,
+  nextBallPos: Vec3
+): BoundaryCrossing {
+  const candidates = [
+    { side: 'LEFT' as const, distance: Math.abs(nextBallPos.x), outside: nextBallPos.x < 0 },
+    { side: 'RIGHT' as const, distance: Math.abs(nextBallPos.x - pitch.length), outside: nextBallPos.x > pitch.length },
+    { side: 'TOP' as const, distance: Math.abs(nextBallPos.y), outside: nextBallPos.y < 0 },
+    { side: 'BOTTOM' as const, distance: Math.abs(nextBallPos.y - pitch.width), outside: nextBallPos.y > pitch.width },
+  ]
+    .filter(candidate => candidate.outside)
+    .sort((a, b) => a.distance - b.distance);
+
+  const candidate = candidates[0];
+  if (!candidate) {
+    return { crossed: false, type: 'NONE', point: null, t: null, half: null, side: null };
+  }
+
+  const point = {
+    x: Math.max(0, Math.min(pitch.length, nextBallPos.x)),
+    y: Math.max(0, Math.min(pitch.width, nextBallPos.y)),
+  };
+
+  const goalMouth =
+    point.y >= pitch.width / 2 - pitch.goalWidth / 2 &&
+    point.y <= pitch.width / 2 + pitch.goalWidth / 2;
+
+  return {
+    crossed: true,
+    type: candidate.side === 'LEFT' || candidate.side === 'RIGHT'
+      ? goalMouth ? 'GOAL_MOUTH' : 'GOAL_LINE'
+      : 'TOUCHLINE',
+    point,
+    t: 1,
+    half: point.x < pitch.length / 2 ? 'LEFT' : 'RIGHT',
+    side: candidate.side,
+  };
 }
 
 // ═══════════════════════════════════════════════
