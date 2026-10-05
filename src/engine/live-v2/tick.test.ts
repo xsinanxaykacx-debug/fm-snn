@@ -138,6 +138,52 @@ describe('live-v2 tick', () => {
     expect(next.players.p2.position.y).toBeLessThanOrEqual(next.pitch.width);
   });
 
+  it('integrates possession after movement and ball physics', () => {
+    const s = state();
+    const next = runTick({
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          position: { x: 50.8, y: 32 },
+        },
+      },
+    });
+
+    expect(next.ball.ownerId).toBe('p1');
+    expect(next.ball.lastTouchId).toBe('p1');
+    expect(next.ball.lastTouchSide).toBe('HOME');
+  });
+
+  it('allows possession to change to a closer opponent during the tick', () => {
+    const s = state();
+    const next = runTick({
+      ...s,
+      ball: {
+        ...s.ball,
+        ownerId: 'p1',
+        lastTouchId: 'p1',
+        lastTouchSide: 'HOME',
+      },
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          position: { x: 50, y: 32 },
+        },
+        p2: {
+          ...s.players.p2,
+          position: { x: 50.4, y: 32 },
+        },
+      },
+    });
+
+    expect(next.ball.ownerId).toBe('p2');
+    expect(next.ball.lastTouchId).toBe('p2');
+    expect(next.ball.lastTouchSide).toBe('AWAY');
+  });
+
   it('keeps perception and decision deterministic for the same state and seed', () => {
     const a = runTick(state());
     const b = runTick(state());
