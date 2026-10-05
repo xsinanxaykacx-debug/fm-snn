@@ -19,12 +19,10 @@ export function runTick(state: MatchState): MatchState {
   const perceptions = perceive(state);
   const decisions = decide(state, perceptions);
   const previousBallPosition = { ...state.ball.position };
-  const perceivedState = state;
-
   // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
   const intents: MovementIntent[] = decisions;
 
-  const moved = applyMovement(perceivedState, intents);
+  const moved = applyMovement(withActions, intents);
   const ballStepped = stepBall(moved);
 
   const boundary = resolveBoundary(
