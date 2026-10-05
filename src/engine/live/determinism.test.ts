@@ -115,3 +115,55 @@ describe('BUG-032 second-half movement regression', () => {
     expect(cumulativeMovement).toBeGreaterThan(0);
   }, 120_000);
 });
+
+
+describe('BUG-032 boundary recovery', () => {
+  const pitch = {
+    length: 104,
+    width: 64,
+    goalWidth: 7.32,
+    goalHeight: 2.44,
+    postRadius: 0.06,
+    penaltyAreaDepth: 16.5,
+    penaltyAreaWidth: 40.32,
+    goalAreaDepth: 5.5,
+    goalAreaWidth: 18.32,
+    penaltySpotDistance: 11,
+    centerCircleRadius: 9.15,
+    cornerArcRadius: 1,
+  };
+
+  it('recovers a goal when the ball is already beyond the left goal line', async () => {
+    const { detectBoundaryOutcome } = await import('./events');
+
+    const outcome = detectBoundaryOutcome({
+      pitch,
+      prevBallPos: { x: -0.2, y: 32, z: 0.11 },
+      nextBallPos: { x: -2, y: 32, z: 0.11 },
+      lastTouchId: 'player_club_1_18',
+      lastTouchClubId: 'club_14',
+      homeClubId: 'club_1',
+      awayClubId: 'club_14',
+    });
+
+    expect(outcome.type).toBe('goal');
+    expect(outcome).toMatchObject({ scorerSide: 'AWAY' });
+  });
+
+  it('still detects the normal inside-to-outside crossing', async () => {
+    const { detectBoundaryOutcome } = await import('./events');
+
+    const outcome = detectBoundaryOutcome({
+      pitch,
+      prevBallPos: { x: 0.8, y: 32, z: 0.11 },
+      nextBallPos: { x: -0.8, y: 32, z: 0.11 },
+      lastTouchId: 'player_club_14_410',
+      lastTouchClubId: 'club_14',
+      homeClubId: 'club_1',
+      awayClubId: 'club_14',
+    });
+
+    expect(outcome.type).toBe('goal');
+    expect(outcome).toMatchObject({ scorerSide: 'AWAY' });
+  });
+});
