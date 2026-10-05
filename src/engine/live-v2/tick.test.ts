@@ -162,6 +162,7 @@ describe('live-v2 tick', () => {
       ...s,
       ball: {
         ...s.ball,
+        velocity: { x: 0, y: 0, z: 0 },
         ownerId: 'p1',
         lastTouchId: 'p1',
         lastTouchSide: 'HOME',
@@ -170,11 +171,11 @@ describe('live-v2 tick', () => {
         ...s.players,
         p1: {
           ...s.players.p1,
-          position: { x: 50, y: 32 },
+          position: { x: 60, y: 32 },
         },
         p2: {
           ...s.players.p2,
-          position: { x: 50.4, y: 32 },
+          position: { x: 50.2, y: 32 },
         },
       },
     });
