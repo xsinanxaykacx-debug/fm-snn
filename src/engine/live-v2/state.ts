@@ -125,6 +125,9 @@ export type MatchDiagnostics = {
 };
 
 export type MatchState = {
+  /** Optional deterministic seed reserved for the decision/RNG layer. */
+  seed?: number;
+
   /** Match clock in simulation seconds. */
   clockSeconds: number;
 
