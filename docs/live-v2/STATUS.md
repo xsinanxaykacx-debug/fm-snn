@@ -10,8 +10,8 @@
 - Repo: xsinanxaykacx-debug/fm-snn
 - Branch: live-v2-foundation
 - PR: #39 (OPEN, DRAFT)
-- HEAD: 2b762cdba2e6c386552cc516f019dd1b3cfef692
-- Son yeşil CI: #716 (başarılı, 2b762cd)
+- HEAD: 75de842ed0824c5202504b9c60109e3b6252bad2
+- Son yeşil CI: #718 (başarılı, 75de842)
 
 ## Tamamlanan adımlar (handoff §23 sırası)
 - [x] A: perceive/decide tick entegrasyonu — CI #706 yeşil
