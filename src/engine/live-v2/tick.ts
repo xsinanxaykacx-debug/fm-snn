@@ -1,6 +1,7 @@
 import type { MatchState } from './state';
 import { perceive } from './perception';
 import { decide } from './decision';
+import { updatePossession } from './possession';
 import { applyMovement, type MovementIntent } from './movement';
 import { stepBall } from './ball';
 import { resolveBoundary } from './boundary';
@@ -40,6 +41,8 @@ export function runTick(state: MatchState): MatchState {
     next = applyRestart(next, boundary.event);
     next = { ...next, events: [...next.events, boundary.event] };
     next = consumeRestart(next);
+  } else {
+    next = updatePossession(next);
   }
 
   const nextClock = next.clockSeconds + 1;
