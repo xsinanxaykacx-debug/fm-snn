@@ -1,4 +1,6 @@
 import type { MatchState } from './state';
+import { perceive } from './perception';
+import { decide } from './decision';
 import { applyMovement, type MovementIntent } from './movement';
 import { stepBall } from './ball';
 import { resolveBoundary } from './boundary';
@@ -20,6 +22,8 @@ function phaseAt(clockSeconds: number): MatchState['phase'] {
 
 /** Executes exactly one deterministic v2 simulation tick. */
 export function runTick(state: MatchState): MatchState {
+  const perceptions = perceive(state);
+  const decisions = decide(state, perceptions);
   const previousBallPosition = { ...state.ball.position };
   const perceivedState = state;
   const intents = noDecisionMovement(perceivedState);
@@ -44,6 +48,7 @@ export function runTick(state: MatchState): MatchState {
 
   const nextClock = next.clockSeconds + 1;
   const nextPhase = phaseAt(nextClock);
+  const lastDecisionAction = decisions[0]?.action;
 
   return {
     ...next,
@@ -55,6 +60,8 @@ export function runTick(state: MatchState): MatchState {
       lastTick: next.tick + 1,
       lastBallPosition: { ...next.ball.position },
       lastBallVelocity: { ...next.ball.velocity },
+      lastDecisionAction,
+      perceivedPlayerCount: Object.keys(perceptions.players).length,
     },
   };
 }
