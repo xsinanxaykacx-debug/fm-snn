@@ -171,11 +171,11 @@ describe('live-v2 tick', () => {
         ...s.players,
         p1: {
           ...s.players.p1,
-          position: { x: 60, y: 32 },
+          position: { x: 52.5, y: 32 },
         },
         p2: {
           ...s.players.p2,
-          position: { x: 50.2, y: 32 },
+          position: { x: 49.8, y: 32 },
         },
       },
     });
