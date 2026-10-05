@@ -39,6 +39,7 @@ export function runTick(state: MatchState): MatchState {
     previousBallPosition,
     ballStepped.ball.position,
     ballStepped.ball,
+    moved.players,
   );
 
   let next = ballStepped;
