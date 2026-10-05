@@ -5,7 +5,13 @@ export type MatchPhase = 'kickoff' | 'first_half' | 'halftime' | 'second_half' |
 export type Vec2 = { x: number; y: number };
 export type Vec3 = Vec2 & { z: number };
 
-export type Pitch = { length: number; width: number; goalWidth: number; goalHeight: number };
+export type Pitch = {
+  length: number;
+  width: number;
+  goalWidth: number;
+  goalHeight: number;
+  goalAreaDepth: number;
+};
 
 export type BallState = {
   position: Vec3;
@@ -15,9 +21,18 @@ export type BallState = {
   lastTouchSide: TeamSide | null;
 };
 
-export type PlayerState = { id: string; team: TeamSide; position: Vec2; velocity: Vec2 };
+export type PlayerState = {
+  id: string;
+  team: TeamSide;
+  position: Vec2;
+  velocity: Vec2;
+};
 
-export type TeamState = { id: string; side: TeamSide; playerIds: string[] };
+export type TeamState = {
+  id: string;
+  side: TeamSide;
+  playerIds: string[];
+};
 
 export type RestartState =
   | { type: 'kickoff'; side: TeamSide; point: Vec2 }
