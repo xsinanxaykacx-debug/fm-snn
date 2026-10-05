@@ -1,6 +1,7 @@
 import type { MatchState } from './state';
 import { perceive } from './perception';
 import { decide } from './decision';
+import { resolveActions } from './actionResolution';
 import { updatePossession } from './possession';
 import { applyMovement, type MovementIntent } from './movement';
 import { stepBall } from './ball';
@@ -18,6 +19,7 @@ function phaseAt(clockSeconds: number): MatchState['phase'] {
 export function runTick(state: MatchState): MatchState {
   const perceptions = perceive(state);
   const decisions = decide(state, perceptions);
+  const withActions = resolveActions(state, decisions);
   const previousBallPosition = { ...state.ball.position };
   // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
   const intents: MovementIntent[] = decisions;
