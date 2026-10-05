@@ -6,6 +6,8 @@
  * than mutating shared state in place.
  */
 
+import type { DecisionAction } from './decision';
+
 export type TeamSide = 'HOME' | 'AWAY';
 
 export type MatchPhase =
@@ -122,6 +124,8 @@ export type MatchDiagnostics = {
   lastTick: number;
   lastBallPosition: Vec3;
   lastBallVelocity: Vec3;
+  lastDecisionAction?: DecisionAction;
+  perceivedPlayerCount?: number;
 };
 
 export type MatchState = {
