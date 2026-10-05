@@ -1,0 +1,46 @@
+import type { MatchState, Vec3 } from './state';
+
+export type BallPhysicsConfig = {
+  dt: number;
+  friction: number;
+  gravity: number;
+  stopSpeed: number;
+};
+
+export const DEFAULT_BALL_PHYSICS: BallPhysicsConfig = {
+  dt: 1,
+  friction: 0.15,
+  gravity: 9.81,
+  stopSpeed: 0.001,
+};
+
+function finiteVector(value: Vec3): boolean {
+  return Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.z);
+}
+
+export function stepBall(state: MatchState, config: BallPhysicsConfig = DEFAULT_BALL_PHYSICS): MatchState {
+  if (!Number.isFinite(config.dt) || config.dt <= 0) throw new Error('live-v2 ball: invalid dt');
+  if (!Number.isFinite(config.friction) || config.friction < 0 || config.friction > 1) throw new Error('live-v2 ball: invalid friction');
+  if (!Number.isFinite(config.gravity) || config.gravity < 0) throw new Error('live-v2 ball: invalid gravity');
+  if (!Number.isFinite(config.stopSpeed) || config.stopSpeed < 0) throw new Error('live-v2 ball: invalid stopSpeed');
+  if (!finiteVector(state.ball.position) || !finiteVector(state.ball.velocity)) throw new Error('live-v2 ball: non-finite state');
+
+  const { position: p, velocity: v } = state.ball;
+  const horizontalFactor = Math.max(0, 1 - config.friction * config.dt);
+  const nextVelocity = {
+    x: v.x * horizontalFactor,
+    y: v.y * horizontalFactor,
+    z: v.z - config.gravity * config.dt,
+  };
+  const nextPosition = {
+    x: p.x + nextVelocity.x * config.dt,
+    y: p.y + nextVelocity.y * config.dt,
+    z: p.z + nextVelocity.z * config.dt,
+  };
+  const horizontalSpeed = Math.hypot(nextVelocity.x, nextVelocity.y);
+  const velocity = horizontalSpeed < config.stopSpeed
+    ? { x: 0, y: 0, z: nextVelocity.z }
+    : nextVelocity;
+
+  return { ...state, ball: { ...state.ball, position: nextPosition, velocity } };
+}
