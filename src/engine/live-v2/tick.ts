@@ -11,29 +11,21 @@ function noDecisionMovement(state: MatchState): MovementIntent[] {
   }));
 }
 
-/**
- * Executes exactly one deterministic v2 simulation tick.
- *
- * Perception and decision are intentionally no-op foundations at this stage:
- * the pipeline is explicit now, so later modules can replace those phases
- * without changing ordering or ownership of state.
- */
+function phaseAt(clockSeconds: number): MatchState['phase'] {
+  if (clockSeconds >= 5400) return 'full_time';
+  if (clockSeconds === 2700) return 'halftime';
+  if (clockSeconds > 2700) return 'second_half';
+  return 'first_half';
+}
+
+/** Executes exactly one deterministic v2 simulation tick. */
 export function runTick(state: MatchState): MatchState {
   const previousBallPosition = { ...state.ball.position };
-
-  // 1. perception: read-only foundation; no mutation
   const perceivedState = state;
-
-  // 2. decision: deterministic foundation; no random action yet
   const intents = noDecisionMovement(perceivedState);
-
-  // 3. movement: immutable + bounded
   const moved = applyMovement(perceivedState, intents);
-
-  // 4. ball physics
   const ballStepped = stepBall(moved);
 
-  // 5. boundary resolution
   const boundary = resolveBoundary(
     moved.pitch,
     previousBallPosition,
@@ -44,27 +36,22 @@ export function runTick(state: MatchState): MatchState {
 
   let next = ballStepped;
 
-  // 6. restart application + 7. event emission
   if (boundary.event) {
     next = applyRestart(next, boundary.event);
-    next = {
-      ...next,
-      events: [...next.events, boundary.event],
-    };
+    next = { ...next, events: [...next.events, boundary.event] };
     next = consumeRestart(next);
   }
 
-  // 8. diagnostics + clock/tick progression
+  const nextClock = next.clockSeconds + 1;
+  const nextPhase = phaseAt(nextClock);
+
   return {
     ...next,
-    clockSeconds: next.clockSeconds + 1,
+    clockSeconds: nextClock,
     tick: next.tick + 1,
-    phase:
-      next.clockSeconds + 1 >= 90
-        ? 'full_time'
-        : next.phase,
+    phase: nextPhase,
     diagnostics: {
-      lastPhase: next.phase,
+      lastPhase: nextPhase,
       lastTick: next.tick + 1,
       lastBallPosition: { ...next.ball.position },
       lastBallVelocity: { ...next.ball.velocity },
