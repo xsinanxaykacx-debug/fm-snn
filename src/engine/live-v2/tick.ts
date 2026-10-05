@@ -6,13 +6,6 @@ import { stepBall } from './ball';
 import { resolveBoundary } from './boundary';
 import { applyRestart, consumeRestart } from './restart';
 
-function noDecisionMovement(state: MatchState): MovementIntent[] {
-  return Object.keys(state.players).map((playerId) => ({
-    playerId,
-    displacement: { x: 0, y: 0 },
-  }));
-}
-
 function phaseAt(clockSeconds: number): MatchState['phase'] {
   if (clockSeconds >= 5400) return 'full_time';
   if (clockSeconds === 2700) return 'halftime';
@@ -26,7 +19,10 @@ export function runTick(state: MatchState): MatchState {
   const decisions = decide(state, perceptions);
   const previousBallPosition = { ...state.ball.position };
   const perceivedState = state;
-  const intents = noDecisionMovement(perceivedState);
+
+  // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
+  const intents: MovementIntent[] = decisions;
+
   const moved = applyMovement(perceivedState, intents);
   const ballStepped = stepBall(moved);
 
