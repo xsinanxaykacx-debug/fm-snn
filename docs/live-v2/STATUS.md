@@ -4,26 +4,26 @@
 > Yeni bir oturumda ChatGPT/Claude/aider'a ilk verilecek dosya budur.
 
 ## Son güncelleme
-2026-10-05 — C tamamlandı (CI #710 yeşil), D adımına geçiliyor
+2026-10-05 — D tamamlandı (CI #716 yeşil), E adımına geçiliyor
 
 ## Repo / Branch / PR
 - Repo: xsinanxaykacx-debug/fm-snn
 - Branch: live-v2-foundation
 - PR: #39 (OPEN, DRAFT)
-- HEAD: 517095ebd3c26d84bbb8e96f71582a81e8b94319
-- Son yeşil CI: #710 (2m 46s, 517095e)
+- HEAD: 2b762cdba2e6c386552cc516f019dd1b3cfef692
+- Son yeşil CI: #716 (başarılı, 2b762cd)
 
 ## Tamamlanan adımlar (handoff §23 sırası)
 - [x] A: perceive/decide tick entegrasyonu — CI #706 yeşil
 - [x] B: decision intent → movement — CI #707 yeşil
 - [x] C: possession → tick — CI #710 yeşil
-- [ ] D: action resolution (PASS/SHOOT/DRIBBLE) — sıradaki
-- [ ] E: RNG → action resolution
+- [x] D: action resolution (PASS/SHOOT/DRIBBLE/CHASE) — CI #716 yeşil
+- [ ] E: RNG → decision/action resolution
 - [ ] F: 11v11 runtime acceptance
 - [ ] G: realism calibration
 
 ## Mevcut tick pipeline
-perceive → decide → movement → ball physics → boundary
+perceive → decide → resolveActions → movement → ball physics → boundary
    ↓
 if boundary event: restart (applyRestart + consumeRestart)
 else:              updatePossession
@@ -31,7 +31,7 @@ else:              updatePossession
 clock / phase / diagnostics
 
 ## Test durumu
-- 80/80 test geçiyor (10 dosya)
+- 131/131 test geçiyor (38 dosya; yeni D testleri dahil)
 - npx tsc --noEmit temiz
 - Legacy src/engine/live/* sıfır dokunuş
 
@@ -50,7 +50,7 @@ clock / phase / diagnostics
 | rng.ts | ✅ Seeded LCG (bağlı değil) | 4 |
 | tick.ts | ✅ A+B+C entegre | 9 |
 | simulation.ts | ✅ 5 horizon | 13 |
-| actionResolution.ts | ❌ HENÜZ YOK | — |
+| actionResolution.ts | ✅ PASS/SHOOT/DRIBBLE/CHASE | 8 |
 
 ## Değişmez sınırlar
 1. Legacy src/engine/live/* DOKUNULMAZ.
