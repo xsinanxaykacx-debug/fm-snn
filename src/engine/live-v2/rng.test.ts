@@ -28,6 +28,22 @@ describe('live-v2 rng', () => {
     expect(sequence42).not.toEqual(sequence43);
   });
 
+  it('returns values in [0, 1)', () => {
+    expect(randomSequence({ seed: 42 }, 1000)[0]
+      .every((value) => value >= 0 && value < 1))
+      .toBe(true);
+  });
+
+  it('uses nextRandom as the canonical one-step API', () => {
+    const start = { seed: 24681357 };
+    const [first, state1] = nextRandom(start);
+    const [second, state2] = nextRandom(state1);
+    const [sequence, finalState] = randomSequence(start, 2);
+
+    expect(sequence).toEqual([first, second]);
+    expect(finalState).toEqual(state2);
+  });
+
   it('accepts uint32 boundary seeds and rejects invalid seeds', () => {
     expect(() => nextRandom({ seed: 0 })).not.toThrow();
     expect(() => nextRandom({ seed: 0xffffffff })).not.toThrow();
