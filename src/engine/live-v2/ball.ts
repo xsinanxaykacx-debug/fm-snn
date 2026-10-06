@@ -87,11 +87,6 @@ export function stepBall(
     nextVelocity.z = 0;
   }
 
-  const horizontalSpeed = Math.hypot(
-    nextVelocity.x,
-    nextVelocity.y,
-  );
-
   // Friction is continuous: do not hard-stop a live ball at a numeric
   // speed threshold. A hard zero here can create a permanent freeze when
   // no player owns the ball and all decisions are CHASE.
