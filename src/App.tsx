@@ -18,6 +18,7 @@ import { SeasonEndModal } from './components/SeasonEndModal';
 import { PressConferenceModal } from './components/PressConferenceModal';
 import { InboxView } from './components/InboxView';
 import { LiveMatchScreen } from './components/LiveMatchScreen';
+import { TeamBadge } from './components/TeamBadge';
 
 type Tab =
   | 'dashboard'
@@ -44,7 +45,6 @@ export default function App() {
   const week = useGameStore(s => s.currentWeek);
   const seasonOver = useGameStore(s => s.seasonOver);
   const userClub = useGameStore(s => s.clubs[s.userClubId]);
-  const budget = userClub?.budget ?? 0;
   const pendingPressMatch = useGameStore(s => s.pendingPressMatch);
   const applyPressEffects = useGameStore(s => s.applyPressEffects);
   const clearPendingPress = useGameStore(s => s.clearPendingPress);
@@ -53,6 +53,23 @@ export default function App() {
 
   const inboxMessages = useInboxStore(s => s.messages);
   const unreadCount = inboxMessages.filter(m => !m.isRead).length;
+  const playWeek = useGameStore(s => s.playWeek);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const sidebarItems: { key: Tab; icon: string; label: string }[] = [
+    { key: 'dashboard', icon: '🏠', label: 'Ana Sayfa' },
+    { key: 'squad', icon: '👥', label: 'Kadro' },
+    { key: 'tactics', icon: '🎯', label: 'Taktik' },
+    { key: 'fixtures', icon: '📅', label: 'Fikstür' },
+    { key: 'table', icon: '📊', label: 'Puan Durumu' },
+    { key: 'cup', icon: '🏆', label: 'Kupa' },
+    { key: 'stats', icon: '📈', label: 'İstatistikler' },
+    { key: 'inbox', icon: '📬', label: 'Gelen Kutusu' },
+    { key: 'transfer', icon: '💸', label: 'Transfer' },
+    { key: 'training', icon: '🏃', label: 'Antrenman' },
+    { key: 'academy', icon: '🎓', label: 'Akademi' },
+    { key: 'liveMatch', icon: '⚽', label: 'Canlı Maç' },
+  ];
 
   useEffect(() => {
     if (pendingPressMatch && !showPress) {
@@ -76,95 +93,67 @@ export default function App() {
     }
   }, [seasonOver]);
 
-  const tabs: { key: Tab; label: string; badge?: number }[] = [
-    { key: 'dashboard', label: '📋 Ana Sayfa' },
-    { key: 'fixtures', label: '📅 Fikstür' },
-    { key: 'liveMatch', label: '⚽ Canlı Maç' },
-    { key: 'cup', label: '🏆 Kupa' },
-    { key: 'squad', label: '👥 Kadro' },
-    { key: 'tactics', label: '🎯 Taktik' },
-    { key: 'training', label: '🏃 Antrenman' },
-    { key: 'academy', label: '🎓 Akademi' },
-    { key: 'table', label: '📊 Puan Durumu' },
-    { key: 'stats', label: '🏆 İstatistikler' },
-    { key: 'inbox', label: '📬 Gelen Kutusu', badge: unreadCount },
-    { key: 'transfer', label: '💸 Transfer' },
-    { key: 'settings', label: '⚙️ Ayarlar' },
-  ];
-
   return (
-    <div className="min-h-screen bg-pitch-900">
-      <header className="bg-pitch-800 border-b border-pitch-700 px-6 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-accent">⚽ FM Clone</h1>
-            <p className="text-xs text-slate-400 truncate">
-              {userClub?.name} • Sezon {season} • Hafta {week} • Bütçe: £{(budget / 1_000_000).toFixed(1)}M
-            </p>
+    <div className="min-h-screen bg-pitch-900 text-slate-200">
+      <aside className={`fixed inset-y-0 left-0 z-30 bg-pitch-800 border-r border-pitch-700 transition-[width] duration-200 ${sidebarCollapsed ? 'w-16' : 'w-[220px]'}`}>
+        <div className="flex h-full flex-col">
+          <div className="flex h-24 items-center border-b border-pitch-700 px-4">
+            <TeamBadge clubId={userClub?.id ?? ''} shortName={userClub?.shortName ?? userClub?.name ?? 'FM'} size="md" />
+            {!sidebarCollapsed && <div className="ml-3 min-w-0"><div className="truncate text-sm font-bold text-slate-100">{userClub?.name ?? 'Takım'}</div><div className="text-xs text-slate-400">FM Clone</div></div>}
           </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {seasonOver && (
-              <button
-                onClick={() => setShowSeasonEnd(true)}
-                className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-900 font-bold px-4 py-2 rounded text-sm animate-pulse"
-              >
-                🏆 Sezon Sonu
-              </button>
-            )}
-            <button
-              onClick={() => { if (confirm('Yeni oyun başlatılsın mı? Mevcut kayıt silinir.')) newGame(); }}
-              className="btn-secondary text-sm"
-            >
-              🔄 Yeni Oyun
+          <nav className="flex-1 space-y-1 overflow-y-auto p-2">
+            {sidebarItems.map(item => {
+              const active = tab === item.key;
+              const badge = item.key === 'inbox' ? unreadCount : 0;
+              return <button key={item.key} type="button" title={sidebarCollapsed ? item.label : undefined} onClick={() => setTab(item.key)}
+                className={`relative flex w-full items-center rounded-r px-3 py-2.5 text-sm font-medium transition-colors ${active ? 'bg-pitch-700 text-accent border-l-2 border-accent' : 'border-l-2 border-transparent text-slate-400 hover:bg-pitch-700 hover:text-slate-200'} ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3'}`}>
+                <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
+                {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                {!sidebarCollapsed && badge > 0 && <span className="ml-auto min-w-[18px] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[9px] font-bold text-white">{badge}</span>}
+              </button>;
+            })}
+          </nav>
+          <div className="border-t border-pitch-700 p-2">
+            <button type="button" onClick={() => setSidebarCollapsed(value => !value)} title={sidebarCollapsed ? 'Sidebarı genişlet' : 'Sidebarı daralt'} aria-label={sidebarCollapsed ? 'Sidebarı genişlet' : 'Sidebarı daralt'} className="flex w-full items-center justify-center rounded px-3 py-2 text-sm text-slate-400 hover:bg-pitch-700 hover:text-slate-200">
+              {sidebarCollapsed ? '»' : '«'}
             </button>
           </div>
         </div>
-      </header>
-
-      <nav className="bg-pitch-800 border-b border-pitch-700 px-6">
-        <div className="flex justify-center items-center gap-1 overflow-x-auto">
-          {tabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`relative px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
-                tab === t.key
-                  ? 'text-accent border-b-2 border-accent'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {t.label}
-              {t.badge !== undefined && t.badge > 0 && (
-                <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
-                  {t.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      <main className="p-6 max-w-7xl mx-auto">
-        {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
-        {tab === 'fixtures' && <Fixtures />}
-        {tab === 'liveMatch' && <LiveMatchScreen />}
-        {tab === 'cup' && <Cup />}
-        {tab === 'squad' && <Squad />}
-        {tab === 'tactics' && <Tactics />}
-        {tab === 'training' && <Training />}
-        {tab === 'academy' && <Academy />}
-        {tab === 'table' && <Table />}
-        {tab === 'stats' && <Stats />}
-        {tab === 'inbox' && <InboxView />}
-        {tab === 'transfer' && <Transfers />}
-        {tab === 'settings' && <Settings />}
-      </main>
-
+      </aside>
+      <div className={`min-h-screen transition-[margin] duration-200 ${sidebarCollapsed ? 'ml-16' : 'ml-[220px]'}`}>
+        <header className="sticky top-0 z-20 h-14 bg-pitch-800 border-b border-pitch-700 px-4 sm:px-6">
+          <div className="flex h-full items-center gap-4">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <TeamBadge clubId={userClub?.id ?? ''} shortName={userClub?.shortName ?? userClub?.name ?? 'FM'} size="sm" />
+              <span className="truncate text-sm font-semibold text-slate-100">{userClub?.name ?? 'Takım'}</span>
+            </div>
+            <div className="hidden shrink-0 text-sm font-semibold text-slate-300 sm:block">Sezon {season} • Hafta {week}</div>
+            <div className="flex shrink-0 items-center gap-2">
+              {seasonOver && <button type="button" onClick={() => setShowSeasonEnd(true)} className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-900 font-bold px-3 py-2 rounded text-xs animate-pulse">🏆 Sezon Sonu</button>}
+              <button type="button" onClick={playWeek} disabled={seasonOver} className="btn-secondary text-sm disabled:cursor-not-allowed disabled:opacity-50">▶ Devam</button>
+              <button type="button" onClick={() => { if (confirm('Yeni oyun başlatılsın mı? Mevcut kayıt silinir.')) newGame(); }} className="btn-secondary hidden text-sm lg:inline-flex">🔄 Yeni Oyun</button>
+            </div>
+          </div>
+        </header>
+        <main className="flex-1 p-4 sm:p-6">
+          {tab === 'dashboard' && <Dashboard onNavigate={setTab} />}
+          {tab === 'fixtures' && <Fixtures />}
+          {tab === 'liveMatch' && <LiveMatchScreen />}
+          {tab === 'cup' && <Cup />}
+          {tab === 'squad' && <Squad />}
+          {tab === 'tactics' && <Tactics />}
+          {tab === 'training' && <Training />}
+          {tab === 'academy' && <Academy />}
+          {tab === 'table' && <Table />}
+          {tab === 'stats' && <Stats />}
+          {tab === 'inbox' && <InboxView />}
+          {tab === 'transfer' && <Transfers />}
+          {tab === 'settings' && <Settings />}
+        </main>
+      </div>
       {showSeasonEnd && (
         <SeasonEndModal onClose={() => setShowSeasonEnd(false)} />
       )}
-
       {showPress && pendingPressMatch && (
         <PressConferenceModal
           matchResult={pendingPressMatch}
@@ -180,4 +169,5 @@ export default function App() {
       )}
     </div>
   );
+
 }
