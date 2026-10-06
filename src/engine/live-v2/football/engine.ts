@@ -69,7 +69,7 @@ function applyPossession(state:MatchState):MatchState {
    .sort((a,b)=>distance(a.position,state.ball.position)-distance(b.position,state.ball.position)||a.id.localeCompare(b.id));
  if(!candidates[0])return state;
  const p=candidates[0];
- let next={...state,ball:{...state.ball,ownerId:p.id,lastTouchId:p.id,lastTouchSide:p.team}};
+ let next:MatchState={...state,ball:{...state.ball,ownerId:p.id,lastTouchId:p.id,lastTouchSide:p.team}};
  if(state.ball.lastTouchSide&&state.ball.lastTouchSide!==p.team){
   next=withTeamStat(next,p.team,'interceptions');
   next=withPlayerStat(next,p.id,'interceptions');
@@ -99,7 +99,7 @@ function resolveBoundary(state:MatchState):MatchState {
  else if(x<0){event=last==='HOME'?'corner':'goal_kick';side=last==='HOME'?'AWAY':'HOME';}
  else {event=last==='AWAY'?'corner':'goal_kick';side=last==='AWAY'?'HOME':'AWAY';}
  const point=event==='throw_in'?{x:clamp(x,0,state.pitch.length),y:y<0?0:state.pitch.width}:event==='corner'?{x:side==='HOME'?0:state.pitch.length,y:y<state.pitch.width/2?0:state.pitch.width}:{x:side==='HOME'?5.5:state.pitch.length-5.5,y:state.pitch.width/2};
- let next={...state,ball:{...b,position:{x:clamp(x,0,state.pitch.length),y:clamp(y,0,state.pitch.width),z:0},velocity:{x:0,y:0,z:0},ownerId:null},restart:{type:event,side,point} as MatchState['restart']};
+ let next:MatchState={...state,ball:{...b,position:{x:clamp(x,0,state.pitch.length),y:clamp(y,0,state.pitch.width),z:0},velocity:{x:0,y:0,z:0},ownerId:null},restart:{type:event,side,point} as MatchState['restart']};
  next=withTeamStat(next,side,event==='corner'?'corners':event==='throw_in'?'throwIns':'goalKicks');
  return addEvent(next,{type:event,teamId:side,position:point,description:event});
 }
@@ -212,7 +212,7 @@ export function runFootballTick(state:MatchState):MatchState {
  if(owner&&owner.onPitch!==false)next=resolveOwnerAction(next,owner);
  else {next=advanceBall(next);next=applyPossession(next);}
  next=movePlayers(next);
- const actionMap:Record<string,typeof STAMINA_COST[keyof typeof STAMINA_COST]>={};
+ const actionMap:Record<string,keyof typeof STAMINA_COST>={};
  for(const p of active(next)){actionMap[p.id]=p.id===next.ball.ownerId?'DRIBBLE':distance(p.position,next.ball.position)<18?'CHASE':'POSITION';}
  next=consumeStamina(next,actionMap);
  if(next.tick>=3600&&next.tick%300===0){
