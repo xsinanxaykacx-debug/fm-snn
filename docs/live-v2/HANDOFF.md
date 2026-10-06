@@ -158,3 +158,27 @@ Tur 15a — dokümantasyon kurulumu. E4 TAMAMLANDI, E5 HAZIR.
 - Açık sorular
 - STATUS.md commit SHA
 - HANDOFF.md commit SHA
+
+
+### Tur 15b — E5 DRIBBLE RNG
+- **Tarih:** 2026-10-06
+- **Konu:** DRIBBLE retain/lose sonucuna seeded RNG eklendi; geometri RNG'den bağımsız bırakıldı.
+- **ADIM 1 — Mevcut davranış:** `resolveDribble()` başlangıçta RNG tüketmiyordu. `DRIBBLE_DISTANCE = 0.8` ve `DRIBBLE_SPEED = 2.5`; ownerId oyuncuda kalıyor, lastTouchId/lastTouchSide oyuncuya atanıyordu. Üretim kodunda doğrulanan satırlar: constants 7-8, `resolveDribble` 151-183.
+- **ADIM 2 — Kapsam kararı:** RNG kontrol sonucuna bağlandı. İlk sürüm retain/lose oranı sabit %50 (`randomValue < 0.5`). Gerekçe: E5'te RNG kontratı ve deterministic progression izole ediliyor; oyuncu özelliklerine bağlı olasılık ağırlığı G/kalibrasyon kapsamına bırakıldı.
+- **ADIM 3 — Test-first:** `actionResolutionRng.test.ts` genişletildi. Aynı seed retain, aynı seed lose, farklı seed ile farklı sonuç, seed +1 RNG, tam 1 RNG, CHASE no-RNG, PASS/SHOOT regression, lose sonrası ownerId null/last-touch ve çözülemeyen DRIBBLE no-RNG kontratları eklendi/güncellendi.
+- **Test commit:** `3de06b9fd5e71007b695dfc34e25426f8fa1ef24` — `test(live-v2): add E5 dribble RNG coverage`
+- **Test-first CI:** #784 FAIL. 43 test dosyası; 169 testin 163'ü PASS, 6'sı FAIL. Kırmızı sonuç production implementasyonu olmadan beklenen E5 kontrat ihlalini kanıtladı: DRIBBLE seed ilerlemiyordu ve lose sonucu ownerId null olmuyordu. Lint ve Build GREEN idi; Tests FAIL.
+- **ADIM 4 — Uygulama:** `actionResolution.ts` içinde `resolveDribble(state, playerId, randomValue)` yapıldı. RNG yalnızca geçerli/çözülen DRIBBLE için `nextRandom(rngState)` ile tam 1 kez tüketiliyor. Retain'te ownerId oyuncuda, lose'ta ownerId null; geometri/velocity korunuyor; lastTouchId ve lastTouchSide korunuyor. CHASE'e dokunulmadı; PASS/SHOOT akışı korunuyor.
+- **Application commit:** `8d86d83e99958241e4e2f4b36856e4a76c354109` — `feat(live-v2): add seeded dribble retain lose RNG`
+- **CI #785:** PASS. 43/43 test dosyası, 169/169 test, GREEN.
+- **PR:** #49, base `live-v2-foundation`, merged.
+- **Merge commit:** `d6242bfdc28f9ed2b67511880cf3912fe1b69aeb`
+- **Post-merge CI #786:** PASS. 43/43 test dosyası, 169/169 test, GREEN.
+- **ADIM 5 — Mevcut testler:** E4 PASS/SHOOT RNG regressionları GREEN; CHASE no-RNG GREEN; simulation horizon/determinism testleri CI içinde GREEN. E5 sonrası toplam 169 test.
+- **ADIM 6 — CI özeti:** #784 FAIL → #785 GREEN → #786 GREEN. Üç run da raporlandı; başarısız run gizlenmedi.
+- **ADIM 7 — STATUS:** `547f3e2597a5d14855ec14247ca7520727b423fa` — `docs(live-v2): sync STATUS.md with E5 completion`
+- **ADIM 8 — HANDOFF:** Bu commit ile Tur 15b bölümü eklendi; ayrı commit.
+- **Yerel doğrulama:** HAYIR. Bu çalışma ortamında GitHub dışı repo checkout/network erişimi olmadığı için local test çalıştırılamadı. CI doğrulaması #785/#786 GREEN'dir; bu nedenle local test sonucu varsayılmıyor.
+- **Sonuç:** E5 production kodu merge edildi ve post-merge CI GREEN. E6'ya geçiş için CI koşulu sağlandı; yerel test çalıştırılmadığı açıkça kayıt altındadır.
+- **Açık noktalar:** Genel Güç düşüşü E6 sonrası ayrı tur. Retain/lose oranı şimdilik sabit %50; oyuncu özelliklerine bağlı kalibrasyon sonraki G kapsamındadır.
+- **Sıradaki:** E6 — Simulation determinism acceptance.
