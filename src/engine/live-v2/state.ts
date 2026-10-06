@@ -126,6 +126,8 @@ export type MatchDiagnostics = {
   lastBallVelocity: Vec3;
   lastDecisionAction?: DecisionAction;
   perceivedPlayerCount?: number;
+  restartState?: RestartState;
+  lastBoundaryEvent?: MatchEvent | null;
 };
 
 export type MatchState = {
