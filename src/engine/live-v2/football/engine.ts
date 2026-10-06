@@ -120,7 +120,7 @@ function resolveShot(state:MatchState,player:PlayerState):MatchState {
  }
  const [goalRoll,seed2]=nextRandom(next.seed); next={...next,seed:seed2};
  const finishing=(player.attributes?.finishing??60)/100;
- const goalChance=clamp(xG*(0.72+finishing*0.35),0.01,0.75);
+ const goalChance=clamp(xG*(1.35+finishing*0.35),0.01,0.75);
  if(goalRoll<goalChance){
   const scorer=player.team; next={...next,score:{...next.score,[scorer==='HOME'?'home':'away']:next.score[scorer==='HOME'?'home':'away']+1}};
   next=withTeamStat(next,scorer,'goals'); next=withPlayerStat(next,player.id,'goals'); next=withTeamStat(next,scorer,'shotsOnTarget'); next=withPlayerStat(next,player.id,'shotsOnTarget');
