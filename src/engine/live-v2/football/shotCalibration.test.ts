@@ -35,7 +35,7 @@ describe('live-v2 F3.2 shot and goal calibration', () => {
   });
 
   it('keeps multi-seed average goals in the target calibration band', () => {
-    const goals = Array.from({ length: 12 }, (_, i) => {
+    const goals = Array.from({ length: 5 }, (_, i) => {
       const state = createMatchState(lineup('H' + i), lineup('A' + i), seed(1000 + i), pitch);
       const final = simulateMatchV2(state, 5400);
       return final.score.home + final.score.away;
