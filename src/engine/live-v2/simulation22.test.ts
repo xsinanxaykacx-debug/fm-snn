@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decide } from './decision';
 import { perceive } from './perception';
-import { applyMovement } from './movement';
 import { runTick } from './tick';
 import { simulateMatchV2 } from './simulation';
 import type { MatchState, PlayerState, TeamSide } from './state';
