@@ -36,11 +36,14 @@ export function runTick(state: MatchState): MatchState {
   );
 
   let liveForDecision = ballStepped;
+  let restartActivated = false;
+
   if (boundary.event) {
     liveForDecision = playRestart({
       ...applyRestart(ballStepped, boundary.event),
       events: [...ballStepped.events, boundary.event],
     });
+    restartActivated = true;
   }
 
   const perceptions = perceive(liveForDecision);
@@ -50,7 +53,9 @@ export function runTick(state: MatchState): MatchState {
   const intents: MovementIntent[] = decisions;
 
   const moved = applyMovement(withActions, intents);
-  const next = updatePossession(moved);
+  // A freshly kicked restart must not be immediately re-owned at its restart
+  // point. The next tick's physics moves the ball before possession is resolved.
+  const next = restartActivated ? moved : updatePossession(moved);
 
   const nextClock = next.clockSeconds + 1;
   const nextPhase = phaseAt(nextClock);
