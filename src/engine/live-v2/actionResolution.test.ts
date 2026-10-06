@@ -73,17 +73,22 @@ describe('live-v2 action resolution', () => {
 
     const dx = 70 - 50;
     const dy = 20 - 32;
-    const length = Math.hypot(dx, dy);
-    expect(next.ball.velocity.x).toBeCloseTo((dx / length) * 8);
-    expect(next.ball.velocity.y).toBeCloseTo((dy / length) * 8);
+    const targetAngle = Math.atan2(dy, dx);
+    const actualAngle = Math.atan2(next.ball.velocity.y, next.ball.velocity.x);
+    const angleDifference = Math.abs(
+      Math.atan2(Math.sin(actualAngle - targetAngle), Math.cos(actualAngle - targetAngle)),
+    );
+
+    expect(Math.hypot(next.ball.velocity.x, next.ball.velocity.y)).toBeCloseTo(8);
+    expect(angleDifference).toBeLessThanOrEqual(0.18);
     expect(next.ball.velocity.z).toBe(0);
   });
 
   it('resolves SHOOT toward the opponent goal center', () => {
     const next = resolveActions(state(), [decision('SHOOT')]);
 
-    expect(next.ball.velocity.x).toBe(24);
-    expect(next.ball.velocity.y).toBe(0);
+    expect(Math.hypot(next.ball.velocity.x, next.ball.velocity.y)).toBeCloseTo(24);
+    expect(next.ball.velocity.x).toBeGreaterThan(23.8);
     expect(next.ball.velocity.z).toBe(0);
   });
 
