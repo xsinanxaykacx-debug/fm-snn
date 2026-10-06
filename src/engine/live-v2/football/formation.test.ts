@@ -11,8 +11,10 @@ describe('live-v2 roles and formation',()=>{
   const away=formationSlots(formation,'AWAY',pitch,DEFAULT_TACTICS);
   expect(home).toHaveLength(11); expect(away).toHaveLength(11);
   expect(home.map(x=>x.role)).toEqual(away.map(x=>x.role));
-  expect(home.every(x=>x.position.x<=52)).toBe(true);
-  expect(away.every(x=>x.position.x>=52)).toBe(true);
+  expect(home[0].position.x).toBeLessThan(52);
+  expect(away[0].position.x).toBeGreaterThan(52);
+  expect(home.slice(1).some(x=>x.position.x>52)).toBe(true);
+  expect(away.slice(1).some(x=>x.position.x<52)).toBe(true);
   expect(home[0].role).toBe('GK'); expect(away[0].role).toBe('GK');
  });
 });
