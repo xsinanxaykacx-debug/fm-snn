@@ -127,8 +127,8 @@ export function runTick(state: MatchState): MatchState {
 
   return {
     ...next,
-    // E2 only carries RNG state; decision/action RNG consumption starts in E3.
-    seed: decisions.seed,
+    // Carry the RNG state after both decision and action-resolution consumption.
+    seed: withActions.seed,
     clockSeconds: nextClock,
     tick: next.tick + 1,
     phase: nextPhase,
