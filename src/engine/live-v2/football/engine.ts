@@ -33,6 +33,37 @@ function withPlayerStat(state:MatchState,id:string,key:keyof PlayerMatchStats,de
  return {...state,football:{...f,playerStats:{...f.playerStats,[id]:next}},players:{...state.players,[id]:{...state.players[id],matchStats:next}}};
 }
 function direction(from:Vec2,to:Vec2):Vec2 { const dx=to.x-from.x,dy=to.y-from.y,l=Math.hypot(dx,dy); return l===0?{x:0,y:0}:{x:dx/l,y:dy/l}; }
+function stableHash(id:string):number {
+ let h=2166136261;
+ for(let i=0;i<id.length;i++)h=Math.imul(h^id.charCodeAt(i),16777619);
+ return h>>>0;
+}
+function chaseTarget(ball:Vec2,chaserId:string,chaseIndex:number,pitch:MatchState['pitch']):Vec2 {
+ const patterns=[{x:-1.2,y:-1.2},{x:1.2,y:-1.2},{x:0,y:1.2}];
+ const rotation=stableHash(chaserId)%3;
+ const p=patterns[(chaseIndex+rotation)%patterns.length];
+ return {x:clamp(ball.x+p.x,0,pitch.length),y:clamp(ball.y+p.y,0,pitch.width)};
+}
+function chaserNearOwner(state:MatchState):PlayerState|undefined {
+ const ownerId=state.ball.ownerId; if(!ownerId)return undefined;
+ return active(state).filter(p=>p.id!==ownerId&&p.team!==state.players[ownerId]?.team)
+   .map(p=>({p,d:distance(p.position,state.players[ownerId].position)}))
+   .filter(x=>x.d<2)
+   .sort((a,b)=>a.d-b.d||a.p.id.localeCompare(b.p.id))[0]?.p;
+}
+function resolveChaserTackle(state:MatchState):MatchState {
+ const ownerId=state.ball.ownerId; const owner=ownerId?state.players[ownerId]:undefined;
+ const chaser=chaserNearOwner(state);
+ if(!owner||!chaser)return state;
+ const [roll,seed]=nextRandom(state.seed);
+ let next={...state,seed};
+ const tackleChance=clamp(0.28+(chaser.attributes?.tackling??55)/250,0.28,0.62);
+ if(roll>=tackleChance)return next;
+ next=withTeamStat(next,chaser.team,'tackles');
+ next=withPlayerStat(next,chaser.id,'tackles');
+ next=addEvent(next,{type:'tackle',playerId:chaser.id,teamId:chaser.team,relatedPlayerId:owner.id,position:chaser.position,description:'tackle'});
+ return {...next,ball:{...next.ball,ownerId:chaser.id,lastTouchId:chaser.id,lastTouchSide:chaser.team,position:{...chaser.position,z:0}}};
+}
 function active(state:MatchState):PlayerState[] { return Object.values(state.players).filter(p=>p.onPitch!==false); }
 function movePlayers(state:MatchState):MatchState {
  const ball=state.ball.position; const nextPlayers={...state.players};
@@ -43,7 +74,8 @@ function movePlayers(state:MatchState):MatchState {
   const slots=formationSlots(state.football!.formation[side],side,state.pitch,state.football!.tactics[side]);
   team.forEach((p,index)=>{
    const isChase=chase.includes(p.id);
-   const target=isChase?ball:slots[index]?.position??p.position;
+   const chaseIndex=chase.indexOf(p.id);
+   const target=isChase?chaseTarget(ball,p.id,chaseIndex, state.pitch):slots[index]?.position??p.position;
    const dir=direction(p.position,target);
    const pressing=state.football!.tactics[side].pressing==='high'&&isChase;
    const speed=(pressing?PRESSING_SPEED:PLAYER_SPEED)*movementSpeedMultiplier(state.football!.tactics[side])*(1+(pressing?pressingIntensity(state.football!.tactics[side])*0.08:0));
@@ -209,7 +241,16 @@ export function runFootballTick(state:MatchState):MatchState {
  if(next.phase==='halftime'){ next={...next,phase:'second_half'}; }
  if(next.football!.pendingPenalty){ next=resolvePenalty({...next,football:{...next.football!,pendingPenalty:null}},next.football!.pendingPenalty.side); }
  const owner=next.ball.ownerId?next.players[next.ball.ownerId]:undefined;
- if(owner&&owner.onPitch!==false)next=resolveOwnerAction(next,owner);
+ if(owner&&owner.onPitch!==false){
+  const beforeOwner=next.ball.ownerId;
+  next=resolveChaserTackle(next);
+  const newOwner=next.ball.ownerId?next.players[next.ball.ownerId]:undefined;
+  if(newOwner&&next.ball.ownerId!==beforeOwner){
+   next=resolveOwnerAction(next,newOwner);
+  }else{
+   next=resolveOwnerAction(next,owner);
+  }
+ }
  else {next=advanceBall(next);next=applyPossession(next);}
  next=movePlayers(next);
  const actionMap:Record<string,keyof typeof STAMINA_COST>={};
