@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { calculateTeamUnits } from '../engine/units/teamUnits';
 import { useGameStore } from './gameStore';
