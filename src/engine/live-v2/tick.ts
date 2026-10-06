@@ -41,7 +41,6 @@ export function runTick(state: MatchState): MatchState {
   if (boundary.event) {
     next = applyRestart(ballStepped, boundary.event);
     next = { ...next, events: [...next.events, boundary.event] };
-    next = consumeRestart(next);
   } else {
     const perceptions = perceive(ballStepped);
     decisions = decide(ballStepped, perceptions);
