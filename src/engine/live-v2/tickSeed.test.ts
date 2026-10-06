@@ -70,15 +70,12 @@ describe('live-v2 tick seed integration', () => {
     expect(a).toEqual(b);
   });
 
-  it('different seeds produce the same non-RNG tick result before RNG consumption is wired', () => {
+  it('different seeds can produce different decision results while preserving determinism', () => {
     const a = runTick(initialState({ seed: 123456 }));
     const b = runTick(initialState({ seed: 654321 }));
 
-    const { seed: seedA, ...withoutSeedA } = a;
-    const { seed: seedB, ...withoutSeedB } = b;
-
-    expect(seedA).not.toEqual(seedB);
-    expect(withoutSeedA).toEqual(withoutSeedB);
+    expect(a.seed).not.toEqual(b.seed);
+    expect(a.diagnostics.lastDecisionAction).not.toBe(b.diagnostics.lastDecisionAction);
   });
 
   it('MatchState seed is an RngState', () => {
