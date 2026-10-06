@@ -95,6 +95,34 @@ describe('live-v2 tick', () => {
     expect(next.diagnostics.lastBoundaryEvent?.type).toBe('goal');
   });
 
+  it('does not remain frozen in restart state after a boundary event', () => {
+    const s = state();
+    const afterBoundary = runTick({
+      ...s,
+      ball: {
+        ...s.ball,
+        position: { x: 103.9, y: 32, z: 0.11 },
+        velocity: { x: 10, y: 0, z: 0 },
+        lastTouchSide: 'AWAY',
+      },
+    });
+
+    expect(afterBoundary.restart).toBeNull();
+    expect(afterBoundary.diagnostics.restartState).toBeNull();
+    expect(afterBoundary.diagnostics.lastBoundaryEvent?.type).toBe('goal');
+
+    let next = afterBoundary;
+    for (let i = 0; i < 100; i += 1) {
+      next = runTick(next);
+    }
+
+    expect(next.restart).toBeNull();
+    expect(next.diagnostics.restartState).toBeNull();
+    expect(Math.abs(next.ball.velocity.x) + Math.abs(next.ball.velocity.y)).toBeGreaterThan(0);
+    expect(next.players.p1.position).not.toEqual(s.players.p1.position);
+    expect(next.players.p2.position).not.toEqual(s.players.p2.position);
+  });
+
   it('keeps players inside the pitch after decision-driven movement', () => {
     const s = state();
 
