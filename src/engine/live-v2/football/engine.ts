@@ -55,7 +55,7 @@ function movePlayers(state:MatchState):MatchState {
  const chaseCount=Object.values(nextPlayers).filter(p=>p.onPitch!==false&&p.id!==state.ball.ownerId).map(p=>distance(p.position,ball)).sort((a,b)=>a-b).slice(0,MAX_CHASE).length;
  return {...state,players:nextPlayers,football:{...state.football!,lastChaseCount:chaseCount,lastPositionCount:Math.max(0,active(state).length-1-chaseCount)}};
 }
-function consumeStamina(state:MatchState,actions:Record<string,typeof STAMINA_COST[keyof typeof STAMINA_COST]>):MatchState {
+function consumeStamina(state:MatchState,actions:Record<string,keyof typeof STAMINA_COST>):MatchState {
  const players={...state.players};
  for(const p of active(state)){const cost=STAMINA_COST[actions[p.id]??'POSITION']; const stamina=clamp((p.stamina??100)-cost,0,100); players[p.id]={...p,stamina};}
  return {...state,players};

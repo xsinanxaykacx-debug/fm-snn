@@ -6,6 +6,8 @@ import { runTick } from '../engine/live-v2/tick';
 import type { RngState } from '../engine/live-v2/rng';
 import type { Pitch, MatchState } from '../engine/live-v2/state';
 import type { Match, MatchEvent as MatchResultEvent } from '../engine/types';
+import type { FootballEvent } from '../engine/live-v2/football/types';
+import { finalizeStats } from '../engine/live-v2/football/stats';
 
 type StartMessage = {
   type: 'start';
