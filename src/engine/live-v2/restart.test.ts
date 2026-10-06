@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyRestart, consumeRestart, eventToRestart } from './restart';
+import { applyRestart, consumeRestart, eventToRestart, playRestart } from './restart';
 import type { MatchEvent, MatchState } from './state';
 
 const state: MatchState = {
@@ -38,5 +38,18 @@ describe('live-v2 restart', () => {
     expect(withRestart.restart?.type).toBe('kickoff');
     expect(live.restart).toBeNull();
   });
+  it('plays a pending restart exactly once and returns to live play', () => {
+    const pending = applyRestart(state, events[0]);
+    const live = playRestart(pending);
+
+    expect(live.restart).toBeNull();
+    expect(live.ball.ownerId).toBeNull();
+    expect(live.ball.velocity).toEqual({ x: -8, y: 0, z: 0 });
+  });
+
+  it('does nothing when no restart is pending', () => {
+    expect(playRestart(state)).toBe(state);
+  });
+
   it('is deterministic', () => expect(applyRestart(state, events[2])).toEqual(applyRestart(state, events[2])));
 });
