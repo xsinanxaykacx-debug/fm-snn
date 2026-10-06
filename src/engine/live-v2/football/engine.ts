@@ -202,7 +202,7 @@ export function runFootballTick(state:MatchState):MatchState {
  if(state.phase==='full_time')return state;
  let next=restartState(state);
  if(next.tick===0&&next.football!.events.length===0)next=addEvent(next,{type:'kickoff',teamId:'HOME',position:next.ball.position,description:'kickoff'});
- if(next.tick===2700){
+ if(next.tick===2700&&next.phase!=='halftime'){
   next=addEvent(next,{type:'half_time',description:'half time'});
   return {...next,phase:'halftime',clockSeconds:2700,tick:2700};
  }
