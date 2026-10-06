@@ -155,8 +155,15 @@ describe('live-v2 22-player runtime foundation', () => {
     const finalState = simulateMatchV2(stateWithPlayerCount(11), 5400);
     const elapsedMs = performance.now() - start;
 
-    console.log(`F1_PERF_22_5400_MS=${elapsedMs.toFixed(2)}`);
+    const twoPlayerStart = performance.now();
+    const twoPlayerFinal = simulateMatchV2(stateWithPlayerCount(1), 5400);
+    const twoPlayerMs = performance.now() - twoPlayerStart;
 
+    console.log(`F1_PERF_22_5400_MS=${elapsedMs.toFixed(2)}`);
+    console.log(`F1_PERF_2_5400_MS=${twoPlayerMs.toFixed(2)}`);
+    console.log(`F1_PERF_RATIO=${(elapsedMs / Math.max(twoPlayerMs, 0.001)).toFixed(2)}`);
+
+    expect(twoPlayerFinal.tick).toBe(5400);
     expect(finalState.tick).toBe(5400);
     expect(finalState.clockSeconds).toBe(5400);
     expect(finalState.phase).toBe('full_time');
@@ -201,21 +208,4 @@ describe('live-v2 22-player runtime foundation', () => {
     }
   });
 
-  it('reports a 2-player vs 22-player 5400-tick performance baseline', () => {
-    const twoStart = performance.now();
-    const twoPlayerFinal = simulateMatchV2(stateWithPlayerCount(1), 5400);
-    const twoPlayerMs = performance.now() - twoStart;
-
-    const twentyTwoStart = performance.now();
-    const twentyTwoPlayerFinal = simulateMatchV2(stateWithPlayerCount(11), 5400);
-    const twentyTwoPlayerMs = performance.now() - twentyTwoStart;
-
-    console.log(`F1_PERF_2_5400_MS=${twoPlayerMs.toFixed(2)}`);
-    console.log(`F1_PERF_22_5400_MS=${twentyTwoPlayerMs.toFixed(2)}`);
-    console.log(`F1_PERF_RATIO=${(twentyTwoPlayerMs / Math.max(twoPlayerMs, 0.001)).toFixed(2)}`);
-
-    expect(twoPlayerFinal.tick).toBe(5400);
-    expect(twentyTwoPlayerFinal.tick).toBe(5400);
-    expect(twentyTwoPlayerFinal.phase).toBe('full_time');
-  });
 });
