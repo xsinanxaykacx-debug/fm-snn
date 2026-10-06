@@ -51,5 +51,5 @@ export type FootballState = {
   actionCooldowns:Record<string,number>;
   passSnapshot:Record<string,{tick:number;position:Vec2;receiverId:string}>;
   events:FootballEvent[]; playerStats:Record<string,PlayerMatchStats>;
-  teamStats:Record<TeamSide,TeamMatchStats>; lastAssistBySide:{HOME:string|null;AWAY:string|null};
+  teamStats:Record<TeamSide,TeamMatchStats>; lastAssistBySide:{HOME:string|null;AWAY:string|null}; lastChaseCount:number; lastPositionCount:number;
 };

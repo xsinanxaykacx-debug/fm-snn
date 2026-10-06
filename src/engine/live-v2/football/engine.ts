@@ -46,7 +46,8 @@ function movePlayers(state:MatchState):MatchState {
    nextPlayers[p.id]={...p,position:{x:clamp(p.position.x+dir.x*step,0,state.pitch.length),y:clamp(p.position.y+dir.y*step,0,state.pitch.width)},velocity:{x:dir.x*step,y:dir.y*step}};
   });
  }
- return {...state,players:nextPlayers};
+ const chaseCount=Object.values(nextPlayers).filter(p=>p.onPitch!==false&&p.id!==state.ball.ownerId).map(p=>distance(p.position,ball)).sort((a,b)=>a-b).slice(0,MAX_CHASE).length;
+ return {...state,players:nextPlayers,football:{...state.football!,lastChaseCount:chaseCount,lastPositionCount:Math.max(0,active(state).length-1-chaseCount)}};
 }
 function consumeStamina(state:MatchState,actions:Record<string,typeof STAMINA_COST[keyof typeof STAMINA_COST]>):MatchState {
  const players={...state.players};

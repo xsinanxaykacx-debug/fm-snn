@@ -20,7 +20,7 @@ export function attachFootball(state:MatchState,homeFormation:FormationName='4-4
  const football:FootballState={
   formation:{HOME:homeFormation,AWAY:awayFormation},tactics:{HOME:{...DEFAULT_TACTICS},AWAY:{...DEFAULT_TACTICS}},
   maxSubstitutions:3,substitutionsUsed:{HOME:0,AWAY:0},kickoffSide:'HOME',actionCooldowns:{},passSnapshot:{},
-  events:[],playerStats:{},teamStats:{HOME:emptyTeamStats(),AWAY:emptyTeamStats()},lastAssistBySide:{HOME:null,AWAY:null},
+  events:[],playerStats:{},teamStats:{HOME:emptyTeamStats(),AWAY:emptyTeamStats()},lastAssistBySide:{HOME:null,AWAY:null},lastChaseCount:0,lastPositionCount:0,
  };
  const players={...state.players};
  for(const side of ['HOME','AWAY'] as const){
