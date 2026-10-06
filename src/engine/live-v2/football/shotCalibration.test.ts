@@ -13,7 +13,7 @@ const pitch: Pitch = {
 };
 
 function seed(value: number): RngState {
-  return { value };
+  return { seed: value };
 }
 
 function lineup(prefix: string) {
