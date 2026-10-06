@@ -42,6 +42,11 @@ export function toLiveFrame(
   tick: number,
   time: number,
 ): LiveFrame {
+  const chaseIds = state.football
+    ? Object.values(state.players).filter((p) => p.onPitch !== false && p.id !== state.ball.ownerId)
+        .sort((a,b) => Math.hypot(a.position.x-state.ball.position.x,a.position.y-state.ball.position.y)-Math.hypot(b.position.x-state.ball.position.x,b.position.y-state.ball.position.y)||a.id.localeCompare(b.id))
+        .slice(0,3).map((p)=>p.id)
+    : [];
   const players = Object.values(state.players)
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((player) => ({
@@ -50,7 +55,7 @@ export function toLiveFrame(
       y: player.position.y,
       isHome: player.team === 'HOME',
       facing: Math.atan2(player.velocity.y, player.velocity.x),
-      intent: 'UNKNOWN',
+      intent: state.football ? (chaseIds.includes(player.id) ? 'CHASE' : 'POSITION') : 'UNKNOWN',
     }));
 
   return {
