@@ -171,7 +171,7 @@ function resolveOwnerAction(state:MatchState,owner:PlayerState):MatchState {
     next=addEvent(next,{type:red?'red':'yellow',playerId:opponent.id,teamId:opponent.team,position:opponent.position,description:red?'red':'yellow'});
     if(red)next=withPlayerStat(next,opponent.id,'red');
    }
-   if(inPenaltyArea(next.pitch,owner.team,owner.position)){
+   if(inPenaltyArea(next.pitch,opponent.team,owner.position)){
     next=withTeamStat(next,owner.team,'penalties');
     next={...next,football:{...next.football!,pendingPenalty:{side:owner.team}}};
     return addEvent(next,{type:'penalty',teamId:owner.team,position:owner.position,description:'penalty'});
