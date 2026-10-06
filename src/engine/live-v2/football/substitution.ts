@@ -5,7 +5,7 @@ export function makeSubstitution(state:MatchState,side:TeamSide,outId:string,inI
  const f=state.football; if(!f||f.substitutionsUsed[side]>=f.maxSubstitutions)return state;
  const out=state.players[outId], incoming=state.players[inId]; if(!out||!incoming||out.team!==side||incoming.team!==side||out.onPitch===false)return state;
  const used=f.substitutionsUsed[side]+1;
- const players={...state.players,[outId]:{...out,onPitch:false,velocity:{x:0,y:0}},[inId]:{...incoming,onPitch:true,stamina:100,redCard:false,matchStats:emptyPlayerStats()}};
+ const players={...state.players,[outId]:{...out,onPitch:false,velocity:{x:0,y:0}},[inId]:{...incoming,onPitch:true,stamina:100,redCard:false,role:out.role,startingPosition:out.startingPosition?{...out.startingPosition}:{...out.position},matchStats:emptyPlayerStats()}};
  const event={id:state.tick+'-'+f.events.length,type:'substitution' as const,minute:Math.floor(state.clockSeconds/60),tick:state.tick,teamId:side,playerId:inId,relatedPlayerId:outId,description:'substitution'};
  return {...state,players,football:{...f,substitutionsUsed:{...f.substitutionsUsed,[side]:used},events:[...f.events,event]}};
 }

@@ -58,7 +58,7 @@ function resolvePlayerIds(
     throw new Error(`live-v2 worker: club ${clubId} has fewer than 11 players`);
   }
 
-  return ids.slice(0, 11);
+  return ids;
 }
 
 function buildLineup(
@@ -67,16 +67,8 @@ function buildLineup(
   userLineup: string[] | undefined,
   players: StartMessage['players'],
 ): MatchLineup {
-  return {
-    clubId: club.id,
-    players: resolvePlayerIds(
-      club.id,
-      club.lineup,
-      userClubId,
-      userLineup,
-      players,
-    ).map((id) => ({ id })),
-  };
+  const ids=resolvePlayerIds(club.id,club.lineup,userClubId,userLineup,players);
+  return {clubId:club.id,players:ids.slice(0,14).map((id)=>({id}))};
 }
 
 function eventToMatchEvent(

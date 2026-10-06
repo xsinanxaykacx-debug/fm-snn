@@ -39,8 +39,8 @@ function buildPlayers(
   side: TeamSide,
   pitch: Pitch,
 ): Record<string, PlayerState> {
-  if (lineup.players.length !== 11) {
-    throw new Error(`live-v2 factory: ${side} lineup must contain exactly 11 players`);
+  if (lineup.players.length < 11) {
+    throw new Error(`live-v2 factory: ${side} lineup must contain at least 11 players`);
   }
 
   const slots = slotsFor(side, pitch);
@@ -50,12 +50,13 @@ function buildPlayers(
     if (!player.id) throw new Error('live-v2 factory: player id is required');
     if (players[player.id]) throw new Error(`live-v2 factory: duplicate player id ${player.id}`);
 
-    const position = slots[index];
+    const position = slots[index] ?? { x: side === 'HOME' ? 5 : pitch.length - 5, y: pitch.width / 2 };
     players[player.id] = {
       id: player.id,
       team: side,
       position: { ...position },
       velocity: { x: 0, y: 0 },
+      onPitch: index < 11,
     };
   });
 

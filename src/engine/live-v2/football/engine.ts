@@ -5,6 +5,8 @@ import { chooseFootballAction } from './action';
 import { formationSlots } from './formation';
 import type { FootballEvent, FootballState, PlayerMatchStats, TeamMatchStats } from './types';
 import { emptyPlayerStats, DEFAULT_ATTRIBUTES } from './setup';
+import { applyStaminaCost, staminaModifier } from './stamina';
+import { makeSubstitution } from './substitution';
 
 const MAX_CHASE=3;
 const BALL_DECELERATION=0.88;
@@ -150,7 +152,7 @@ function resolveOwnerAction(state:MatchState,owner:PlayerState):MatchState {
  }
  next=withPlayerStat(next,owner.id,'dribbles'); next=addEvent(next,{type:'dribble',playerId:owner.id,teamId:owner.team,position:owner.position,description:'dribble'});
  const goalDirection=owner.team==='HOME'?1:-1; const stamina=owner.stamina??100; const pace=(owner.attributes?.pace??65)/100;
- const step=(2.2+pace*1.8)*(stamina/100); const pos={x:clamp(owner.position.x+goalDirection*step,0,next.pitch.length),y:owner.position.y};
+ const step=(2.2+pace*1.8)*staminaModifier(stamina); const pos={x:clamp(owner.position.x+goalDirection*step,0,next.pitch.length),y:owner.position.y};
  const players={...next.players,[owner.id]:{...owner,position:pos,velocity:{x:goalDirection*step,y:0}}};
  return {...next,players,ball:{...next.ball,position:{...pos,z:0},lastTouchId:owner.id,lastTouchSide:owner.team}};
 }
@@ -171,6 +173,14 @@ export function runFootballTick(state:MatchState):MatchState {
  const actionMap:Record<string,typeof STAMINA_COST[keyof typeof STAMINA_COST]>={};
  for(const p of active(next)){actionMap[p.id]=p.id===next.ball.ownerId?'DRIBBLE':distance(p.position,next.ball.position)<18?'CHASE':'POSITION';}
  next=consumeStamina(next,actionMap);
+ if(next.tick>=3600&&next.tick%300===0){
+  for(const side of ['HOME','AWAY'] as const){
+   if(next.football!.substitutionsUsed[side]>=3)continue;
+   const out=Object.values(next.players).filter(p=>p.team===side&&p.onPitch!==false&&(p.stamina??100)<25&&p.redCard!==true).sort((a,b)=>(a.stamina??100)-(b.stamina??100)||a.id.localeCompare(b.id))[0];
+   const incoming=Object.values(next.players).filter(p=>p.team===side&&p.onPitch===false&&p.redCard!==true).sort((a,b)=>a.id.localeCompare(b.id))[0];
+   if(out&&incoming)next=makeSubstitution(next,side,out.id,incoming.id);
+  }
+ }
  if(next.ball.ownerId)next={...next,ball:{...next.ball,position:{...next.players[next.ball.ownerId].position,z:0}}};
  if(!next.ball.ownerId)next=resolveBoundary(next);
  const nextTick=next.tick+1; const nextClock=next.clockSeconds+1;
