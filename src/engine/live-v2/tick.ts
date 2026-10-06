@@ -66,6 +66,8 @@ export function runTick(state: MatchState): MatchState {
       lastBallVelocity: { ...next.ball.velocity },
       lastDecisionAction,
       perceivedPlayerCount: Object.keys(perceptions.players).length,
+      restartState: next.restart,
+      lastBoundaryEvent: boundary.event,
     },
   };
 }
