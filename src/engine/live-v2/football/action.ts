@@ -1,5 +1,5 @@
-import type { MatchState } from '../state';
 import { nextRandom } from '../rng';
+import type { MatchState } from '../state';
 import type { DecisionAction } from '../decision';
 import type { Role, Tactics } from './types';
 import { distance, goalX } from './geometry';
@@ -25,8 +25,8 @@ export function chooseFootballAction(state:MatchState,playerId:string,tactics:Ta
   const role=p.role as Role|undefined;
   const pressure=Object.values(state.players).filter(x=>x.team!==p.team&&x.onPitch!==false)
     .map(x=>distance(x.position,p.position)).sort((a,b)=>a-b)[0]??99;
-  const passBias=tactics.directness==='short'?0.48:tactics.directness==='direct'?0.22:0.36;
-  const shootBias=nearGoal && ['ST','GF','KFL','KFR','AMC','AML','AMR'].includes(role??'') ? 0.30 : nearGoal ? 0.16 : 0;
+  const passBias=tactics.directness==='short'?0.38:tactics.directness==='direct'?0.18:0.30;
+  const shootBias=nearGoal && ['ST','GF','KFL','KFR','AMC','AML','AMR'].includes(role??'') ? 0.42 : nearGoal ? 0.22 : 0;
   if(nearGoal && random<shootBias)return {action:'SHOOT',playerId};
   if(random<shootBias+passBias)return {action:'PASS',playerId,targetId:bestTeammate(state,playerId,p.team)};
   if(pressure<3.5)return {action:'DRIBBLE',playerId};
