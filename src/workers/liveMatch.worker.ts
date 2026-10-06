@@ -1,52 +1,23 @@
-import { simulateMatchLive } from '../engine/live';
-import type { Club, Match, Player, LiveMatchState } from '../engine/types';
+import { createMatchState, type MatchLineup } from '../engine/live-v2/adapters/matchStateFactory';
+import { createV2MatchSeed } from '../engine/live-v2/adapters/matchSeed';
+import { toLiveFrame } from '../engine/live-v2/adapters/liveFrame';
+import { runTick } from '../engine/live-v2/tick';
+import type { RngState } from '../engine/live-v2/rng';
+import type { Pitch, MatchState } from '../engine/live-v2/state';
+import type { Match, MatchEvent as MatchResultEvent } from '../engine/types';
 
 type StartMessage = {
   type: 'start';
-  home: Club;
-  away: Club;
-  players: Record<string, Player>;
-  week: number;
+  home: { id: string; lineup?: string[] };
+  away: { id: string; lineup?: string[] };
+  players: Record<string, { id: string; clubId: string | null }>;
+  userClubId: string;
   userLineup?: string[];
-  seed: number;
-};
-
-type FramePlayer = {
-  id: string;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  homeX: number;
-  homeY: number;
-  isHome: boolean;
-  role: string;
-  facing: number;
-  intent: string;
-  isBallOwner: boolean;
-  isChasingBall: boolean;
-  isMarking: string | null;
-  decisionReason: string | null;
-  targetX: number | null;
-  targetY: number | null;
-  targetPlayerId: string | null;
-};
-
-type Frame = {
-  time: number;
-  tick: number;
-  phase: string;
-  score: { home: number; away: number };
-  ball: {
-    x: number;
-    y: number;
-    z: number;
-    vx: number;
-    vy: number;
-    ownerId: string | null;
-    lastTouchId: string | null;
-  };
-  players: FramePlayer[];
+  season: number;
+  week: number;
+  fixture: string;
+  seed?: RngState;
+  pitch: Pitch;
 };
 
 type DebugRecording = {
@@ -54,7 +25,7 @@ type DebugRecording = {
   sampleEveryTicks: number;
   maxSimulationSeconds: number;
   startedAt: number;
-  frames: Frame[];
+  frames: ReturnType<typeof toLiveFrame>[];
 };
 
 type WorkerScope = {
@@ -63,99 +34,136 @@ type WorkerScope = {
 };
 
 const scope = self as unknown as WorkerScope;
+const FRAME_EVERY_TICKS = 10;
+const MAX_SECONDS = 5400;
 
-const DEBUG_SAMPLE_TICKS = 10;
-const DEBUG_MAX_SECONDS = 300;
+function resolvePlayerIds(
+  clubId: string,
+  configuredLineup: string[] | undefined,
+  userClubId: string,
+  userLineup: string[] | undefined,
+  players: StartMessage['players'],
+): string[] {
+  const preferred = clubId === userClubId ? userLineup : configuredLineup;
+  const fallback = Object.values(players)
+    .filter((player) => player.clubId === clubId)
+    .map((player) => player.id)
+    .sort();
 
-function compactFrame(state: LiveMatchState): Frame {
+  const ids = preferred && preferred.length > 0 ? preferred : fallback;
+
+  if (ids.length < 11) {
+    throw new Error(`live-v2 worker: club ${clubId} has fewer than 11 players`);
+  }
+
+  return ids.slice(0, 11);
+}
+
+function buildLineup(
+  club: { id: string; lineup?: string[] },
+  userClubId: string,
+  userLineup: string[] | undefined,
+  players: StartMessage['players'],
+): MatchLineup {
   return {
-    time: state.time,
-    tick: state.tick,
-    phase: state.phase,
-    score: { ...state.score },
-    ball: {
-      x: state.ball.position.x,
-      y: state.ball.position.y,
-      z: state.ball.position.z,
-      vx: state.ball.velocity.x,
-      vy: state.ball.velocity.y,
-      ownerId: state.ball.ownerId,
-      lastTouchId: state.ball.lastTouchId,
-    },
-    players: Object.keys(state.players).sort().map(id => {
-      const p = state.players[id];
-      const decision = state.decisions[id]?.decision ?? p.currentDecision;
-
-      return {
-        id,
-        x: p.position.x,
-        y: p.position.y,
-        vx: p.velocity.x,
-        vy: p.velocity.y,
-        homeX: p.homePosition.x,
-        homeY: p.homePosition.y,
-        isHome: p.isHome,
-        role: p.role,
-        facing: p.facing,
-        intent: p.currentIntent,
-        isBallOwner: p.isBallOwner,
-        isChasingBall: p.isChasingBall,
-        isMarking: p.isMarking,
-        decisionReason: state.decisions[id]?.reason ?? decision?.reason ?? null,
-        targetX: decision?.target?.x ?? null,
-        targetY: decision?.target?.y ?? null,
-        targetPlayerId: decision?.targetPlayerId ?? null,
-      };
-    }),
+    clubId: club.id,
+    players: resolvePlayerIds(
+      club.id,
+      club.lineup,
+      userClubId,
+      userLineup,
+      players,
+    ).map((id) => ({ id })),
   };
 }
 
-function sendFrame(state: LiveMatchState): void {
-  scope.postMessage({
-    type: 'frame',
-    ...compactFrame(state),
-  });
+function eventToMatchEvent(
+  event: MatchState['events'][number],
+  state: MatchState,
+): MatchResultEvent {
+  const minute = Math.floor(state.clockSeconds / 60);
+
+  if (event.type === 'goal') {
+    return {
+      minute,
+      type: 'goal',
+      team: event.scorerSide === 'HOME' ? 'home' : 'away',
+      description: `${event.scorerSide === 'HOME' ? 'HOME' : 'AWAY'} gol`,
+    };
+  }
+
+  return {
+    minute,
+    type: event.type,
+    team: event.type === 'goal_kick' || event.type === 'corner' || event.type === 'throw_in'
+      ? event.side === 'HOME' ? 'home' : 'away'
+      : undefined,
+    description: event.type,
+  };
+}
+
+function toTemporaryMatchResult(
+  state: MatchState,
+  homeId: string,
+  awayId: string,
+): Match {
+  return {
+    homeId,
+    awayId,
+    homeScore: state.score.home,
+    awayScore: state.score.away,
+    events: state.events.map((event) => eventToMatchEvent(event, state)),
+    stats: {
+      possession: { home: 50, away: 50 },
+      shots: { home: 0, away: 0 },
+      onTarget: { home: 0, away: 0 },
+      chances: { home: 0, away: 0 },
+    },
+    played: true,
+    engine: 'live-v2',
+  };
 }
 
 scope.onmessage = (event) => {
   if (event.data.type !== 'start') return;
-  const data = event.data;
 
   try {
+    const data = event.data;
+    const seed = data.seed ?? createV2MatchSeed(data.season, data.fixture, data.week);
+    const state = createMatchState(
+      buildLineup(data.home, data.userClubId, data.userLineup, data.players),
+      buildLineup(data.away, data.userClubId, data.userLineup, data.players),
+      seed,
+      data.pitch,
+    );
+
     const debug: DebugRecording = {
       version: 1,
-      sampleEveryTicks: DEBUG_SAMPLE_TICKS,
-      maxSimulationSeconds: DEBUG_MAX_SECONDS,
+      sampleEveryTicks: FRAME_EVERY_TICKS,
+      maxSimulationSeconds: MAX_SECONDS,
       startedAt: Date.now(),
       frames: [],
     };
 
-    const result = simulateMatchLive(data.home, data.away, data.players, {
-      week: data.week,
-      userLineup: data.userLineup,
-      seed: data.seed,
-      onTick: (state) => {
-        if (state.tick % 5 === 0 || state.isFinished) {
-          sendFrame(state);
-        }
+    let current = state;
 
-        if (
-          state.tick % DEBUG_SAMPLE_TICKS === 0 &&
-          state.time <= DEBUG_MAX_SECONDS
-        ) {
-          debug.frames.push(compactFrame(state));
+    while (current.tick < MAX_SECONDS) {
+      current = runTick(current);
+
+      if (current.tick % FRAME_EVERY_TICKS === 0 || current.phase === 'full_time') {
+        const frame = toLiveFrame(current, current.tick, current.clockSeconds);
+        scope.postMessage({ type: 'frame', ...frame });
+
+        if (current.clockSeconds <= 300) {
+          debug.frames.push(frame);
         }
-      },
-    });
+      }
+    }
 
     scope.postMessage({
       type: 'complete',
-      result,
+      result: toTemporaryMatchResult(current, data.home.id, data.away.id),
       debug,
-    } satisfies {
-      type: 'complete';
-      result: Match;
-      debug: DebugRecording;
     });
   } catch (error) {
     scope.postMessage({
