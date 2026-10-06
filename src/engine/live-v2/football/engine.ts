@@ -1,6 +1,7 @@
 import type { MatchState, PlayerState, TeamSide, Vec2 } from '../state';
 import { nextRandom } from '../rng';
 import { distance, inGoalMouth, inPenaltyArea, shotXG, clamp } from './geometry';
+import { goalkeeperSaveChance } from './goalkeeper';
 import { chooseFootballAction } from './action';
 import { formationSlots } from './formation';
 import type { FootballEvent, FootballState, PlayerMatchStats, TeamMatchStats } from './types';
@@ -102,7 +103,7 @@ function resolveShot(state:MatchState,player:PlayerState):MatchState {
  const [roll,seed]=nextRandom(next.seed); next={...next,seed};
  const gk=active(next).filter(p=>p.team!==player.team&&p.role==='GK').sort((a,b)=>a.id.localeCompare(b.id))[0];
  const gkSkill=gk?(gk.attributes?.goalkeeper??45)+(gk.attributes?.reflexes??45)+(gk.attributes?.gkPositioning??45):45;
- const saveChance=clamp(0.28+gkSkill/500+(1-xG)*0.12,0.2,0.72);
+ const saveChance=gk?goalkeeperSaveChance(gk,distance(gk.position,player.position),1-Math.min(1,pressure/15)):0;
  if(gk&&roll<saveChance){
   next=withTeamStat(next,player.team,'shotsOnTarget'); next=withPlayerStat(next,player.id,'shotsOnTarget');
   next=withPlayerStat(next,gk.id,'saves'); next=addEvent(next,{type:'shot_on_target',playerId:player.id,teamId:player.team,xG,position:player.position,description:'shot on target'});
@@ -114,7 +115,7 @@ function resolveShot(state:MatchState,player:PlayerState):MatchState {
  const goalChance=clamp(xG*(0.72+finishing*0.35),0.01,0.75);
  if(goalRoll<goalChance){
   const scorer=player.team; next={...next,score:{...next.score,[scorer==='HOME'?'home':'away']:next.score[scorer==='HOME'?'home':'away']+1}};
-  next=withTeamStat(next,scorer,'goals'); next=withPlayerStat(next,player.id,'goals');
+  next=withTeamStat(next,scorer,'goals'); next=withPlayerStat(next,player.id,'goals'); next=withTeamStat(next,scorer,'shotsOnTarget'); next=withPlayerStat(next,player.id,'shotsOnTarget');
   next=addEvent(next,{type:'goal',playerId:player.id,teamId:scorer,xG,position:{x:scorer==='HOME'?next.pitch.length:0,y:next.pitch.width/2},description:'goal'});
   const assist=next.football!.lastAssistBySide[scorer]; if(assist&&assist!==player.id){next=withPlayerStat(next,assist,'assists');next=addEvent(next,{type:'assist',playerId:assist,teamId:scorer,relatedPlayerId:player.id,description:'assist'});}
   return {...next,ball:{...next.ball,position:{x:next.pitch.length/2,y:next.pitch.width/2,z:0},velocity:{x:0,y:0,z:0},ownerId:null},restart:{type:'kickoff',side:scorer==='HOME'?'AWAY':'HOME',point:{x:next.pitch.length/2,y:next.pitch.width/2}}};
@@ -181,7 +182,7 @@ export function runFootballTick(state:MatchState):MatchState {
    if(out&&incoming)next=makeSubstitution(next,side,out.id,incoming.id);
   }
  }
- if(next.ball.ownerId)next={...next,ball:{...next.ball,position:{...next.players[next.ball.ownerId].position,z:0}}};
+ if(next.ball.ownerId){ const ownerPlayer=next.players[next.ball.ownerId]; next={...next,ball:{...next.ball,position:{...ownerPlayer.position,z:0}}}; next=withTeamStat(next,ownerPlayer.team,'possessionTicks'); }
  if(!next.ball.ownerId)next=resolveBoundary(next);
  const nextTick=next.tick+1; const nextClock=next.clockSeconds+1;
  if(nextTick>=5400){
