@@ -148,7 +148,11 @@ function resolveShot(
   };
 }
 
-function resolveDribble(state: MatchState, playerId: string): MatchState {
+function resolveDribble(
+  state: MatchState,
+  playerId: string,
+  randomValue: number,
+): MatchState {
   const player = state.players[playerId];
 
   if (!player || state.ball.ownerId !== playerId) {
@@ -156,6 +160,7 @@ function resolveDribble(state: MatchState, playerId: string): MatchState {
   }
 
   const forward = player.team === 'HOME' ? 1 : -1;
+  const retainsBall = randomValue < 0.5;
 
   return {
     ...state,
@@ -171,7 +176,7 @@ function resolveDribble(state: MatchState, playerId: string): MatchState {
         y: 0,
         z: 0,
       },
-      ownerId: playerId,
+      ownerId: retainsBall ? playerId : null,
       lastTouchId: playerId,
       lastTouchSide: player.team,
     },
@@ -192,7 +197,7 @@ function resolveChase(state: MatchState, _playerId: string): MatchState {
  * PASS and SHOOT consume exactly one seeded RNG value when the action is
  * actually resolved. The decision stage has already consumed its own values,
  * so action resolution starts from decisions.seed and returns the advanced
- * state seed. CHASE and DRIBBLE consume no RNG in E4.
+ * state seed. CHASE consumes no RNG; DRIBBLE consumes one RNG value only when resolved.
  */
 export function resolveActions(
   state: MatchState,
@@ -229,9 +234,18 @@ export function resolveActions(
         next = resolveShot(next, decision.playerId, randomValue);
         break;
       }
-      case 'DRIBBLE':
-        next = resolveDribble(next, decision.playerId);
+      case 'DRIBBLE': {
+        const player = next.players[decision.playerId];
+
+        if (!player || next.ball.ownerId !== decision.playerId) {
+          break;
+        }
+
+        const [randomValue, nextSeed] = nextRandom(rngState);
+        rngState = nextSeed;
+        next = resolveDribble(next, decision.playerId, randomValue);
         break;
+      }
       case 'CHASE':
         next = resolveChase(next, decision.playerId);
         break;
