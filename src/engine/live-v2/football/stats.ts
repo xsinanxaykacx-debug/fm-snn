@@ -18,7 +18,7 @@ const ratio=(a:number,b:number)=>b===0?0:(a/b)*100;
 export function finalizeStats(f:FootballState):FinalMatchStats{
  const h=f.teamStats.HOME,a=f.teamStats.AWAY;
  return {
-  possession:{home:pct(h.possessionTicks,h.possessionTicks+a.possessionTicks),away:pct(a.possessionTicks,h.possessionTicks+a.possessionTicks)},
+  possession:{home:pct(h.possessionTicks,a.possessionTicks),away:pct(a.possessionTicks,h.possessionTicks)},
   shots:{home:n(h,'shots'),away:n(a,'shots')},onTarget:{home:n(h,'shotsOnTarget'),away:n(a,'shotsOnTarget')},
   xG:{home:n(h,'xG'),away:n(a,'xG')},passes:{home:n(h,'passes'),away:n(a,'passes')},
   passAccuracy:{home:ratio(n(h,'successfulPasses'),n(h,'passes')),away:ratio(n(a,'successfulPasses'),n(a,'passes'))},
