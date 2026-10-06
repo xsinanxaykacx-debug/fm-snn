@@ -72,7 +72,7 @@ export function createMatchState(
   const homePlayers = buildPlayers(home, 'HOME', pitch);
   const awayPlayers = buildPlayers(away, 'AWAY', pitch);
 
-  return {
+  return attachFootball({
     seed: { ...seed },
     clockSeconds: 0,
     tick: 0,
