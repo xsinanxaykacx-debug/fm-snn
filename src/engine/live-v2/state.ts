@@ -125,11 +125,11 @@ export type MatchDiagnostics = {
   lastBallPosition: Vec3;
   lastBallVelocity: Vec3;
   lastDecisionAction?: DecisionAction;
-  lastAction: 'PASS' | 'SHOOT' | 'DRIBBLE' | 'CHASE' | null;
-  lastPassTarget: Vec2 | null;
-  lastBallVelocityBefore: Vec3;
-  lastBallVelocityAfter: Vec3;
-  lastZeroVelocitySource:
+  lastAction?: 'PASS' | 'SHOOT' | 'DRIBBLE' | 'CHASE' | null;
+  lastPassTarget?: Vec2 | null;
+  lastBallVelocityBefore?: Vec3;
+  lastBallVelocityAfter?: Vec3;
+  lastZeroVelocitySource?:
     | 'resolvePass'
     | 'resolveShot'
     | 'resolveDribble'
