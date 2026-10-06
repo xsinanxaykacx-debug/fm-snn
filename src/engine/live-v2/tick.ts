@@ -18,36 +18,39 @@ function phaseAt(clockSeconds: number): MatchState['phase'] {
 /** Executes exactly one deterministic v2 simulation tick. */
 export function runTick(state: MatchState): MatchState {
   // A pending restart is a one-tick transition, not a persistent simulation
-  // mode. Resolve it before perception/decision so no live subsystem can
-  // repeatedly steal/control a stationary restart ball.
+  // mode. Resolve it before any live subsystem sees the stationary restart ball.
   const liveState = playRestart(state);
 
-  const perceptions = perceive(liveState);
-  const decisions = decide(liveState, perceptions);
-  const withActions = resolveActions(liveState, decisions);
+  // Ball physics is authoritative for the current tick. Perception/decision
+  // must observe this updated position, otherwise chase intents are always one
+  // tick behind the ball.
   const previousBallPosition = { ...liveState.ball.position };
-  // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
-  const intents: MovementIntent[] = decisions;
-
-  const moved = applyMovement(withActions, intents);
-  const ballStepped = stepBall(moved);
+  const ballStepped = stepBall(liveState);
 
   const boundary = resolveBoundary(
-    moved.pitch,
+    liveState.pitch,
     previousBallPosition,
     ballStepped.ball.position,
     ballStepped.ball,
-    moved.players,
+    liveState.players,
   );
 
-  let next = ballStepped;
+  let next: MatchState;
+  let decisions: ReturnType<typeof decide> = [];
 
   if (boundary.event) {
-    next = applyRestart(next, boundary.event);
+    next = applyRestart(ballStepped, boundary.event);
     next = { ...next, events: [...next.events, boundary.event] };
     next = consumeRestart(next);
   } else {
-    next = updatePossession(next);
+    const perceptions = perceive(ballStepped);
+    decisions = decide(ballStepped, perceptions);
+    const withActions = resolveActions(ballStepped, decisions);
+    // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
+    const intents: MovementIntent[] = decisions;
+
+    const moved = applyMovement(withActions, intents);
+    next = updatePossession(moved);
   }
 
   const nextClock = next.clockSeconds + 1;
@@ -65,7 +68,7 @@ export function runTick(state: MatchState): MatchState {
       lastBallPosition: { ...next.ball.position },
       lastBallVelocity: { ...next.ball.velocity },
       lastDecisionAction,
-      perceivedPlayerCount: Object.keys(perceptions.players).length,
+      perceivedPlayerCount: Object.keys(liveState.players).length,
       restartState: next.restart,
       lastBoundaryEvent: boundary.event,
     },
