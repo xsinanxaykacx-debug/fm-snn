@@ -6,7 +6,7 @@ import { updatePossession } from './possession';
 import { applyMovement, type MovementIntent } from './movement';
 import { stepBall } from './ball';
 import { resolveBoundary } from './boundary';
-import { applyRestart, consumeRestart } from './restart';
+import { applyRestart, consumeRestart, playRestart } from './restart';
 
 function phaseAt(clockSeconds: number): MatchState['phase'] {
   if (clockSeconds >= 5400) return 'full_time';
@@ -17,10 +17,15 @@ function phaseAt(clockSeconds: number): MatchState['phase'] {
 
 /** Executes exactly one deterministic v2 simulation tick. */
 export function runTick(state: MatchState): MatchState {
-  const perceptions = perceive(state);
-  const decisions = decide(state, perceptions);
-  const withActions = resolveActions(state, decisions);
-  const previousBallPosition = { ...state.ball.position };
+  // A pending restart is a one-tick transition, not a persistent simulation
+  // mode. Resolve it before perception/decision so no live subsystem can
+  // repeatedly steal/control a stationary restart ball.
+  const liveState = playRestart(state);
+
+  const perceptions = perceive(liveState);
+  const decisions = decide(liveState, perceptions);
+  const withActions = resolveActions(liveState, decisions);
+  const previousBallPosition = { ...liveState.ball.position };
   // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
   const intents: MovementIntent[] = decisions;
 
