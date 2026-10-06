@@ -1,6 +1,7 @@
 import { createMatchState, type MatchLineup } from '../engine/live-v2/adapters/matchStateFactory';
 import { createV2MatchSeed } from '../engine/live-v2/adapters/matchSeed';
 import { toLiveFrame } from '../engine/live-v2/adapters/liveFrame';
+import { shouldEmitFrame, ticksPerFrame } from '../engine/live-v2/adapters/tickLoopScheduler';
 import { runTick } from '../engine/live-v2/tick';
 import type { RngState } from '../engine/live-v2/rng';
 import type { Pitch, MatchState } from '../engine/live-v2/state';
@@ -34,8 +35,9 @@ type WorkerScope = {
 };
 
 const scope = self as unknown as WorkerScope;
-const FRAME_EVERY_TICKS = 10;
-const MAX_SECONDS = 5400;
+const TICKS_PER_FRAME = 6;
+const FRAME_INTERVAL_MS = 100;
+const MAX_TICKS = 5400;
 
 function resolvePlayerIds(
   clubId: string,
@@ -127,6 +129,8 @@ function toTemporaryMatchResult(
 scope.onmessage = (event) => {
   if (event.data.type !== 'start') return;
 
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+
   try {
     const data = event.data;
     const seed = data.seed ?? createV2MatchSeed(data.season, data.fixture, data.week);
@@ -139,33 +143,60 @@ scope.onmessage = (event) => {
 
     const debug: DebugRecording = {
       version: 1,
-      sampleEveryTicks: FRAME_EVERY_TICKS,
-      maxSimulationSeconds: MAX_SECONDS,
+      sampleEveryTicks: TICKS_PER_FRAME,
+      maxSimulationSeconds: MAX_TICKS,
       startedAt: Date.now(),
       frames: [],
     };
 
     let current = state;
 
-    while (current.tick < MAX_SECONDS) {
-      current = runTick(current);
-
-      if (current.tick % FRAME_EVERY_TICKS === 0 || current.phase === 'full_time') {
-        const frame = toLiveFrame(current, current.tick, current.clockSeconds);
-        scope.postMessage(frame);
-
-        if (current.clockSeconds <= 300) {
-          debug.frames.push(frame);
+    intervalId = setInterval(() => {
+      try {
+        for (let i = 0; i < ticksPerFrame(TICKS_PER_FRAME); i += 1) {
+          if (current.tick >= MAX_TICKS) break;
+          current = runTick(current);
         }
+
+        if (shouldEmitFrame(current.tick, TICKS_PER_FRAME) || current.phase === 'full_time') {
+          const frame = toLiveFrame(current, current.tick, current.clockSeconds);
+          scope.postMessage(frame);
+
+          if (current.clockSeconds <= 300) {
+            debug.frames.push(frame);
+          }
+        }
+
+        if (current.tick >= MAX_TICKS || current.phase === 'full_time') {
+          if (intervalId !== null) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+
+          scope.postMessage({
+            type: 'complete',
+            result: toTemporaryMatchResult(current, data.home.id, data.away.id),
+            debug,
+          });
+        }
+      } catch (error) {
+        if (intervalId !== null) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+
+        scope.postMessage({
+          type: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
+    }, FRAME_INTERVAL_MS);
+  } catch (error) {
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = null;
     }
 
-    scope.postMessage({
-      type: 'complete',
-      result: toTemporaryMatchResult(current, data.home.id, data.away.id),
-      debug,
-    });
-  } catch (error) {
     scope.postMessage({
       type: 'error',
       message: error instanceof Error ? error.message : String(error),
