@@ -152,7 +152,7 @@ scope.onmessage = (event) => {
 
       if (current.tick % FRAME_EVERY_TICKS === 0 || current.phase === 'full_time') {
         const frame = toLiveFrame(current, current.tick, current.clockSeconds);
-        scope.postMessage({ type: 'frame', ...frame });
+        scope.postMessage(frame);
 
         if (current.clockSeconds <= 300) {
           debug.frames.push(frame);
