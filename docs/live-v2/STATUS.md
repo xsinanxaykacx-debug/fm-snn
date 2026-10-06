@@ -1,14 +1,14 @@
 # Live-v2 Status
 
 ## Son güncelleme
-2026-10-06 — Tur 15b (E5 tamamlandı, E6 bekliyor)
+2026-10-06 — Tur 16 (E6 tamamlandı, E adımı kapandı)
 
 ## Repo / Branch / PR
 - Repo: xsinanxaykacx-debug/fm-snn
 - Aktif branch: live-v2-foundation
-- HEAD: d6242bfdc28f9ed2b67511880cf3912fe1b69aeb
-- Son GREEN CI: #786 (push, live-v2-foundation)
-- E5 PR: #49 (merged)
+- HEAD: 0637fd0d687edf8ecc7633130ea69404be3092af
+- Son GREEN CI: #790 (push, live-v2-foundation)
+- E6 PR: #50 (merged)
 - main: ded6ed03249b478bac2d247d19d841b99c1af475 (dokunulmuyor)
 
 ## Tamamlanan adımlar
@@ -21,36 +21,39 @@
 - [x] E3: decision.ts RNG — CI #770/#771
 - [x] E4: actionResolution PASS/SHOOT RNG — CI #780/#781
 - [x] E5: DRIBBLE RNG — CI #785/#786
-- [ ] E6: Simulation determinism acceptance
+- [x] E6: Simulation determinism acceptance — CI #789/#790
 - [ ] F: 11v11 runtime acceptance
 - [ ] G: realism calibration
 
+## E adımı
+**TAMAMLANDI — E1–E6 tamamlandı.**
+
 ## Şu anki adım
-E6 bekliyor — Simulation determinism acceptance.
+Genel Güç turu — ayrı branch, ayrı oturum. F/G sonraya bırakıldı.
 
 ## Test durumu
-- 169/169
-- 43 test dosyası
-- CI #785: 169/169 GREEN
-- CI #786: 169/169 GREEN
-- Yerel test: HAYIR — bu çalışma ortamında repo checkout/network erişimi yok; yerel doğrulama yapılamadı.
+- 175/175
+- 44 test dosyası
+- CI #789: 175/175 GREEN
+- CI #790: 175/175 GREEN
+- 5400 tick determinism testi CI içinde çalıştı; run #789 toplam test süresi 135.79s, run #790 toplam test süresi 132.58s.
+- Yerel test: HAYIR — bu çalışma ortamında repo checkout/network erişimi olmadığı için local doğrulama yapılamadı.
+
+## E6 acceptance invariant'ları
+1. 1 tick: aynı seed + aynı input → tam aynı MatchState
+2. 100 tick: aynı seed + aynı input → tam aynı MatchState
+3. 1000 tick: aynı seed + aynı input → tam aynı MatchState
+4. 5400 tick: aynı seed + aynı input → tam aynı MatchState
+5. RNG tüketilen koşulda farklı seed → farklı final state mümkün
+6. Aynı seed ile N tick sonunda seed progression deterministik
 
 ## Pipeline (gerçek)
 restart → ball physics → boundary → perceive → decide → action → movement → possession
 
 ## Bilinen sorunlar
-- Genel Güç düşüşü: sezon 1 H1 59.7 → H11 26.3 → sezon 2 H1 26.0
-- E6 sonrası ayrı tur olarak ele alınacak
-
-## E5 kararı
-- DRIBBLE RNG kontrol sonucuna bağlandı; geometri RNG'den etkilenmiyor.
-- İlk sürüm retain/lose oranı sabit %50.
-- Gerekçe: E5'in amacı RNG kontratını ve deterministik state progression'ı izole etmek; oyuncu özellikleriyle olasılık ağırlığı eklemek G/kalibrasyon kapsamına bırakıldı.
-- Gerçekten çözülen DRIBBLE tam 1 RNG tüketiyor.
-- Geçersiz/çözülemeyen DRIBBLE RNG tüketmiyor.
-- Lose sonucunda ownerId null; lastTouchId/lastTouchSide korunuyor ve top mevcut dribble geometrisi/velocity ile loose-ball state'e geçiyor.
-- CHASE RNG tüketmiyor; PASS/SHOOT RNG davranışı korunuyor.
-- Math.random() kullanılmıyor.
+- **Genel Güç düşüşü:** sezon 1 H1 59.7 → H11 26.3 → sezon 2 H1 26.0
+- Artık öncelikli çalışma konusu.
+- F/G sonraya bırakıldı.
 
 ## Değişmez kurallar
 1. Legacy src/engine/live/* dokunulmaz
