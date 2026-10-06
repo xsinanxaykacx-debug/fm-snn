@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { createV2MatchSeed } from '../engine/live-v2/adapters/matchSeed';
 import type { LiveFrame } from '../engine/live-v2/adapters/liveFrame';
+type DebugFrame = LiveFrame;
 import type { Match } from '../engine/types';
 
 type DebugRecording = {
