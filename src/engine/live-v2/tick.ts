@@ -24,7 +24,10 @@ export function runTick(state: MatchState): MatchState {
   // Ball physics is authoritative for the current tick. Perception/decision
   // must observe this updated position, otherwise chase intents are always one
   // tick behind the ball.
-  const previousBallPosition = { ...liveState.ball.position };
+  const previousBallPosition = {
+    ...liveState.ball.position,
+    z: liveState.ball.position.z ?? 0,
+  };
   const ballStepped = stepBall(liveState);
 
   const boundary = resolveBoundary(
