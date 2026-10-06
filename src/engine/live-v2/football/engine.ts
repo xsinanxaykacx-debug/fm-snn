@@ -2,6 +2,7 @@ import type { MatchState, PlayerState, TeamSide, Vec2 } from '../state';
 import { nextRandom } from '../rng';
 import { distance, inGoalMouth, inPenaltyArea, shotXG, clamp } from './geometry';
 import { goalkeeperSaveChance } from './goalkeeper';
+import { resolvePenalty } from './penalty';
 import { isOffside, foulSeverity } from './rules';
 import { chooseFootballAction } from './action';
 import { formationSlots } from './formation';
@@ -170,6 +171,11 @@ function resolveOwnerAction(state:MatchState,owner:PlayerState):MatchState {
     next=addEvent(next,{type:red?'red':'yellow',playerId:opponent.id,teamId:opponent.team,position:opponent.position,description:red?'red':'yellow'});
     if(red)next=withPlayerStat(next,opponent.id,'red');
    }
+   if(inPenaltyArea(next.pitch,owner.team,owner.position)){
+    next=withTeamStat(next,owner.team,'penalties');
+    next={...next,football:{...next.football!,pendingPenalty:{side:owner.team}}};
+    return addEvent(next,{type:'penalty',teamId:owner.team,position:owner.position,description:'penalty'});
+   }
    next=withTeamStat(next,owner.team,'freeKicks');
    return addEvent(next,{type:'free_kick',teamId:owner.team,position:owner.position,description:'free kick'});
   }
@@ -190,6 +196,7 @@ export function runFootballTick(state:MatchState):MatchState {
   return {...next,phase:'halftime',clockSeconds:2700,tick:2700};
  }
  if(next.phase==='halftime'){ next={...next,phase:'second_half'}; }
+ if(next.football!.pendingPenalty){ return resolvePenalty({...next,football:{...next.football!,pendingPenalty:null}},next.football!.pendingPenalty.side); }
  const owner=next.ball.ownerId?next.players[next.ball.ownerId]:undefined;
  if(owner&&owner.onPitch!==false)next=resolveOwnerAction(next,owner);
  else {next=advanceBall(next);next=applyPossession(next);}
