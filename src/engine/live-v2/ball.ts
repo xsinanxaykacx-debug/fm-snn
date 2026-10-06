@@ -49,7 +49,22 @@ export function stepBall(
     );
   }
 
-  const { position: p, velocity: v } = state.ball;
+  // Some live-v2 callers provide a ground-level ball as a 2D position.
+  // Physics owns the vertical component, so an omitted z coordinate is the
+  // ground plane rather than a non-finite physics value.
+  const p = {
+    x: state.ball.position.x,
+    y: state.ball.position.y,
+    z: state.ball.position.z ?? 0,
+  };
+  const { velocity: v } = state.ball;
+
+  if (!finiteVector(p)) {
+    throw new Error(
+      'live-v2 ball: non-finite position ' + JSON.stringify(state.ball.position),
+    );
+  }
+
   const horizontalFactor = Math.max(
     0,
     1 - config.friction * config.dt,
