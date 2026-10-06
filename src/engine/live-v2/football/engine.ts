@@ -4,7 +4,7 @@ import { distance, inPenaltyArea, shotXG, clamp } from './geometry';
 import { goalkeeperSaveChance } from './goalkeeper';
 import { resolvePenalty } from './penalty';
 import { movementSpeedMultiplier, pressingIntensity } from './tactics';
-import { isOffside, foulSeverity } from './rules';
+import { isOffside } from './rules';
 import { chooseFootballAction } from './action';
 import { formationSlots } from './formation';
 import type { FootballEvent, PlayerMatchStats, TeamMatchStats } from './types';
