@@ -38,11 +38,15 @@ export function stepBall(
   if (!Number.isFinite(config.stopSpeed) || config.stopSpeed < 0) {
     throw new Error('live-v2 ball: invalid stopSpeed');
   }
-  if (
-    !finiteVector(state.ball.position) ||
-    !finiteVector(state.ball.velocity)
-  ) {
-    throw new Error('live-v2 ball: non-finite state');
+  if (!finiteVector(state.ball.position)) {
+    throw new Error(
+      'live-v2 ball: non-finite position ' + JSON.stringify(state.ball.position),
+    );
+  }
+  if (!finiteVector(state.ball.velocity)) {
+    throw new Error(
+      'live-v2 ball: non-finite velocity ' + JSON.stringify(state.ball.velocity),
+    );
   }
 
   const { position: p, velocity: v } = state.ball;
