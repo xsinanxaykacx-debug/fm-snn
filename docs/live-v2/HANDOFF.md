@@ -182,3 +182,26 @@ Tur 15a — dokümantasyon kurulumu. E4 TAMAMLANDI, E5 HAZIR.
 - **Sonuç:** E5 production kodu merge edildi ve post-merge CI GREEN. E6'ya geçiş için CI koşulu sağlandı; yerel test çalıştırılmadığı açıkça kayıt altındadır.
 - **Açık noktalar:** Genel Güç düşüşü E6 sonrası ayrı tur. Retain/lose oranı şimdilik sabit %50; oyuncu özelliklerine bağlı kalibrasyon sonraki G kapsamındadır.
 - **Sıradaki:** E6 — Simulation determinism acceptance.
+
+
+### Tur 16 — E6 Simulation determinism acceptance
+- **Tarih:** 2026-10-06
+- **Konu:** E1–E5 RNG altyapısının gerçek simulation akışında determinizm kabul testleri.
+- **ADIM 1 — Mevcut durum:** `simulateMatchV2(state, maxSeconds)` imzası mevcut. `maxSeconds` integer ve negatif olmayan değer olmalı. Simulation `current.tick + maxSeconds` hedefini `runTick()` ile adım adım çalıştırıyor. `state.seed`, `runTick()` içinde `decide()` ve `resolveActions()` sonrası `withActions.seed` olarak taşınıyor. Mevcut horizon testleri 10/60/300/2700/5400 saniye hedefini, halftime/full_time durumlarını ve bazı saha invariantlarını doğruluyordu; ayrıca 10/60/300/2700/5400 için determinism testi zaten vardı.
+- **ADIM 1 — Kod taraması:** `tick.ts` içinde player iteration'ı deterministik sıralanıyor; `passTarget()` Object.values sonrası distance + id tie-break ile sıralıyor. `decision.ts` Object.values oyuncuları id'ye göre sıralıyor. E6 acceptance için yeni test doğrudan final MatchState üzerinde `toEqual` kullanıyor. `Math.random()`, `Date.now()` veya `performance.now()` simulation akışına eklenmedi.
+- **ADIM 2 — Kapsam:** 1, 100, 1000 ve 5400 tick için aynı seed + aynı input → tam aynı MatchState; RNG tüketilen koşulda farklı seed → farklı final state; N tick sonunda seed progression deterministik.
+- **ADIM 3 — Test-first:** Yeni dosya `src/engine/live-v2/simulationDeterminism.test.ts`. 6 acceptance testi eklendi. 5400 tick testi ayrı test case olarak çalıştırıldı; slow annotation eklenmedi çünkü test suite bunu ayrı test case olarak çalıştırıyor ve CI'da gerçek 5400 tick çalıştırıldı.
+- **Test commit:** `5bd60f3f700059a05f7c87d630a3ad5c358100cd` — `test(live-v2): add E6 simulation determinism acceptance`
+- **PR:** #50, base `live-v2-foundation`.
+- **ADIM 4 — Production:** Production değişikliği yapılmadı. E6 testleri production determinizmini doğrulamak için yeterli oldu; test-first sonrası mevcut simulation/rng/tick kodunda düzeltme gerektiren kırmızı sonuç oluşmadı.
+- **ADIM 5 — Mevcut testler:** E1–E5 testleri ve mevcut `simulation.test.ts` korundu. Toplam 44 test dosyası / 175 test GREEN.
+- **CI #789:** GREEN. 44/44 test dosyası, 175/175 test. Toplam test süresi **135.79s**. 5400 tick acceptance testi bu run içinde çalıştı.
+- **Merge commit:** `0637fd0d687edf8ecc7633130ea69404be3092af`
+- **CI #790:** GREEN. 44/44 test dosyası, 175/175 test. Toplam test süresi **132.58s**. 5400 tick acceptance testi bu post-merge run içinde de çalıştı.
+- **ADIM 6 — CI özeti:** #789 GREEN → #790 GREEN. Bu turda FAIL oluşmadı. Önceki Tur 15b'nin #784 FAIL, #785/#786/#787/#788 GREEN run'ları E5 geçmişinde ayrıca kayıtlıdır.
+- **ADIM 7 — STATUS:** `d64e93521af77e516c6d0fd418619c88eafedafe` — `docs(live-v2): sync STATUS.md with E6 completion`
+- **ADIM 8 — HANDOFF:** Bu bölüm ayrı commit ile eklendi; commit SHA bu dokümantasyon commitidir.
+- **E adımı:** **EVET — TAMAMLANDI.** E1, E2, E3, E4, E5 ve E6 tamamlandı; E6 post-merge CI #790 GREEN.
+- **Yerel doğrulama:** HAYIR. Bu çalışma ortamında repo checkout/network erişimi olmadığı için local test çalıştırılamadı. CI sonucu varsayılmadı.
+- **Açık nokta:** Genel Güç düşüşü artık öncelikli çalışma konusu: sezon 1 H1 59.7 → H11 26.3 → sezon 2 H1 26.0.
+- **Sıradaki:** Genel Güç turu — ayrı branch, ayrı oturum. F ve G sonraya bırakıldı.
