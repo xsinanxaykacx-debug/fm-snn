@@ -865,6 +865,7 @@ export const useGameStore = create<Store>()(
 
         for (const id in newPlayers) {
           const p = { ...newPlayers[id] };
+          p.condition = 100;
           if (p.careerStats) {
             p.careerStats = {
               ...p.careerStats,
