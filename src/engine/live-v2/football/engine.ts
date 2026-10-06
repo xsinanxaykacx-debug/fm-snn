@@ -226,6 +226,10 @@ export function runFootballTick(state:MatchState):MatchState {
  if(next.ball.ownerId){ const ownerPlayer=next.players[next.ball.ownerId]; next={...next,ball:{...next.ball,position:{...ownerPlayer.position,z:0}}}; next=withTeamStat(next,ownerPlayer.team,'possessionTicks'); }
  if(!next.ball.ownerId)next=resolveBoundary(next);
  const nextTick=next.tick+1; const nextClock=next.clockSeconds+1;
+ if(nextTick===2700){
+  next=addEvent(next,{type:'half_time',description:'half time'});
+  return {...next,tick:2700,clockSeconds:2700,phase:'halftime'};
+ }
  if(nextTick>=5400){
   next=addEvent(next,{type:'full_time',description:'full time'});
   return {...next,tick:5400,clockSeconds:5400,phase:'full_time'};
