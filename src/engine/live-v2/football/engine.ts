@@ -3,6 +3,7 @@ import { nextRandom } from '../rng';
 import { distance, inGoalMouth, inPenaltyArea, shotXG, clamp } from './geometry';
 import { goalkeeperSaveChance } from './goalkeeper';
 import { resolvePenalty } from './penalty';
+import { movementSpeedMultiplier, pressingIntensity } from './tactics';
 import { isOffside, foulSeverity } from './rules';
 import { chooseFootballAction } from './action';
 import { formationSlots } from './formation';
@@ -45,7 +46,7 @@ function movePlayers(state:MatchState):MatchState {
    const target=isChase?ball:slots[index]?.position??p.position;
    const dir=direction(p.position,target);
    const pressing=state.football!.tactics[side].pressing==='high'&&isChase;
-   const speed=pressing?PRESSING_SPEED:PLAYER_SPEED;
+   const speed=(pressing?PRESSING_SPEED:PLAYER_SPEED)*movementSpeedMultiplier(state.football!.tactics[side])*(1+(pressing?pressingIntensity(state.football!.tactics[side])*0.08:0));
    const distanceToTarget=distance(p.position,target);
    const step=Math.min(speed,distanceToTarget);
    nextPlayers[p.id]={...p,position:{x:clamp(p.position.x+dir.x*step,0,state.pitch.length),y:clamp(p.position.y+dir.y*step,0,state.pitch.width)},velocity:{x:dir.x*step,y:dir.y*step}};
