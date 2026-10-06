@@ -1,5 +1,6 @@
 import type { RngState } from '../rng';
 import type { MatchState, Pitch, PlayerState, TeamSide } from '../state';
+import { attachFootball } from '../football/setup';
 
 export type MatchLineupPlayer = {
   id: string;
@@ -112,5 +113,5 @@ export function createMatchState(
       lastBallPosition: { x: pitch.length / 2, y: pitch.width / 2, z: 0 },
       lastBallVelocity: { x: 0, y: 0, z: 0 },
     },
-  };
+  });
 }

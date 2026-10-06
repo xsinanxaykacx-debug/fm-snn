@@ -8,6 +8,7 @@
 
 import type { DecisionAction } from './decision';
 import type { RngState } from './rng';
+import type { FootballState, PlayerAttributes, PlayerMatchStats, Role } from './football/types';
 
 export type TeamSide = 'HOME' | 'AWAY';
 
@@ -62,6 +63,14 @@ export type PlayerState = {
   team: TeamSide;
   position: Vec2;
   velocity: Vec2;
+  role?: Role;
+  stamina?: number;
+  onPitch?: boolean;
+  yellowCards?: number;
+  redCard?: boolean;
+  attributes?: PlayerAttributes;
+  matchStats?: PlayerMatchStats;
+  startingPosition?: Vec2;
 };
 
 export type TeamState = {
@@ -179,6 +188,9 @@ export type MatchState = {
 
   /** Ordered football events emitted by the simulation. */
   events: MatchEvent[];
+
+  /** Rich football runtime owned by live-v2; absent only for legacy foundation fixtures. */
+  football?: FootballState;
 
   /** Lightweight runtime diagnostics for progress/debugging. */
   diagnostics: MatchDiagnostics;
