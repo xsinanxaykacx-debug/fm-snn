@@ -152,6 +152,11 @@ function resolveOwnerAction(state:MatchState,owner:PlayerState):MatchState {
    const success=distance(owner.position,target.position)<28 && roll>0.12;
    next=withPlayerStat(next,owner.id,'successfulPasses',success?1:0);next=withTeamStat(next,owner.team,'successfulPasses',success?1:0);
    next=addEvent(next,{type:'pass',playerId:owner.id,teamId:owner.team,relatedPlayerId:target.id,position:owner.position,description:'pass'});
+   if(success && Math.abs((owner.team==='HOME'?next.pitch.length:0)-target.position.x)<28){
+    next=withTeamStat(next,owner.team,'successfulPasses',0);
+    next=withPlayerStat(next,owner.id,'keyPasses');
+    next=addEvent(next,{type:'key_pass',playerId:owner.id,teamId:owner.team,relatedPlayerId:target.id,position:owner.position,description:'key pass'});
+   }
    if(success){next={...next,football:{...next.football!,lastAssistBySide:{...next.football!.lastAssistBySide,[owner.team]:owner.id}},ball:{...next.ball,ownerId:null,lastTouchId:owner.id,lastTouchSide:owner.team,velocity:{x:dir.x*12,y:dir.y*12,z:0}}};}
    else next={...next,ball:{...next.ball,ownerId:null,lastTouchId:owner.id,lastTouchSide:owner.team,velocity:{x:dir.x*9,y:dir.y*9,z:0}}};
    return next;
