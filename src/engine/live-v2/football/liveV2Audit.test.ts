@@ -10,7 +10,7 @@ function files(root:string):string[]{
 describe('live-v2 audit',()=>{
  it('contains no Math.random or legacy live imports',()=>{
   const root=join(process.cwd(),'src','engine','live-v2');
-  const source=files(root).map(p=>readFileSync(p,'utf8')).join('\n');
+  const source=files(root).filter(p=>!p.endsWith('.test.ts')).map(p=>readFileSync(p,'utf8')).join('\n');
   expect(source).not.toContain('Math.random(');
   expect(source).not.toMatch(/from ['"].*engine\/live\//);
  });
