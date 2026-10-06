@@ -1,22 +1,31 @@
 # UI Refactor — Status
 
 ## Son güncelleme
-2026-10-06 — Aşama 1 (sol sidebar layout)
+2026-10-06 — Aşama 2 (tema refactor + Settings)
 
 ## Branch
-- Branch: feat/fm-sidebar-layout
+- Branch: feat/fm-theme
 - Base: main
-- HEAD: 7bd12b8d4bf5d9ec1c7c84fb5a7a370d8646fcc1
-- Son GREEN CI: #805
+- HEAD: 420652b692b19bceb295a391957b1bc36cf9cc8c
+- Son GREEN CI: #809
 
 ## Aşamalar
 - [x] Aşama 1: Sol sidebar layout
-- [ ] Aşama 2: Tema
+- [x] Aşama 2: Tema
 - [ ] Aşama 3: Alt sekme
 - [ ] Aşama 4: Dashboard widget'ları
 - [ ] Aşama 5: Yeni sayfalar
 
-## Aşama 1 kapsamı
-- Yatay menü → sol sidebar (12 öğe)
-- Üst bar (rozet + takım + sezon/hafta + Devam)
-- Tema değişmedi, alt sekme yok
+## Aşama 2 kapsamı
+- Koyu kırmızı/altın FM paleti
+- Ana arka plan: #140508
+- Panel: #22070d
+- Sidebar: #1a050a
+- Ana metin: #f5e6e8
+- Soluk metin: #a68a8e
+- Altın vurgu: #e6a100
+- Koyu kırmızı vurgu: #8a1323
+- Kenarlık: #3d141b
+- Başarı yeşili: #2e7d32
+- Sidebar: 13 öğe; son öğe ⚙️ Ayarlar
+- Semantik durum renkleri korunur
