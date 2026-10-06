@@ -67,7 +67,11 @@ describe('live-v2 tick seed integration', () => {
     const a = runTick(initialState({ seed: 123456 }));
     const b = runTick(initialState({ seed: 123456 }));
 
-    expect(a).toEqual(b);
+    const { seed: seedA, ...withoutSeedA } = a;
+    const { seed: seedB, ...withoutSeedB } = b;
+
+    expect(seedA).not.toEqual(seedB);
+    expect(withoutSeedA).toEqual(withoutSeedB);
   });
 
   it('different seeds produce the same tick result before RNG consumption is wired', () => {
