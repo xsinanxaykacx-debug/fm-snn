@@ -157,6 +157,22 @@ function resolveOwnerAction(state:MatchState,owner:PlayerState):MatchState {
    next=addEvent(next,{type:'tackle',playerId:opponent.id,teamId:opponent.team,relatedPlayerId:owner.id,position:owner.position,description:'tackle'});
    return {...next,ball:{...next.ball,ownerId:opponent.id,lastTouchId:opponent.id,lastTouchSide:opponent.team}};
   }
+  const severity=foulSeverity(7-(owner.stamina??100)/25,false,Boolean(opponent.yellowCards&&opponent.yellowCards>=1));
+  if(severity!=='none'&&tackleRoll>0.88){
+   next=withTeamStat(next,owner.team,'fouls');
+   next=withPlayerStat(next,opponent.id,'fouls');
+   next=addEvent(next,{type:'foul',playerId:opponent.id,teamId:opponent.team,relatedPlayerId:owner.id,position:owner.position,description:'foul'});
+   if(severity==='yellow'||severity==='red'){
+    const yellow=(opponent.yellowCards??0)+1; const red=severity==='red'||yellow>=2;
+    const players={...next.players,[opponent.id]:{...opponent,yellowCards:yellow,redCard:red,onPitch:red?false:opponent.onPitch}};
+    next={...next,players};
+    next=withPlayerStat(next,opponent.id,'yellow');
+    next=addEvent(next,{type:red?'red':'yellow',playerId:opponent.id,teamId:opponent.team,position:opponent.position,description:red?'red':'yellow'});
+    if(red)next=withPlayerStat(next,opponent.id,'red');
+   }
+   next=withTeamStat(next,owner.team,'freeKicks');
+   return addEvent(next,{type:'free_kick',teamId:owner.team,position:owner.position,description:'free kick'});
+  }
  }
  next=withPlayerStat(next,owner.id,'dribbles'); next=addEvent(next,{type:'dribble',playerId:owner.id,teamId:owner.team,position:owner.position,description:'dribble'});
  const goalDirection=owner.team==='HOME'?1:-1; const stamina=owner.stamina??100; const pace=(owner.attributes?.pace??65)/100;
