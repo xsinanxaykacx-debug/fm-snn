@@ -169,7 +169,7 @@ function resolveOwnerAction(state:MatchState,owner:PlayerState):MatchState {
    next=addEvent(next,{type:'tackle',playerId:opponent.id,teamId:opponent.team,relatedPlayerId:owner.id,position:owner.position,description:'tackle'});
    return {...next,ball:{...next.ball,ownerId:opponent.id,lastTouchId:opponent.id,lastTouchSide:opponent.team}};
   }
-  const severity=foulSeverity(7-(owner.stamina??100)/25,false,Boolean(opponent.yellowCards&&opponent.yellowCards>=1));
+  const severity=tackleRoll>0.995?'red':tackleRoll>0.97?'yellow':tackleRoll>0.92?'foul':'none';
   if(severity!=='none'&&tackleRoll>0.88){
    next=withTeamStat(next,owner.team,'fouls');
    next=withPlayerStat(next,opponent.id,'fouls');
