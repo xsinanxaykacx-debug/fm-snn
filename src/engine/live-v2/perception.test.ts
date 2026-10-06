@@ -4,6 +4,7 @@ import type { MatchState } from './state';
 
 function state(): MatchState {
   return {
+    seed: { seed: 123456 },
     clockSeconds: 0, tick: 0, phase: 'first_half',
     pitch: { length: 104, width: 64, goalWidth: 7.32, goalHeight: 2.44, goalAreaDepth: 5.5 },
     score: { home: 0, away: 0 },
