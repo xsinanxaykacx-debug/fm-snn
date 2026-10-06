@@ -1,17 +1,21 @@
 # F1 — live-v2 22 oyuncu foundation
 
 ## Branch
-- Branch: feat/live-v2-22-player-foundation
+- F1 branch: feat/live-v2-22-player-foundation
 - Base: main
-- HEAD: 522809570d9a8b13549000be64fdfa924d3574b5
-- Son GREEN CI: #812
+- Foundation merge PR: #57
+- Foundation merge SHA: 97e4fa74b7d2598c9e7cd7212762793ee932d405
+- F1 branch update merge PR: #58
+- F1 branch update merge SHA: 59e34365d66ee943825b9fd43316936b067d0436
+- F1 PR: #56
+- F1 merge SHA: 0a1a9deb33ee848db8c22f242954fbfe9d324160
 
 ## Kapsam
 - 22 oyuncu (11 HOME + 11 AWAY)
 - Test: simulation22.test.ts
-- Test sayısı: 10
+- F1 acceptance: 10 test
 - Determinizm: 5400 tick
-- Performans: 22 oyuncu 5400 tick = 579.48 ms; 2 oyuncu = 66.56 ms; oran = 8.71x
+- Performans: 22 oyuncu 5400 tick = 396.29 ms; 2 oyuncu = 57.53 ms; oran = 6.89x
 
 ## Sonuç
 - 22 oyuncu çalışıyor mu: ✅
@@ -22,17 +26,25 @@
 - Player count invariant: ✅
 - NaN/Infinity: ✅
 - Out-of-bounds: ✅
-- Performans >30 sn: ❌ (ölçüm 0.579 sn)
-- PR CI #812: GREEN
-- CI toplam test: 154 passed
-- Bu main baseline'ında live-v2 testleri: 104 passed
+- Performans >30 sn: ❌ (ölçüm 0.396 sn)
+- F1 acceptance CI #817: GREEN
+- live-v2 testleri: 185 passed (175 foundation + 10 F1)
+- Proje toplamı: 190 passed
 
-## Baseline uyumsuzluğu
-F1 talimatında mevcut v2 test tabanı 175 olarak belirtilmişti. GitHub üzerinde F1 branch'i main'den açıldığında gerçek main baseline'ı CI #812 ile 154 toplam test / 104 live-v2 testi olarak doğrulandı.
+## CI
+- #812 GREEN — F1 test commit
+- #813 GREEN — F1_STATUS initial documentation commit
+- #814 GREEN — live-v2-foundation validation before merge
+- #816 FAIL — F1 branch after foundation merge; 7 failures in simulation22.test.ts because the F1 fixture still used the old numeric seed shape while foundation expects RngState { seed: number }. All 183 other tests passed.
+- #817 GREEN — fixture contract fix; 190/190 tests passed.
 
-175 testlik güncel v2 foundation ayrı bir live-v2-foundation branch'inde bulunuyor ve main ile diverged durumda. F1 kapsamını sessizce bu branch'e taşımadık; main'den başlama kuralı korundu.
-
-Bu nedenle 22 oyuncu acceptance'ı kanıtlandı, ancak “175 v2 testi korunuyor” kabul kriteri mevcut main üzerinde doğrulanamadı.
+## F1.1 Merge
+- PR #57: live-v2-foundation → main, normal merge
+- Merge SHA: 97e4fa74b7d2598c9e7cd7212762793ee932d405
+- PR #58: main → F1 branch, merge-equivalent rebase/update
+- Merge SHA: 59e34365d66ee943825b9fd43316936b067d0436
+- PR #56: F1 → main, normal merge
+- Merge SHA: 0a1a9deb33ee848db8c22f242954fbfe9d324160
 
 ## İlke
 - Legacy'den hiçbir şey alınmadı.
@@ -40,8 +52,8 @@ Bu nedenle 22 oyuncu acceptance'ı kanıtlandı, ancak “175 v2 testi korunuyor
 - UI değiştirilmedi.
 - Math.random() kullanılmadı.
 - Testler gevşetilmedi.
-- Tüm F1 kodu v2 alanında sıfırdan test fixture/acceptance olarak yazıldı.
+- F1 fixture düzeltmesi yalnızca v2'nin güncel RNG state sözleşmesine uyum sağladı.
 
-## Sıradaki
-- F2: v2 → UI frame adapter
-- Önkoşul: 175-test baseline uyumsuzluğu çözülmeli ve F1 merge/post-merge CI GREEN doğrulanmalı.
+## Durum
+- F1: TAMAMLANDI
+- F2: HAZIR — ancak bu doküman commit'inin CI'si de GREEN olarak doğrulanacak.
