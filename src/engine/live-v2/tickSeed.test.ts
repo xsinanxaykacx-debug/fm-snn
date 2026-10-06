@@ -21,7 +21,7 @@ function initialState(seed: RngState): MatchState {
     ball: {
       position: { x: 50, y: 32, z: 0.11 },
       velocity: { x: 1, y: 0, z: 0 },
-      ownerId: null,
+      ownerId: 'p1',
       lastTouchId: null,
       lastTouchSide: 'HOME',
     },
@@ -55,12 +55,12 @@ function initialState(seed: RngState): MatchState {
 }
 
 describe('live-v2 tick seed integration', () => {
-  it('carries the seed through runTick without consuming it yet', () => {
+  it('advances the seed when the owned player makes a decision', () => {
     const state = initialState({ seed: 123456 });
 
     const next = runTick(state);
 
-    expect(next.seed).toEqual(state.seed);
+    expect(next.seed).not.toEqual(state.seed);
   });
 
   it('same seed and same input produce the same tick result', () => {
@@ -70,15 +70,12 @@ describe('live-v2 tick seed integration', () => {
     expect(a).toEqual(b);
   });
 
-  it('different seeds produce the same non-RNG tick result before RNG consumption is wired', () => {
+  it('different seeds can produce different decision results while preserving determinism', () => {
     const a = runTick(initialState({ seed: 123456 }));
     const b = runTick(initialState({ seed: 654321 }));
 
-    const { seed: seedA, ...withoutSeedA } = a;
-    const { seed: seedB, ...withoutSeedB } = b;
-
-    expect(seedA).not.toEqual(seedB);
-    expect(withoutSeedA).toEqual(withoutSeedB);
+    expect(a.seed).not.toEqual(b.seed);
+    expect(a.diagnostics.lastAction).not.toBe(b.diagnostics.lastAction);
   });
 
   it('MatchState seed is an RngState', () => {
@@ -87,11 +84,11 @@ describe('live-v2 tick seed integration', () => {
     expect(state.seed).toEqual({ seed: 123456 });
   });
 
-  it('simulation preserves the caller-provided seed', () => {
-    const state = initialState({ seed: 123456 });
+  it('simulation consumes decision RNG deterministically', () => {
+    const a = simulateMatchV2(initialState({ seed: 123456 }), 1);
+    const b = simulateMatchV2(initialState({ seed: 123456 }), 1);
 
-    const finalState = simulateMatchV2(state, 1);
-
-    expect(finalState.seed).toEqual({ seed: 123456 });
+    expect(a).toEqual(b);
+    expect(a.seed).not.toEqual({ seed: 123456 });
   });
 });
