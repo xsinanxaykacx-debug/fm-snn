@@ -71,6 +71,45 @@ export function applyRestart(state: MatchState, event: MatchEvent): MatchState {
   };
 }
 
+const RESTART_KICK_SPEED = 8;
+
+function restartDirection(state: MatchState, side: TeamSide): Vec2 {
+  return {
+    x: side === 'HOME' ? 1 : -1,
+    y: 0,
+  };
+}
+
+/**
+ * Plays one pending restart and immediately returns the match to live play.
+ *
+ * A restart is a one-shot transition: once the ball is placed by
+ * applyRestart(), the next tick must consume the pending restart and release
+ * the ball into normal simulation. No movement, physics, or possession
+ * module
+ * is allowed to own the restart lifecycle.
+ */
+export function playRestart(state: MatchState): MatchState {
+  if (state.restart === null) return state;
+
+  const direction = restartDirection(state, state.restart.side);
+
+  return {
+    ...state,
+    ball: {
+      ...state.ball,
+      velocity: {
+        x: direction.x * RESTART_KICK_SPEED,
+        y: direction.y * RESTART_KICK_SPEED,
+        z: 0,
+      },
+      ownerId: null,
+      lastTouchSide: state.restart.side,
+    },
+    restart: null,
+  };
+}
+
 export function consumeRestart(state: MatchState): MatchState {
   if (state.restart === null) return state;
   return { ...state, restart: null };
