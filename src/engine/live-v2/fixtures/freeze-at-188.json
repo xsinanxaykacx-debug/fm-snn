@@ -1,0 +1,123 @@
+{
+  "seed": 123456,
+  "clockSeconds": 188,
+  "tick": 188,
+  "phase": "first_half",
+  "pitch": {
+    "length": 104,
+    "width": 64,
+    "goalWidth": 7.32,
+    "goalHeight": 2.44,
+    "goalAreaDepth": 5.5
+  },
+  "score": {
+    "home": 0,
+    "away": 0
+  },
+  "ball": {
+    "position": {
+      "x": 52,
+      "y": 32,
+      "z": 0
+    },
+    "velocity": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "ownerId": null,
+    "lastTouchId": "home-1",
+    "lastTouchSide": "HOME"
+  },
+  "players": {
+    "home-1": {
+      "id": "home-1",
+      "team": "HOME",
+      "position": {
+        "x": 51,
+        "y": 32
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    "home-2": {
+      "id": "home-2",
+      "team": "HOME",
+      "position": {
+        "x": 55,
+        "y": 32
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    "away-1": {
+      "id": "away-1",
+      "team": "AWAY",
+      "position": {
+        "x": 49,
+        "y": 32
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    "away-2": {
+      "id": "away-2",
+      "team": "AWAY",
+      "position": {
+        "x": 45,
+        "y": 32
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  },
+  "teams": {
+    "HOME": {
+      "id": "home",
+      "side": "HOME",
+      "playerIds": [
+        "home-1",
+        "home-2"
+      ]
+    },
+    "AWAY": {
+      "id": "away",
+      "side": "AWAY",
+      "playerIds": [
+        "away-1",
+        "away-2"
+      ]
+    }
+  },
+  "restart": {
+    "type": "kickoff",
+    "side": "HOME",
+    "point": {
+      "x": 52,
+      "y": 32
+    }
+  },
+  "events": [],
+  "diagnostics": {
+    "lastPhase": "first_half",
+    "lastTick": 188,
+    "lastBallPosition": {
+      "x": 52,
+      "y": 32,
+      "z": 0
+    },
+    "lastBallVelocity": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    }
+  }
+}
