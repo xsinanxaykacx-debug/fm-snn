@@ -42,7 +42,7 @@ function state(seed = 123456): MatchState {
 }
 
 function ownerDecision(result: DecisionResult) {
-  return result.decisions.find((decision) => decision.playerId === 'h1')?.action;
+  return result.find((decision) => decision.playerId === 'h1')?.action;
 }
 
 describe('live-v2 decision RNG', () => {
@@ -77,7 +77,7 @@ describe('live-v2 decision RNG', () => {
 
     const result = decide(tied, perceive(tied));
 
-    expect(result.decisions.map((decision) => decision.playerId)).toEqual(['a1', 'h1', 'h2']);
+    expect(result.map((decision) => decision.playerId)).toEqual(['a1', 'h1', 'h2']);
   });
 
   it('keeps CHASE deterministic and independent of RNG seed', () => {
