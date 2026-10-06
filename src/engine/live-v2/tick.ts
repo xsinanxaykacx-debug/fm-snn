@@ -15,11 +15,30 @@ function phaseAt(clockSeconds: number): MatchState['phase'] {
   return 'first_half';
 }
 
+function horizontalSpeed(velocity: MatchState['ball']['velocity']): number {
+  return Math.hypot(velocity.x, velocity.y);
+}
+
+function passTarget(state: MatchState, playerId: string): { x: number; y: number } | null {
+  const player = state.players[playerId];
+  if (!player) return null;
+
+  return Object.values(state.players)
+    .filter((candidate) => candidate.team === player.team && candidate.id !== player.id)
+    .sort((a, b) => {
+      const da = Math.hypot(a.position.x - player.position.x, a.position.y - player.position.y);
+      const db = Math.hypot(b.position.x - player.position.x, b.position.y - player.position.y);
+      return da !== db ? da - db : a.id.localeCompare(b.id);
+    })[0]?.position ?? null;
+}
+
 /** Executes exactly one deterministic v2 simulation tick. */
 export function runTick(state: MatchState): MatchState {
   // A pending restart is a one-tick transition, not a persistent simulation
   // mode. Resolve it before any live subsystem sees the stationary restart ball.
   const liveState = playRestart(state);
+  const lastBallVelocityBefore = { ...liveState.ball.velocity };
+  let lastZeroVelocitySource: MatchState['diagnostics']['lastZeroVelocitySource'] = null;
 
   // Ball physics is authoritative for the current tick. Perception/decision
   // must observe this updated position, otherwise chase intents are always one
@@ -41,9 +60,23 @@ export function runTick(state: MatchState): MatchState {
   let liveForDecision = ballStepped;
   let restartActivated = false;
 
+  if (
+    horizontalSpeed(ballStepped.ball.velocity) === 0 &&
+    horizontalSpeed(liveState.ball.velocity) > 0
+  ) {
+    lastZeroVelocitySource = 'stepBall';
+  }
+
   if (boundary.event) {
+    const restarted = applyRestart(ballStepped, boundary.event);
+    if (
+      horizontalSpeed(restarted.ball.velocity) === 0 &&
+      horizontalSpeed(ballStepped.ball.velocity) > 0
+    ) {
+      lastZeroVelocitySource = 'applyRestart';
+    }
     liveForDecision = playRestart({
-      ...applyRestart(ballStepped, boundary.event),
+      ...restarted,
       events: [...ballStepped.events, boundary.event],
     });
     restartActivated = true;
@@ -52,6 +85,28 @@ export function runTick(state: MatchState): MatchState {
   const perceptions = perceive(liveForDecision);
   const decisions: ReturnType<typeof decide> = decide(liveForDecision, perceptions);
   const withActions = resolveActions(liveForDecision, decisions);
+  const actionDecision = decisions.find(
+    (decision) =>
+      decision.action === 'PASS' ||
+      decision.action === 'SHOOT' ||
+      decision.action === 'DRIBBLE' ||
+      decision.action === 'CHASE',
+  );
+  const lastAction = actionDecision?.action ?? null;
+  const passDecision = decisions.find((decision) => decision.action === 'PASS');
+
+  if (
+    withActions.ball.velocity.x === 0 &&
+    withActions.ball.velocity.y === 0 &&
+    (lastAction === 'PASS' || lastAction === 'SHOOT' || lastAction === 'DRIBBLE')
+  ) {
+    lastZeroVelocitySource =
+      lastAction === 'PASS'
+        ? 'resolvePass'
+        : lastAction === 'SHOOT'
+          ? 'resolveShot'
+          : 'resolveDribble';
+  }
   // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
   const intents: MovementIntent[] = decisions;
 
@@ -75,6 +130,15 @@ export function runTick(state: MatchState): MatchState {
       lastBallPosition: { ...next.ball.position },
       lastBallVelocity: { ...next.ball.velocity },
       lastDecisionAction,
+      lastAction,
+      lastPassTarget: passDecision
+        ? passTarget(liveForDecision, passDecision.playerId)
+        : null,
+      lastBallVelocityBefore,
+      lastBallVelocityAfter: { ...next.ball.velocity },
+      lastZeroVelocitySource:
+        lastZeroVelocitySource ??
+        (horizontalSpeed(next.ball.velocity) === 0 ? 'unknown' : null),
       perceivedPlayerCount: Object.keys(liveState.players).length,
       restartState: next.restart,
       lastBoundaryEvent: boundary.event,
