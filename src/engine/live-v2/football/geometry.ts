@@ -21,5 +21,5 @@ export function shotXG(pitch:Pitch,side:'HOME'|'AWAY',from:Vec2,pressure:number)
   const distanceFactor=clamp(1-dx/42,0.04,0.95);
   const angleFactor=clamp(1-dy/22,0.25,1);
   const pressureFactor=clamp(1-pressure/12,0.55,1);
-  return clamp(0.03 + 0.22*distanceFactor*angleFactor*pressureFactor,0,1);
+  return clamp(0.04 + 0.24*distanceFactor*angleFactor*pressureFactor,0,1);
 }
