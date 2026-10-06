@@ -138,7 +138,7 @@ describe('live-v2 action resolution RNG', () => {
 
   it('RNG consumption is fixed at one value per PASS/SHOOT action', () => {
     const start = { seed: 123456 };
-    const [expectedOne] = nextRandom(start);
+    const [, expectedStateOne] = nextRandom(start);
     const first = resolveActions(state(123456), decisions('PASS', 123456));
 
     const secondInput = {
@@ -148,14 +148,14 @@ describe('live-v2 action resolution RNG', () => {
         ownerId: 'h1',
       },
     };
-    const [, expectedAfterTwo] = nextRandom({ seed: expectedOne });
+    const [, expectedAfterTwo] = nextRandom(expectedStateOne);
 
     const second = resolveActions(
       secondInput,
       decisions('SHOOT', first.seed.seed),
     );
 
-    expect(first.seed.seed).toBe(expectedOne);
+    expect(first.seed.seed).toBe(expectedStateOne.seed);
     expect(second.seed.seed).toBe(expectedAfterTwo);
   });
 });
