@@ -116,6 +116,53 @@ describe('live-v2 tick', () => {
     expect(p1.y).toBeLessThanOrEqual(next.pitch.width);
   });
 
+  it('chases the ball position after ball physics, not the previous tick position', () => {
+    const s = state();
+    const initialPlayer = {
+      ...s.players.p1,
+      position: { x: 50, y: 10 },
+    };
+
+    let next = {
+      ...s,
+      ball: {
+        ...s.ball,
+        position: { x: 50, y: 32 },
+        velocity: { x: 0, y: 10, z: 0 },
+      },
+      players: {
+        ...s.players,
+        p1: initialPlayer,
+        p2: {
+          ...s.players.p2,
+          position: { x: 90, y: 50 },
+        },
+      },
+    };
+
+    for (let i = 0; i < 10; i += 1) {
+      next = runTick(next);
+    }
+
+    const currentBall = next.ball.position;
+    const player = next.players.p1.position;
+    const distanceToCurrentBall = Math.hypot(
+      player.x - currentBall.x,
+      player.y - currentBall.y,
+    );
+
+    // With physics-before-decision, the chase target is the ball position
+    // produced by the current tick. The player must have moved toward the
+    // current trajectory in x/y rather than permanently chasing the old track.
+    expect(player.x).toBeGreaterThan(initialPlayer.position.x);
+    expect(distanceToCurrentBall).toBeLessThan(
+      Math.hypot(
+        initialPlayer.position.x - currentBall.x,
+        initialPlayer.position.y - currentBall.y,
+      ),
+    );
+  });
+
   it('applies decision-driven movement to players', () => {
     const next = runTick(state());
 
