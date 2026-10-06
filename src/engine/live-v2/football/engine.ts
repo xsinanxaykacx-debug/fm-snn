@@ -1,15 +1,15 @@
 import type { MatchState, PlayerState, TeamSide, Vec2 } from '../state';
 import { nextRandom } from '../rng';
-import { distance, inGoalMouth, inPenaltyArea, shotXG, clamp } from './geometry';
+import { distance, inPenaltyArea, shotXG, clamp } from './geometry';
 import { goalkeeperSaveChance } from './goalkeeper';
 import { resolvePenalty } from './penalty';
 import { movementSpeedMultiplier, pressingIntensity } from './tactics';
 import { isOffside, foulSeverity } from './rules';
 import { chooseFootballAction } from './action';
 import { formationSlots } from './formation';
-import type { FootballEvent, FootballState, PlayerMatchStats, TeamMatchStats } from './types';
-import { emptyPlayerStats, DEFAULT_ATTRIBUTES } from './setup';
-import { applyStaminaCost, staminaModifier } from './stamina';
+import type { FootballEvent, PlayerMatchStats, TeamMatchStats } from './types';
+import { emptyPlayerStats } from './setup';
+import { staminaModifier } from './stamina';
 import { makeSubstitution } from './substitution';
 
 const MAX_CHASE=3;
@@ -111,7 +111,6 @@ function resolveShot(state:MatchState,player:PlayerState):MatchState {
  next=addEvent(next,{type:'shot',playerId:player.id,teamId:player.team,xG,position:player.position,description:'shot'});
  const [roll,seed]=nextRandom(next.seed); next={...next,seed};
  const gk=active(next).filter(p=>p.team!==player.team&&p.role==='GK').sort((a,b)=>a.id.localeCompare(b.id))[0];
- const gkSkill=gk?(gk.attributes?.goalkeeper??45)+(gk.attributes?.reflexes??45)+(gk.attributes?.gkPositioning??45):45;
  const saveChance=gk?goalkeeperSaveChance(gk,distance(gk.position,player.position),1-Math.min(1,pressure/15)):0;
  if(gk&&roll<saveChance){
   next=withTeamStat(next,player.team,'shotsOnTarget'); next=withPlayerStat(next,player.id,'shotsOnTarget');
