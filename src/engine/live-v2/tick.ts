@@ -35,22 +35,22 @@ export function runTick(state: MatchState): MatchState {
     liveState.players,
   );
 
-  let next: MatchState;
-  let decisions: ReturnType<typeof decide> = [];
-
+  let liveForDecision = ballStepped;
   if (boundary.event) {
-    next = applyRestart(ballStepped, boundary.event);
-    next = { ...next, events: [...next.events, boundary.event] };
-  } else {
-    const perceptions = perceive(ballStepped);
-    decisions = decide(ballStepped, perceptions);
-    const withActions = resolveActions(ballStepped, decisions);
-    // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
-    const intents: MovementIntent[] = decisions;
-
-    const moved = applyMovement(withActions, intents);
-    next = updatePossession(moved);
+    liveForDecision = playRestart({
+      ...applyRestart(ballStepped, boundary.event),
+      events: [...ballStepped.events, boundary.event],
+    });
   }
+
+  const perceptions = perceive(liveForDecision);
+  const decisions: ReturnType<typeof decide> = decide(liveForDecision, perceptions);
+  const withActions = resolveActions(liveForDecision, decisions);
+  // decisions already conform to MovementIntent (DecisionIntent extends MovementIntent)
+  const intents: MovementIntent[] = decisions;
+
+  const moved = applyMovement(withActions, intents);
+  const next = updatePossession(moved);
 
   const nextClock = next.clockSeconds + 1;
   const nextPhase = phaseAt(nextClock);
