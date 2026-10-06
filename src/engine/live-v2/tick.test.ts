@@ -91,6 +91,8 @@ describe('live-v2 tick', () => {
     expect(next.events[0]?.type).toBe('goal');
     expect(next.score.away).toBe(1);
     expect(next.restart).toBeNull();
+    expect(next.diagnostics.restartState).toBeNull();
+    expect(next.diagnostics.lastBoundaryEvent?.type).toBe('goal');
   });
 
   it('keeps players inside the pitch after decision-driven movement', () => {
