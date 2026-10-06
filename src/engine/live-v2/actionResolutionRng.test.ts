@@ -156,6 +156,6 @@ describe('live-v2 action resolution RNG', () => {
     );
 
     expect(first.seed.seed).toBe(expectedStateOne.seed);
-    expect(second.seed.seed).toBe(expectedAfterTwo);
+    expect(second.seed.seed).toBe(expectedAfterTwo.seed);
   });
 });
