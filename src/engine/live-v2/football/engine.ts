@@ -2,6 +2,7 @@ import type { MatchState, PlayerState, TeamSide, Vec2 } from '../state';
 import { nextRandom } from '../rng';
 import { distance, inGoalMouth, inPenaltyArea, shotXG, clamp } from './geometry';
 import { goalkeeperSaveChance } from './goalkeeper';
+import { isOffside, foulSeverity } from './rules';
 import { chooseFootballAction } from './action';
 import { formationSlots } from './formation';
 import type { FootballEvent, FootballState, PlayerMatchStats, TeamMatchStats } from './types';
@@ -133,6 +134,12 @@ function resolveOwnerAction(state:MatchState,owner:PlayerState):MatchState {
  if(decision.action==='SHOOT')return resolveShot(next,owner);
  if(decision.action==='PASS'&&decision.targetId){
   const target=next.players[decision.targetId]; if(target){
+   const defenders=active(next).filter(p=>p.team!==owner.team).map(p=>p.position);
+   if(isOffside(owner.team,target.position,owner.position,defenders)){
+    next=withTeamStat(next,owner.team,'offsides');
+    next=addEvent(next,{type:'offside',playerId:target.id,teamId:owner.team,position:target.position,description:'offside'});
+    return {...next,ball:{...next.ball,ownerId:null,velocity:{x:0,y:0,z:0}},restart:{type:'goal_kick',side:owner.team==='HOME'?'AWAY':'HOME',point:{x:owner.team==='HOME'?next.pitch.length-5.5:5.5,y:next.pitch.width/2}}};
+   }
    const dir=direction(owner.position,target.position); next=withTeamStat(next,owner.team,'passes');next=withPlayerStat(next,owner.id,'passes');
    const success=distance(owner.position,target.position)<28 && roll>0.12;
    next=withPlayerStat(next,owner.id,'successfulPasses',success?1:0);next=withTeamStat(next,owner.team,'successfulPasses',success?1:0);
