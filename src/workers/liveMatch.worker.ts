@@ -6,6 +6,8 @@ import { runTick } from '../engine/live-v2/tick';
 import type { RngState } from '../engine/live-v2/rng';
 import type { Pitch, MatchState } from '../engine/live-v2/state';
 import type { Match, MatchEvent as MatchResultEvent } from '../engine/types';
+import type { FootballEvent } from '../engine/live-v2/football/types';
+import { finalizeStats } from '../engine/live-v2/football/stats';
 
 type StartMessage = {
   type: 'start';
@@ -52,13 +54,15 @@ function resolvePlayerIds(
     .map((player) => player.id)
     .sort();
 
-  const ids = preferred && preferred.length > 0 ? preferred : fallback;
+  const starters = preferred && preferred.length > 0 ? preferred : fallback.slice(0, 11);
+  const extras = fallback.filter((id) => !starters.includes(id)).slice(0, 3);
+  const ids = [...starters, ...extras];
 
-  if (ids.length < 11) {
+  if (starters.length < 11) {
     throw new Error(`live-v2 worker: club ${clubId} has fewer than 11 players`);
   }
 
-  return ids.slice(0, 11);
+  return ids;
 }
 
 function buildLineup(
@@ -67,41 +71,30 @@ function buildLineup(
   userLineup: string[] | undefined,
   players: StartMessage['players'],
 ): MatchLineup {
-  return {
-    clubId: club.id,
-    players: resolvePlayerIds(
-      club.id,
-      club.lineup,
-      userClubId,
-      userLineup,
-      players,
-    ).map((id) => ({ id })),
-  };
+  const ids=resolvePlayerIds(club.id,club.lineup,userClubId,userLineup,players);
+  return {clubId:club.id,players:ids.slice(0,14).map((id)=>({id}))};
 }
 
 function eventToMatchEvent(
-  event: MatchState['events'][number],
+  event: FootballEvent,
   state: MatchState,
 ): MatchResultEvent {
   const minute = Math.floor(state.clockSeconds / 60);
+  const team = event.teamId === 'HOME' ? 'home' : event.teamId === 'AWAY' ? 'away' : undefined;
+  const typeMap: Record<string, MatchResultEvent['type']> = { half_time:'halftime', full_time:'fulltime', penalty_goal:'goal', own_goal:'goal', shot_on_target:'shot', shot_off_target:'miss', blocked_shot:'blocked_shot', key_pass:'pass', assist:'pass', tackle:'dribble', intercept:'dribble' };
+  const mapped = typeMap[event.type] ?? event.type;
 
-  if (event.type === 'goal') {
+  if (event.type === 'goal' || event.type === 'own_goal' || event.type === 'penalty_goal') {
     return {
       minute,
       type: 'goal',
-      team: event.scorerSide === 'HOME' ? 'home' : 'away',
-      description: `${event.scorerSide === 'HOME' ? 'HOME' : 'AWAY'} gol`,
+      team: event.teamId === 'HOME' ? 'home' : 'away',
+      playerId: event.playerId,
+      description: event.description,
     };
   }
 
-  return {
-    minute,
-    type: event.type,
-    team: event.type === 'goal_kick' || event.type === 'corner' || event.type === 'throw_in'
-      ? event.side === 'HOME' ? 'home' : 'away'
-      : undefined,
-    description: event.type,
-  };
+  return { minute, type: mapped as MatchResultEvent['type'], playerId: event.playerId, team, description: event.description, xG: event.xG };
 }
 
 function toTemporaryMatchResult(
@@ -114,13 +107,8 @@ function toTemporaryMatchResult(
     awayId,
     homeScore: state.score.home,
     awayScore: state.score.away,
-    events: state.events.map((event) => eventToMatchEvent(event, state)),
-    stats: {
-      possession: { home: 50, away: 50 },
-      shots: { home: 0, away: 0 },
-      onTarget: { home: 0, away: 0 },
-      chances: { home: 0, away: 0 },
-    },
+    events: (state.football?.events ?? []).map((event) => eventToMatchEvent(event, state)),
+    stats: (() => { const s=finalizeStats(state.football!); return { possession:s.possession, shots:s.shots, onTarget:s.onTarget, chances:s.shots, xG:s.xG, passes:s.passes, passesCompleted:{home:state.football!.teamStats.HOME.successfulPasses,away:state.football!.teamStats.AWAY.successfulPasses}, fouls:s.fouls, corners:s.corners, throwIns:{home:state.football!.teamStats.HOME.throwIns,away:state.football!.teamStats.AWAY.throwIns}, goalKicks:{home:state.football!.teamStats.HOME.goalKicks,away:state.football!.teamStats.AWAY.goalKicks}, offsides:s.offsides }; })(),
     played: true,
     engine: 'live-v2',
   };
