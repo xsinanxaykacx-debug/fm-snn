@@ -119,12 +119,12 @@ describe('live-v2 action resolution RNG', () => {
     expect(b.seed).toEqual({ seed: 654321 });
   });
 
-  it('DRIBBLE remains unchanged in E4', () => {
+  it('DRIBBLE preserves its deterministic geometry while consuming one RNG value', () => {
     const next = resolveActions(state(123456), decisions('DRIBBLE', 123456));
 
     expect(next.ball.position).toEqual({ x: 50.8, y: 32, z: 0 });
     expect(next.ball.velocity).toEqual({ x: 2.5, y: 0, z: 0 });
-    expect(next.seed).toEqual({ seed: 123456 });
+    expect(next.seed).not.toEqual({ seed: 123456 });
   });
 
   it('PASS/SHOOT consume RNG and advance the state seed', () => {
@@ -157,5 +157,107 @@ describe('live-v2 action resolution RNG', () => {
 
     expect(first.seed.seed).toBe(expectedStateOne.seed);
     expect(second.seed.seed).toBe(expectedAfterTwo.seed);
+  });
+
+  it('DRIBBLE retain: same seed produces the same result', () => {
+    const a = resolveActions(state(123456), decisions('DRIBBLE', 123456));
+    const b = resolveActions(state(123456), decisions('DRIBBLE', 123456));
+
+    expect(a).toEqual(b);
+    expect(a.ball.ownerId).toBe('h1');
+  });
+
+  it('DRIBBLE lose: same seed produces the same result', () => {
+    const a = resolveActions(state(1000000000), decisions('DRIBBLE', 1000000000));
+    const b = resolveActions(state(1000000000), decisions('DRIBBLE', 1000000000));
+
+    expect(a).toEqual(b);
+    expect(a.ball.ownerId).toBeNull();
+  });
+
+  it('DRIBBLE different seeds can produce different retain/lose outcomes', () => {
+    const retain = resolveActions(state(123456), decisions('DRIBBLE', 123456));
+    const lose = resolveActions(state(1000000000), decisions('DRIBBLE', 1000000000));
+
+    expect(retain.ball.ownerId).toBe('h1');
+    expect(lose.ball.ownerId).toBeNull();
+  });
+
+  it('DRIBBLE advances the seed by exactly one RNG value', () => {
+    const start = { seed: 123456 };
+    const [, expected] = nextRandom(start);
+    const next = resolveActions(state(123456), decisions('DRIBBLE', 123456));
+
+    expect(next.seed).toEqual(expected);
+  });
+
+  it('DRIBBLE consumes exactly one RNG value per resolved action', () => {
+    const start = { seed: 123456 };
+    const [, expectedOne] = nextRandom(start);
+    const [, expectedTwo] = nextRandom(expectedOne);
+
+    const first = resolveActions(state(123456), decisions('DRIBBLE', 123456));
+    const secondInput = {
+      ...first,
+      ball: {
+        ...first.ball,
+        ownerId: 'h1',
+      },
+    };
+    const second = resolveActions(
+      secondInput,
+      decisions('DRIBBLE', first.seed.seed),
+    );
+
+    expect(first.seed).toEqual(expectedOne);
+    expect(second.seed).toEqual(expectedTwo);
+  });
+
+  it('CHASE still consumes no RNG after E5', () => {
+    const next = resolveActions(state(123456), decisions('CHASE', 123456));
+
+    expect(next.seed).toEqual({ seed: 123456 });
+  });
+
+  it('PASS and SHOOT RNG behavior remains unchanged after E5', () => {
+    const start = { seed: 123456 };
+    const [, expected] = nextRandom(start);
+    const pass = resolveActions(state(123456), decisions('PASS', 123456));
+    const shoot = resolveActions(state(123456), decisions('SHOOT', 123456));
+
+    expect(pass.seed).toEqual(expected);
+    expect(shoot.seed).toEqual(expected);
+  });
+
+  it('DRIBBLE lose leaves the ball loose and preserves last-touch attribution', () => {
+    const next = resolveActions(state(1000000000), decisions('DRIBBLE', 1000000000));
+
+    expect(next.ball.ownerId).toBeNull();
+    expect(next.ball.lastTouchId).toBe('h1');
+    expect(next.ball.lastTouchSide).toBe('HOME');
+    expect(next.ball.position).toEqual({ x: 50.8, y: 32, z: 0 });
+    expect(next.ball.velocity).toEqual({ x: 2.5, y: 0, z: 0 });
+  });
+
+  it('an unresolved DRIBBLE consumes no RNG', () => {
+    const before = state(123456);
+    const next = resolveActions(
+      {
+        ...before,
+        ball: {
+          ...before.ball,
+          ownerId: null,
+        },
+      },
+      decisions('DRIBBLE', 123456),
+    );
+
+    expect(next).toEqual({
+      ...before,
+      ball: {
+        ...before.ball,
+        ownerId: null,
+      },
+    });
   });
 });
