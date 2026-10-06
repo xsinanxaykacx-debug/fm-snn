@@ -28,7 +28,7 @@ export function attachFootball(state:MatchState,homeFormation:FormationName='4-4
   const slots=formationSlots(football.formation[side],side,state.pitch,football.tactics[side]);
   ids.forEach((id,index)=>{ const p=players[id]; const slot=slots[index] ?? slots[10];
    const stats=emptyPlayerStats();
-   players[id]={...p,role:slot.role,stamina:100,onPitch:true,yellowCards:0,redCard:false,
+   players[id]={...p,role:slot.role,stamina:100,onPitch:index<11,yellowCards:0,redCard:false,
     attributes:{...DEFAULT_ATTRIBUTES,...(p.attributes??{})},matchStats:stats,startingPosition:{...slot.position}};
    football.playerStats[id]=stats;
   });
