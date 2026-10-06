@@ -92,7 +92,8 @@ describe('live-v2 decision RNG', () => {
     expect(resultA.find((decision) => decision.playerId === 'h1')).toEqual(
       resultB.find((decision) => decision.playerId === 'h1'),
     );
-    expect(resultA.seed).toEqual(resultB.seed);
+    expect(resultA.seed).toEqual({ seed: 1 });
+    expect(resultB.seed).toEqual({ seed: 987654321 });
   });
 
   it('advances the seed when an owned-ball decision consumes RNG', () => {
