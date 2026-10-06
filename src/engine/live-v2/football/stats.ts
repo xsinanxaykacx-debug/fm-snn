@@ -13,7 +13,7 @@ export type FinalMatchStats={
  fouls:{home:number;away:number};
 };
 const n=(s:TeamMatchStats,k:keyof TeamMatchStats)=>s[k] as number;
-const pct=(a:number,b:number)=>a+b===0?0:(a/(a+b))*100;
+const pct=(a:number,b:number)=>a+b===0?0:(100*a)/(a+b);
 const ratio=(a:number,b:number)=>b===0?0:(a/b)*100;
 export function finalizeStats(f:FootballState):FinalMatchStats{
  const h=f.teamStats.HOME,a=f.teamStats.AWAY;
