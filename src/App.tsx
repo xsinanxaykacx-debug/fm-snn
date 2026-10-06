@@ -69,6 +69,7 @@ export default function App() {
     { key: 'training', icon: '🏃', label: 'Antrenman' },
     { key: 'academy', icon: '🎓', label: 'Akademi' },
     { key: 'liveMatch', icon: '⚽', label: 'Canlı Maç' },
+    { key: 'settings', icon: '⚙️', label: 'Ayarlar' },
   ];
 
   useEffect(() => {
@@ -95,33 +96,33 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-pitch-900 text-slate-200">
-      <aside className={`fixed inset-y-0 left-0 z-30 bg-pitch-800 border-r border-pitch-700 transition-[width] duration-200 ${sidebarCollapsed ? 'w-16' : 'w-[220px]'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-30 bg-fm-sidebar border-r border-fm-border transition-[width] duration-200 ${sidebarCollapsed ? 'w-16' : 'w-[220px]'}`}>
         <div className="flex h-full flex-col">
-          <div className="flex h-24 items-center border-b border-pitch-700 px-4">
+          <div className="flex h-24 items-center border-b border-fm-border px-4">
             <TeamBadge clubId={userClub?.id ?? ''} shortName={userClub?.shortName ?? userClub?.name ?? 'FM'} size="md" />
-            {!sidebarCollapsed && <div className="ml-3 min-w-0"><div className="truncate text-sm font-bold text-slate-100">{userClub?.name ?? 'Takım'}</div><div className="text-xs text-slate-400">FM Clone</div></div>}
+            {!sidebarCollapsed && <div className="ml-3 min-w-0"><div className="truncate text-sm font-bold text-slate-100">{userClub?.name ?? 'Takım'}</div><div className="text-xs text-fm-muted">FM Clone</div></div>}
           </div>
           <nav className="flex-1 space-y-1 overflow-y-auto p-2">
             {sidebarItems.map(item => {
               const active = tab === item.key;
               const badge = item.key === 'inbox' ? unreadCount : 0;
               return <button key={item.key} type="button" title={sidebarCollapsed ? item.label : undefined} onClick={() => setTab(item.key)}
-                className={`relative flex w-full items-center rounded-r px-3 py-2.5 text-sm font-medium transition-colors ${active ? 'bg-pitch-700 text-accent border-l-2 border-accent' : 'border-l-2 border-transparent text-slate-400 hover:bg-pitch-700 hover:text-slate-200'} ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3'}`}>
+                className={`relative flex w-full items-center rounded-r px-3 py-2.5 text-sm font-medium transition-colors ${active ? 'bg-pitch-700 text-fm-gold border-l-2 border-fm-gold' : 'border-l-2 border-transparent text-fm-muted hover:bg-pitch-700 hover:text-slate-200'} ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3'}`}>
                 <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
                 {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                 {!sidebarCollapsed && badge > 0 && <span className="ml-auto min-w-[18px] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[9px] font-bold text-white">{badge}</span>}
               </button>;
             })}
           </nav>
-          <div className="border-t border-pitch-700 p-2">
-            <button type="button" onClick={() => setSidebarCollapsed(value => !value)} title={sidebarCollapsed ? 'Sidebarı genişlet' : 'Sidebarı daralt'} aria-label={sidebarCollapsed ? 'Sidebarı genişlet' : 'Sidebarı daralt'} className="flex w-full items-center justify-center rounded px-3 py-2 text-sm text-slate-400 hover:bg-pitch-700 hover:text-slate-200">
+          <div className="border-t border-fm-border p-2">
+            <button type="button" onClick={() => setSidebarCollapsed(value => !value)} title={sidebarCollapsed ? 'Sidebarı genişlet' : 'Sidebarı daralt'} aria-label={sidebarCollapsed ? 'Sidebarı genişlet' : 'Sidebarı daralt'} className="flex w-full items-center justify-center rounded px-3 py-2 text-sm text-fm-muted hover:bg-pitch-700 hover:text-slate-200">
               {sidebarCollapsed ? '»' : '«'}
             </button>
           </div>
         </div>
       </aside>
       <div className={`min-h-screen transition-[margin] duration-200 ${sidebarCollapsed ? 'ml-16' : 'ml-[220px]'}`}>
-        <header className="sticky top-0 z-20 h-14 bg-pitch-800 border-b border-pitch-700 px-4 sm:px-6">
+        <header className="sticky top-0 z-20 h-14 bg-fm-sidebar border-b border-fm-border px-4 sm:px-6">
           <div className="flex h-full items-center gap-4">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <TeamBadge clubId={userClub?.id ?? ''} shortName={userClub?.shortName ?? userClub?.name ?? 'FM'} size="sm" />

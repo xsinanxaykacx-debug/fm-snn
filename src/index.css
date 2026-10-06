@@ -3,6 +3,18 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-main: #140508;
+    --bg-panel: #22070d;
+    --bg-sidebar: #1a050a;
+    --text-main: #f5e6e8;
+    --text-muted: #a68a8e;
+    --accent-gold: #e6a100;
+    --accent-red: #8a1323;
+    --border-color: #3d141b;
+    --success-green: #2e7d32;
+  }
+
   body {
     @apply bg-pitch-900 text-slate-100 font-sans;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -20,7 +32,7 @@
     @apply btn bg-pitch-700 hover:bg-pitch-600 text-slate-100;
   }
   .card {
-    @apply bg-pitch-800 rounded-lg p-4 border border-pitch-700;
+    @apply bg-fm-panel rounded-lg p-4 border border-pitch-700;
   }
   .stat-row {
     @apply flex justify-between py-1 border-b border-pitch-700 text-sm;
@@ -122,4 +134,18 @@
   max-width: 280px;
   height: 260px;
   margin: 0 auto;
+}
+
+@layer utilities {
+  .text-slate-100 { color: var(--text-main); }
+  .text-slate-200 { color: #ead9dc; }
+  .text-slate-300 { color: #d2bfc3; }
+  .text-slate-400 { color: var(--text-muted); }
+  .text-slate-500 { color: #80666b; }
+  .text-slate-600 { color: #684c52; }
+  .bg-slate-950 { background-color: var(--bg-main); }
+  .bg-slate-700 { background-color: var(--bg-panel); }
+  .bg-slate-500 { background-color: var(--text-muted); }
+  .border-slate-700 { border-color: var(--border-color); }
+  .border-slate-500 { border-color: var(--text-muted); }
 }
