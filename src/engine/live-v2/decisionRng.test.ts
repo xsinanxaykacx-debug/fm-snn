@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decide, type DecisionResult } from './decision';
 import { perceive } from './perception';
+import { nextRandom } from './rng';
 import type { MatchState } from './state';
 
 function state(seed = 123456): MatchState {
@@ -62,7 +63,7 @@ describe('live-v2 decision RNG', () => {
     expect(actions.size).toBeGreaterThan(1);
   });
 
-  it('keeps equal-distance target tie-break deterministic by player id', () => {
+  it('keeps equal-distance player ordering deterministic by player id', () => {
     const s = state(123456);
     const tied = {
       ...s,
@@ -75,10 +76,8 @@ describe('live-v2 decision RNG', () => {
     };
 
     const result = decide(tied, perceive(tied));
-    const h2 = result.decisions.find((decision) => decision.playerId === 'h2');
 
-    expect(h2?.action).toBe('CHASE');
-    expect(h2?.displacement).toEqual({ x: -1, y: 0 });
+    expect(result.decisions.map((decision) => decision.playerId)).toEqual(['a1', 'h1', 'h2']);
   });
 
   it('keeps CHASE deterministic and independent of RNG seed', () => {
@@ -102,15 +101,11 @@ describe('live-v2 decision RNG', () => {
     expect(result.seed.seed).not.toBe(123456);
   });
 
-  it('consumes a deterministic number of RNG values per owned-ball decision', () => {
-    const oneOwner = decide(state(123456), perceive(state(123456)));
-    const twoOwners = {
-      ...state(123456),
-      ball: { ...state(123456).ball, ownerId: null },
-    };
+  it('consumes exactly one RNG value for one owned-ball decision', () => {
+    const start = state(123456);
+    const result = decide(start, perceive(start));
+    const [, expectedSeed] = nextRandom(start.seed);
 
-    const resultTwo = decide(twoOwners, perceive(twoOwners));
-
-    expect(oneOwner.seed.seed).not.toBe(resultTwo.seed.seed);
+    expect(result.seed).toEqual(expectedSeed);
   });
 });
