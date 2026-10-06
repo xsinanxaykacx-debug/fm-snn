@@ -92,7 +92,13 @@ export function runTick(state: MatchState): MatchState {
       decision.action === 'DRIBBLE' ||
       decision.action === 'CHASE',
   );
-  const lastAction = actionDecision?.action ?? null;
+  const lastAction =
+    actionDecision?.action === 'PASS' ||
+    actionDecision?.action === 'SHOOT' ||
+    actionDecision?.action === 'DRIBBLE' ||
+    actionDecision?.action === 'CHASE'
+      ? actionDecision.action
+      : null;
   const passDecision = decisions.find((decision) => decision.action === 'PASS');
 
   if (
