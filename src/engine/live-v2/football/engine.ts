@@ -160,7 +160,7 @@ export function runFootballTick(state:MatchState):MatchState {
  if(next.tick===0&&next.football!.events.length===0)next=addEvent(next,{type:'kickoff',teamId:'HOME',position:next.ball.position,description:'kickoff'});
  if(next.tick===2700){
   next=addEvent(next,{type:'half_time',description:'half time'});
-  return {...next,phase:'halftime',clockSeconds:2701,tick:2701};
+  return {...next,phase:'halftime',clockSeconds:2700,tick:2700};
  }
  if(next.phase==='halftime'){ next={...next,phase:'second_half'}; }
  const owner=next.ball.ownerId?next.players[next.ball.ownerId]:undefined;
