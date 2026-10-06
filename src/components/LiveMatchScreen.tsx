@@ -1,57 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { createMatchSeed } from '../engine/live';
+import { createV2MatchSeed } from '../engine/live-v2/adapters/matchSeed';
+import type { LiveFrame } from '../engine/live-v2/adapters/liveFrame';
 import type { Match } from '../engine/types';
-
-type FramePlayer = {
-  id: string;
-  x: number;
-  y: number;
-  isHome: boolean;
-  facing: number;
-  intent: string;
-};
-
-type LiveFrame = {
-  type: 'frame';
-  time: number;
-  tick: number;
-  phase: string;
-  score: { home: number; away: number };
-  ball: {
-    x: number;
-    y: number;
-    z: number;
-    vx: number;
-    vy: number;
-    ownerId: string | null;
-    lastTouchId: string | null;
-  };
-  players: FramePlayer[];
-};
-
-type DebugFrame = Omit<LiveFrame, 'type'> & {
-  players: Array<{
-    id: string;
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-    homeX: number;
-    homeY: number;
-    isHome: boolean;
-    role: string;
-    facing: number;
-    intent: string;
-    isBallOwner: boolean;
-    isChasingBall: boolean;
-    isMarking: string | null;
-    decisionReason: string | null;
-    targetX: number | null;
-    targetY: number | null;
-    targetPlayerId: string | null;
-  }>;
-};
 
 type DebugRecording = {
   version: 1;
@@ -240,17 +191,31 @@ export function LiveMatchScreen() {
       setRunning(false);
     };
 
+    const fixtureKey = fixture.id ?? `${fixture.week}:${fixture.homeId}:${fixture.awayId}`;
+    const seed = createV2MatchSeed(
+      state.season,
+      fixtureKey,
+      fixture.week ?? state.currentWeek,
+    );
+
     worker.postMessage({
       type: 'start',
-      home,
-      away,
+      home: { id: home.id, lineup: home.lineup },
+      away: { id: away.id, lineup: away.lineup },
       players: state.players,
-      week: state.currentWeek,
+      userClubId: state.userClubId,
       userLineup: state.userLineup,
-      seed: createMatchSeed(
-        `${state.season}:${fixture.id ?? `${fixture.week}:${fixture.homeId}:${fixture.awayId}`}`,
-        fixture.week ?? state.currentWeek
-      ),
+      season: state.season,
+      week: fixture.week ?? state.currentWeek,
+      fixture: fixtureKey,
+      seed,
+      pitch: {
+        length: 104,
+        width: 64,
+        goalWidth: 7.32,
+        goalHeight: 2.44,
+        goalAreaDepth: 5.5,
+      },
     });
   }
 
