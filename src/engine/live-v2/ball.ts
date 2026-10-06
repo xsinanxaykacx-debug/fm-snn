@@ -92,14 +92,10 @@ export function stepBall(
     nextVelocity.y,
   );
 
-  const velocity =
-    horizontalSpeed < config.stopSpeed
-      ? {
-          x: 0,
-          y: 0,
-          z: nextVelocity.z,
-        }
-      : nextVelocity;
+  // Friction is continuous: do not hard-stop a live ball at a numeric
+  // speed threshold. A hard zero here can create a permanent freeze when
+  // no player owns the ball and all decisions are CHASE.
+  const velocity = nextVelocity;
 
   return {
     ...state,
