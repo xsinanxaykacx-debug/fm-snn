@@ -6,7 +6,7 @@ import { updatePossession } from './possession';
 import { applyMovement, type MovementIntent } from './movement';
 import { stepBall } from './ball';
 import { resolveBoundary } from './boundary';
-import { applyRestart, consumeRestart, playRestart } from './restart';
+import { applyRestart, playRestart } from './restart';
 
 function phaseAt(clockSeconds: number): MatchState['phase'] {
   if (clockSeconds >= 5400) return 'full_time';
