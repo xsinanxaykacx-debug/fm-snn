@@ -5,7 +5,7 @@ import type { MatchState } from './state';
 
 function initialState(): MatchState {
   return {
-    seed: 123456,
+    seed: { seed: 123456 },
     clockSeconds: 0,
     tick: 0,
     phase: 'first_half',
