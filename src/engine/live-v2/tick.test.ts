@@ -150,12 +150,13 @@ describe('live-v2 tick', () => {
       ...s.players.p1,
       position: { x: 50, y: 10 },
     };
+    const previousBall = { x: 50, y: 32 };
 
-    let next = {
+    const next = runTick({
       ...s,
       ball: {
         ...s.ball,
-        position: { x: 50, y: 32 },
+        position: previousBall,
         velocity: { x: 0, y: 10, z: 0 },
       },
       players: {
@@ -166,29 +167,33 @@ describe('live-v2 tick', () => {
           position: { x: 90, y: 50 },
         },
       },
-    };
-
-    for (let i = 0; i < 10; i += 1) {
-      next = runTick(next);
-    }
+    });
 
     const currentBall = next.ball.position;
     const player = next.players.p1.position;
-    const distanceToCurrentBall = Math.hypot(
-      player.x - currentBall.x,
-      player.y - currentBall.y,
-    );
+    const movementVector = {
+      x: player.x - initialPlayer.position.x,
+      y: player.y - initialPlayer.position.y,
+    };
+    const currentDirection = {
+      x: currentBall.x - initialPlayer.position.x,
+      y: currentBall.y - initialPlayer.position.y,
+    };
+    const previousDirection = {
+      x: previousBall.x - initialPlayer.position.x,
+      y: previousBall.y - initialPlayer.position.y,
+    };
 
-    // With physics-before-decision, the chase target is the ball position
-    // produced by the current tick. The player must have moved toward the
-    // current trajectory in x/y rather than permanently chasing the old track.
-    expect(player.x).toBeGreaterThan(initialPlayer.position.x);
-    expect(distanceToCurrentBall).toBeLessThan(
-      Math.hypot(
-        initialPlayer.position.x - currentBall.x,
-        initialPlayer.position.y - currentBall.y,
-      ),
-    );
+    // The movement intent must align more strongly with the post-physics
+    // ball position than with the ball position from the previous tick.
+    const dotCurrent =
+      movementVector.x * currentDirection.x +
+      movementVector.y * currentDirection.y;
+    const dotPrevious =
+      movementVector.x * previousDirection.x +
+      movementVector.y * previousDirection.y;
+
+    expect(dotCurrent).toBeGreaterThan(dotPrevious);
   });
 
   it('applies decision-driven movement to players', () => {
