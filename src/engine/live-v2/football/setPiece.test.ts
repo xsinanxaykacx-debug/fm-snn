@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chooseSetPieceTaker, restartPoint } from './setPiece';
 import type { MatchState } from '../state';
-const state={} as MatchState;
+const state={pitch:{length:104,width:64,goalWidth:7.32,goalHeight:2.44,goalAreaDepth:5.5}} as MatchState;
 describe('live-v2 set pieces',()=>{
  it('chooses the highest relevant taker with stable id tie-break',()=>{
   const s={...state,pitch:{length:104,width:64,goalWidth:7.32,goalHeight:2.44,goalAreaDepth:5.5},players:{
