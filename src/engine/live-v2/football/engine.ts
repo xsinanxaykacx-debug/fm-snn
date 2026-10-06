@@ -69,7 +69,13 @@ function applyPossession(state:MatchState):MatchState {
    .sort((a,b)=>distance(a.position,state.ball.position)-distance(b.position,state.ball.position)||a.id.localeCompare(b.id));
  if(!candidates[0])return state;
  const p=candidates[0];
- return {...state,ball:{...state.ball,ownerId:p.id,lastTouchId:p.id,lastTouchSide:p.team}};
+ let next={...state,ball:{...state.ball,ownerId:p.id,lastTouchId:p.id,lastTouchSide:p.team}};
+ if(state.ball.lastTouchSide&&state.ball.lastTouchSide!==p.team){
+  next=withTeamStat(next,p.team,'interceptions');
+  next=withPlayerStat(next,p.id,'interceptions');
+  next=addEvent(next,{type:'intercept',playerId:p.id,teamId:p.team,position:p.position,description:'interception'});
+ }
+ return next;
 }
 function advanceBall(state:MatchState):MatchState {
  if(state.ball.ownerId)return state;
