@@ -73,7 +73,7 @@ export function applyRestart(state: MatchState, event: MatchEvent): MatchState {
 
 const RESTART_KICK_SPEED = 8;
 
-function restartDirection(state: MatchState, side: TeamSide): Vec2 {
+function restartDirection(side: TeamSide): Vec2 {
   return {
     x: side === 'HOME' ? 1 : -1,
     y: 0,
@@ -92,7 +92,7 @@ function restartDirection(state: MatchState, side: TeamSide): Vec2 {
 export function playRestart(state: MatchState): MatchState {
   if (state.restart === null) return state;
 
-  const direction = restartDirection(state, state.restart.side);
+  const direction = restartDirection(state.restart.side);
 
   return {
     ...state,
