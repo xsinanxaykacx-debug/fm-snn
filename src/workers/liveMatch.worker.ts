@@ -74,12 +74,12 @@ function buildLineup(
 }
 
 function eventToMatchEvent(
-  event: MatchState['events'][number],
+  event: FootballEvent,
   state: MatchState,
 ): MatchResultEvent {
   const minute = Math.floor(state.clockSeconds / 60);
   const team = event.teamId === 'HOME' ? 'home' : event.teamId === 'AWAY' ? 'away' : undefined;
-  const typeMap: Record<string, MatchResultEvent['type']> = { half_time:'halftime', full_time:'fulltime', penalty_goal:'goal', shot_on_target:'shot', shot_off_target:'miss', blocked_shot:'blocked_shot', own_goal:'goal' };
+  const typeMap: Record<string, MatchResultEvent['type']> = { half_time:'halftime', full_time:'fulltime', penalty_goal:'goal', own_goal:'goal', shot_on_target:'shot', shot_off_target:'miss', blocked_shot:'blocked_shot', key_pass:'pass', assist:'pass', tackle:'dribble', intercept:'dribble' };
   const mapped = typeMap[event.type] ?? event.type;
 
   if (event.type === 'goal' || event.type === 'own_goal' || event.type === 'penalty_goal') {
@@ -105,7 +105,7 @@ function toTemporaryMatchResult(
     awayId,
     homeScore: state.score.home,
     awayScore: state.score.away,
-    events: state.events.map((event) => eventToMatchEvent(event, state)),
+    events: (state.football?.events ?? []).map((event) => eventToMatchEvent(event, state)),
     stats: (() => { const s=finalizeStats(state.football!); return { possession:s.possession, shots:s.shots, onTarget:s.onTarget, chances:s.shots, xG:s.xG, passes:s.passes, passesCompleted:{home:state.football!.teamStats.HOME.successfulPasses,away:state.football!.teamStats.AWAY.successfulPasses}, fouls:s.fouls, corners:s.corners, throwIns:{home:state.football!.teamStats.HOME.throwIns,away:state.football!.teamStats.AWAY.throwIns}, goalKicks:{home:state.football!.teamStats.HOME.goalKicks,away:state.football!.teamStats.AWAY.goalKicks}, offsides:s.offsides }; })(),
     played: true,
     engine: 'live-v2',
