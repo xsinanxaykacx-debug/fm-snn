@@ -19,12 +19,22 @@ function bestTeammate(state:MatchState,playerId:string,side:'HOME'|'AWAY'):strin
       return scoreA-scoreB || a.id.localeCompare(b.id);
     })[0]?.id;
 }
+function nearestDefender(state:MatchState,playerId:string,side:'HOME'|'AWAY'):string|undefined {
+  const p=state.players[playerId]; if(!p)return undefined;
+  return sortedPlayers(state,side)
+    .filter(x=>x.id!==playerId && ['DR','DL','WBR','WBL','DC','DMC'].includes(x.role??''))
+    .sort((a,b)=>distance(a.position,p.position)-distance(b.position,p.position)||a.id.localeCompare(b.id))[0]?.id
+    ?? bestTeammate(state,playerId,side);
+}
 export function chooseFootballAction(state:MatchState,playerId:string,tactics:Tactics,random:number):FootballDecision {
   const p=state.players[playerId]; if(!p)throw new Error('live-v2 football: unknown player');
   const nearGoal=Math.abs(goalX(p.team,state.pitch)-p.position.x)<22;
   const role=p.role as Role|undefined;
   const pressure=Object.values(state.players).filter(x=>x.team!==p.team&&x.onPitch!==false)
     .map(x=>distance(x.position,p.position)).sort((a,b)=>a-b)[0]??99;
+  if(role==='GK'){
+    return {action:'PASS',playerId,targetId:nearestDefender(state,playerId,p.team)};
+  }
   const passBias=tactics.directness==='short'?0.38:tactics.directness==='direct'?0.18:0.30;
   const shootBias=nearGoal && ['ST','GF','KFL','KFR','AMC','AML','AMR'].includes(role??'') ? 0.42 : nearGoal ? 0.22 : 0;
   if(nearGoal && random<shootBias)return {action:'SHOOT',playerId};
