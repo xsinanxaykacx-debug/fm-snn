@@ -12,7 +12,6 @@ export function resolvePenalty(state:MatchState,side:TeamSide):MatchState{
  if(!takerId)return {...state,football:{...state.football!,pendingPenalty:null}};
  const taker=state.players[takerId]; const gk=Object.values(state.players).filter(p=>p.team!==side&&p.role==='GK'&&p.onPitch!==false).sort((a,b)=>a.id.localeCompare(b.id))[0];
  let next={...state,ball:{...state.ball,position:{...spot,z:0},ownerId:null,velocity:{x:0,y:0,z:0}},football:{...state.football!,pendingPenalty:null}};
- next={...next,football:{...next.football!,events:[...next.football!.events,{id:next.tick+'-'+next.football!.events.length,type:'penalty',minute:Math.floor(next.clockSeconds/60),tick:next.tick,playerId:takerId,teamId:side,position:spot,description:'penalty'}]}};
  const [roll,seed]=nextRandom(next.seed); next={...next,seed};
  const save=gk?goalkeeperSaveChance(gk,11,1):0.38;
  const goalChance=clamp(0.76+((taker.attributes?.finishing??60)-60)/500,0.55,0.9);

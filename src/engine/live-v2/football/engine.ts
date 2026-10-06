@@ -196,7 +196,7 @@ export function runFootballTick(state:MatchState):MatchState {
   return {...next,phase:'halftime',clockSeconds:2700,tick:2700};
  }
  if(next.phase==='halftime'){ next={...next,phase:'second_half'}; }
- if(next.football!.pendingPenalty){ return resolvePenalty({...next,football:{...next.football!,pendingPenalty:null}},next.football!.pendingPenalty.side); }
+ if(next.football!.pendingPenalty){ next=resolvePenalty({...next,football:{...next.football!,pendingPenalty:null}},next.football!.pendingPenalty.side); }
  const owner=next.ball.ownerId?next.players[next.ball.ownerId]:undefined;
  if(owner&&owner.onPitch!==false)next=resolveOwnerAction(next,owner);
  else {next=advanceBall(next);next=applyPossession(next);}
