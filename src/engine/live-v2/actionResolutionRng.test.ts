@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveActions } from './actionResolution';
+import { nextRandom } from './rng';
 import type { DecisionResult } from './decision';
 import type { MatchState } from './state';
 
