@@ -5,9 +5,12 @@ on:
     branches:
       - main
       - "fix/**"
+      - live-v2-foundation
   pull_request:
     branches:
       - main
+      - live-v2-foundation
+  workflow_dispatch:
 
 jobs:
   validate:

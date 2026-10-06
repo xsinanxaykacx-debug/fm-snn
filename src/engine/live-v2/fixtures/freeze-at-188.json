@@ -1,5 +1,5 @@
 {
-  "seed": 123456,
+  "seed": { "seed": 123456 },
   "clockSeconds": 188,
   "tick": 188,
   "phase": "first_half",

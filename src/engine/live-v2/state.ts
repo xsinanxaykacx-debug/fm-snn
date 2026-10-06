@@ -7,6 +7,7 @@
  */
 
 import type { DecisionAction } from './decision';
+import type { RngState } from './rng';
 
 export type TeamSide = 'HOME' | 'AWAY';
 
@@ -143,8 +144,8 @@ export type MatchDiagnostics = {
 };
 
 export type MatchState = {
-  /** Optional deterministic seed reserved for the decision/RNG layer. */
-  seed?: number;
+  /** Deterministic RNG state carried through every match tick. */
+  seed: RngState;
 
   /** Match clock in simulation seconds. */
   clockSeconds: number;

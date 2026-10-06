@@ -127,6 +127,8 @@ export function runTick(state: MatchState): MatchState {
 
   return {
     ...next,
+    // Carry the RNG state after both decision and action-resolution consumption.
+    seed: withActions.seed,
     clockSeconds: nextClock,
     tick: next.tick + 1,
     phase: nextPhase,
